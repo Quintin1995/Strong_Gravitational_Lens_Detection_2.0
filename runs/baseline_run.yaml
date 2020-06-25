@@ -1,0 +1,52 @@
+# settings.yaml file
+# This file contains all settings for a model to run.
+
+
+
+
+
+# READ!!!!!
+# THIS YAML IS THE BASELINE YAML, please do not change anything in this file. If you want to train a model and change its parameters, then please copy run.yaml and call it something like run1.yaml. Then call run1.yaml in the code. This can be changed easily in cnn.py.
+
+
+
+
+
+
+
+
+
+model_name: first_model     # string
+num_chunks: 2000            # int
+chunk_size: 1280            # int
+batch_size: 64              # int
+num_batch_augm: 20          # int
+img_rows: 101               # int
+img_cols: 101               # int
+root_dir_models: models     # string
+
+#other parameters
+nbands: 1                   # number of color channels you want to use.
+normalize: True             # boolean - Normalize the images to max of 255 (valid for single-band only)
+augm_pred: True             # boolean
+learning_rate: 0.0001       # float
+resize: False               # float
+
+#more parameters
+range_min: 0.02             # float
+range_max: 0.30             # float
+
+#more parameters
+buffer_size: 10             # int
+avg_img: 0                  # int
+
+#default augmentation parameters
+zoom_range_min: 0.90909090909   # float     (this value here is: 1.0/1.1)
+zoom_range_max: 1.0             # float
+rotation_range_min: 0           # int
+rotation_range_max: 180         # int range = [0; 360]
+shear_range_min: 0              # int
+shear_range_max: 0              # int
+translation_range_min: -4       # int - can be negative - should be negative :) - like "-4"
+translation_range_max: 4        # int - preferably positive absolute(translation_range_min) - like 4
+do_flip: True                   # boolean (True or False)

@@ -5,90 +5,43 @@ from utils import *
 import random
 import matplotlib.pyplot as plt
 from Network import *
+from Parameters import *
+from Parameters import Parameters
+
+###### Step 0.1: Load all settings from .yaml file
+settings_yaml = load_settings_yaml("runs/run.yaml")
+params = Parameters(settings_yaml)
+params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
 
-## Most, if not all of these 'hyper'-paramters should be read from a run.yaml file,
-## which in turn creates a paramter class with all parameters as object properties.
-
-##### Paths to data
-lenses_path    = "data/training/lenses/"
-negatives_path = "data/training/negatives/"
-sources_path   = "data/training/sources/"
-
-# Data type of images in the numpy array
-data_type      = np.float32
-
-# Image dimensionality
-img_dims = (101,101,1)
-
-# Whether to normalize (normalize per data array and not per image) the data during the image loading process.
-normalize = "per_image"        #options = {"None", "per_image", "per_array"}
-
-# Determines the splitting point of the data. Splitting percentage between test and train data.
-test_fraction  = 0.2             # 0.2 means that 20% of the data will be reserved for test data.
-
-# Alpha scaling, randomly drawn from this uniform distribution. Because the lensing features usually are of a lower luminosity than the LRG. Source scaling factor.
-mock_lens_alpha_scaling = (0.02, 0.30)
-
-# Whether you want to see plots and extra print output
-verbatim = False
-
-# Augmenation Parameters:
-aug_zoom_range = (1.0,1.05)          # This range will be sampled from uniformly.
-aug_num_pixels_shift_allowed = 4     # In Pixels
-aug_rotation_range     = 360         # In Degrees
-aug_do_horizontal_flip = True        # 50% of the time do a horizontal flip)  
-aug_default_fill_mode  = 'nearest'   # Interpolation method, for data augmentation.
-aug_width_shift_range  = aug_num_pixels_shift_allowed/img_dims[0]    # Fraction of width as allowed shift
-aug_height_shift_range = aug_num_pixels_shift_allowed/img_dims[1]    # Fraction of height as allowed shift
-
-# Network Paramters
-net_name          = "resnet18"
-net_learning_rate = 0.0001
-net_model_metrics = "binary_accuracy"
-net_num_outputs   = 1
-net_epochs        = 1
-net_batch_size    = 64
-
-# Loading the input data
-fraction_to_load_lenses    = 1.00    #range = [0,1]
-fraction_to_load_negatives = 1.00    #range = [0,1]
-fraction_to_load_sources   = 0.02     #range = [0,1]
-
-# Chunk Paramters
-num_chunks = 10    # Number of chunks to be generated 
-chunksize  = 1280   # The number of images that will fit into one chunk
-######### END PARAMS #########
-
-
-###### Step 0.0: Create Directories used throughout the project
+###### Step 0.2: Create Directories used throughout the project
 create_dir_if_not_exists("models")
 create_dir_if_not_exists("runs")
 create_dir_if_not_exists("slurms")
 
 
 ###### Step 1.0: Create and store normalized data arrays.
-lenses_array    = get_data_array(img_dims, path=lenses_path, fraction_to_load=fraction_to_load_lenses, are_sources=False, normalize=normalize)
-negatives_array = get_data_array(img_dims, path=negatives_path, fraction_to_load=fraction_to_load_negatives, are_sources=False, normalize=normalize)
-sources_array   = get_data_array(img_dims, path=sources_path, fraction_to_load=fraction_to_load_sources, are_sources=True, normalize=normalize)
+lenses_array    = get_data_array(params.img_dims, path=params.lenses_path, fraction_to_load=params.fraction_to_load_lenses, are_sources=False, normalize=normalize)
+negatives_array = get_data_array(params.img_dims, path=params.negatives_path, fraction_to_load=params.fraction_to_load_negatives, are_sources=False, normalize=normalize)
+sources_array   = get_data_array(params.img_dims, path=params.sources_path, fraction_to_load=params.fraction_to_load_sources, are_sources=True, normalize=normalize)
 
 
 ###### Step 1.1: show some of the stored images from the data array to the user.
-if verbatim:
+if params.verbatim:
     show_random_img_plt_and_stats(lenses_array,    num_imgs=1, title="lenses")
     show_random_img_plt_and_stats(negatives_array, num_imgs=1, title="negatives")
     show_random_img_plt_and_stats(sources_array,   num_imgs=1, title="sources")
 
 
 ###### Step 2: Split the data into train and test data.
-X_train_lenses, X_test_lenses, y_train_lenses, y_test_lenses             = split_train_test_data(lenses_array, 0.0, test_fraction=test_fraction)
-X_train_negatives, X_test_negatives, y_train_negatives, y_test_negatives = split_train_test_data(negatives_array, 0.0, test_fraction=test_fraction)
-X_train_sources, X_test_sources, _, _                                    = split_train_test_data(sources_array, "no_label",  test_fraction=test_fraction)
+X_train_lenses, X_test_lenses, y_train_lenses, y_test_lenses             = split_train_test_data(lenses_array, 0.0, test_fraction=params.test_fraction)
+X_train_negatives, X_test_negatives, y_train_negatives, y_test_negatives = split_train_test_data(negatives_array, 0.0, test_fraction=params.test_fraction)
+X_train_sources, X_test_sources, _, _                                    = split_train_test_data(sources_array, "no_label",  test_fraction=params.test_fraction)
 
 
 ###### Step 4.0 - Load a Training Chunk of data - This includes the merging of lenses with sources (creation of mock lenses).
-X_train_chunk, y_train_chunk = load_chunk(chunksize, X_train_lenses, X_train_negatives, X_train_sources, data_type, mock_lens_alpha_scaling)
-X_test_chunk, y_test_chunk   = load_chunk(chunksize, X_test_lenses, X_test_negatives, X_test_sources, data_type, mock_lens_alpha_scaling)
+X_train_chunk, y_train_chunk = load_chunk(params.chunksize, X_train_lenses, X_train_negatives, X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
+X_test_chunk, y_test_chunk   = load_chunk(params.chunksize, X_test_lenses, X_test_negatives, X_test_sources, params.data_type, params.mock_lens_alpha_scaling)
 
 
 ###### Step 4.1 - Sanity check of the train and test chunk
@@ -107,23 +60,22 @@ if False:
 
 ###### Step 5.0 - Data Augmentation - Data Generator Keras
 datagen = ImageDataGenerator(
-        rotation_range=aug_rotation_range,
-        width_shift_range=aug_width_shift_range,
-        height_shift_range=aug_height_shift_range,
-        zoom_range=aug_zoom_range,
-        horizontal_flip=aug_do_horizontal_flip,
-        fill_mode=aug_default_fill_mode,
+        rotation_range=params.aug_rotation_range,
+        width_shift_range=params.aug_width_shift_range,
+        height_shift_range=params.aug_height_shift_range,
+        zoom_range=params.aug_zoom_range,
+        horizontal_flip=params.aug_do_horizontal_flip,
+        fill_mode=params.aug_default_fill_mode,
         )
 
 ###### Step 6.0 - Create Neural Network - Resnet18
-resnet18   = Network(net_name, net_learning_rate, net_model_metrics, img_dims, net_num_outputs)
+resnet18   = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs)
 
 
 ###### Step 7.0 - Training
-# datagen.fit(X_train_chunk)
-for chunk_idx in range(num_chunks):
-    X_train_chunk, y_train_chunk = load_chunk(chunksize, X_train_lenses, X_train_negatives, X_train_sources, data_type, mock_lens_alpha_scaling)
+for chunk_idx in range(params.num_chunks):
+    X_train_chunk, y_train_chunk = load_chunk(params.chunksize, X_train_lenses, X_train_negatives, X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
     start_time = time.time()
-    resnet18.model.fit_generator(datagen.flow(X_train_chunk, y_train_chunk, batch_size=net_batch_size),
-                        steps_per_epoch=len(X_train_chunk) / net_batch_size, epochs=net_epochs)
+    resnet18.model.fit_generator(datagen.flow(X_train_chunk, y_train_chunk, batch_size=params.net_batch_size),
+                        steps_per_epoch=len(X_train_chunk) / params.net_batch_size, epochs=params.net_epochs)
     print("Training on chunk took: {}".format(hms(time.time() - start_time)))

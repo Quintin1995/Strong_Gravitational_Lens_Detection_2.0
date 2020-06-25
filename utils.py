@@ -1,7 +1,9 @@
 import random
 import numpy as np
-import matplotlib.pyplot as plt
 import os
+from datetime import datetime
+import matplotlib.pyplot as plt
+import yaml
 
 
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
@@ -46,6 +48,7 @@ def show1Img(img, img_title):
     plt.title(img_title)
     plt.show()
 
+
 # Convert seconds to a nice string with hours, minutes and seconds.
 def hms(seconds):
     seconds = np.floor(seconds)
@@ -61,4 +64,22 @@ def create_dir_if_not_exists(dirName):
         os.makedirs(dirName)    
         print("Directory " , dirName ,  " Created ")
     except FileExistsError:
-        print("Directory " , dirName ,  " already exists")  
+        print("Directory " , dirName ,  " already exists")
+
+
+# Load all settings from a yaml file and stores it in a settings dictionary.
+def load_settings_yaml(yaml_run_path):
+    #opens run.yaml and load all the settings into a dictionary.
+    with open(yaml_run_path) as file:
+        settings = yaml.load(file)
+        print("\nSettings: {}".format(yaml_run_path), flush=True)
+        for i in settings:
+            print(str(i) + ": " + str(settings[i]), flush=True)
+        print("\nAll settings loaded.\n\n", flush=True)
+        return settings
+
+
+# Returns a nicely formatted time string
+def get_time_string():
+    now = datetime.now()
+    return now.strftime("%m_%d_%Y_%Hh_%Mm_%Ss")
