@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
@@ -52,3 +53,12 @@ def hms(seconds):
     hours, minutes = divmod(minutes, 60)
 
     return "%02d:%02d:%02d" % (hours, minutes, seconds)
+
+
+# Create target directory & all intermediate directories if don't exists
+def create_dir_if_not_exists(dirName):
+    try:
+        os.makedirs(dirName)    
+        print("Directory " , dirName ,  " Created ")
+    except FileExistsError:
+        print("Directory " , dirName ,  " already exists")  

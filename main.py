@@ -6,6 +6,7 @@ import random
 import matplotlib.pyplot as plt
 from Network import *
 
+
 ## Most, if not all of these 'hyper'-paramters should be read from a run.yaml file,
 ## which in turn creates a paramter class with all parameters as object properties.
 
@@ -57,8 +58,10 @@ fraction_to_load_sources   = 0.02     #range = [0,1]
 # Chunk Paramters
 num_chunks = 10    # Number of chunks to be generated 
 chunksize  = 1280   # The number of images that will fit into one chunk
-
 ######### END PARAMS #########
+
+create_dir_if_not_exists("models")
+create_dir_if_not_exists("runs")
 
 
 
