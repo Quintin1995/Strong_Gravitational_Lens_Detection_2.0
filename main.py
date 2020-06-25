@@ -60,9 +60,11 @@ num_chunks = 10    # Number of chunks to be generated
 chunksize  = 1280   # The number of images that will fit into one chunk
 ######### END PARAMS #########
 
+
+###### Step 0.0: Create Directories used throughout the project
 create_dir_if_not_exists("models")
 create_dir_if_not_exists("runs")
-
+create_dir_if_not_exists("slurms")
 
 
 ###### Step 1.0: Create and store normalized data arrays.
