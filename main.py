@@ -58,43 +58,93 @@ if False:
         show2Imgs(pos_img, neg_img, "pos max pixel: {0:.3f}".format(np.amax(pos_img)), "neg max pixel: {0:.3f}".format(np.amax(neg_img)))
 
 
-###### Step 5.0 - Data Augmentation - Data Generator Keras
-datagen = ImageDataGenerator(
+###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
+train_generator = ImageDataGenerator(
         rotation_range=params.aug_rotation_range,
         width_shift_range=params.aug_width_shift_range,
         height_shift_range=params.aug_height_shift_range,
         zoom_range=params.aug_zoom_range,
         horizontal_flip=params.aug_do_horizontal_flip,
-        fill_mode=params.aug_default_fill_mode,
+        fill_mode=params.aug_default_fill_mode
         )
+
+
+###### Step 5.1 - Data Augmentation - Data Generator Keras - Validation Generator is based on test data for now
+validation_generator = ImageDataGenerator(
+        # rotation_range=params.aug_rotation_range,
+        # width_shift_range=params.aug_width_shift_range,
+        # height_shift_range=params.aug_height_shift_range,
+        # zoom_range=params.aug_zoom_range,
+        horizontal_flip=params.aug_do_horizontal_flip,
+        fill_mode=params.aug_default_fill_mode
+        )
+
 
 ###### Step 6.0 - Create Neural Network - Resnet18
 resnet18   = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs)
 
 
 ###### Step 7.0 - Training
-begin_train_session = time.time()
+loss_per_chunk = []                #store loss of the model
+bin_acc_per_chunk = []              #store binary accuracy of the model
+begin_train_session = time.time()   #records beginning of training time
 try:
     for chunk_idx in range(params.num_chunks):
-        X_train_chunk, y_train_chunk = load_chunk(params.chunksize, X_train_lenses, X_train_negatives, X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
-        start_time = time.time()
         print("chunk {}/{}".format(chunk_idx+1, params.num_chunks))
-        resnet18.model.fit_generator(datagen.flow(X_train_chunk, y_train_chunk, batch_size=params.net_batch_size),
-                            steps_per_epoch=len(X_train_chunk) / params.net_batch_size, epochs=params.net_epochs)
-        print("Training on chunk took: {}".format(hms(time.time() - start_time)))
 
+        # Load chunk
+        X_train_chunk, y_train_chunk = load_chunk(params.chunksize, X_train_lenses, X_train_negatives, X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
+        
+        # Fit model on data with a keras image data generator
+        network_fit_time_start = time.time()     # Records liter
+        # history = resnet18.model.fit_generator(train_generator.flow(    X_train_chunk,
+        #                                                                 y_train_chunk,
+        #                                                                 batch_size=params.net_batch_size),
+        #                                                                 steps_per_epoch=len(X_train_chunk) / params.net_batch_size,
+        #                                                                 epochs=params.net_epochs)
+        train_generator = train_generator.flow(
+            X_train_chunk,
+            y_train_chunk,
+            batch_size=params.net_batch_size)
+
+        validation_generator = validation_generator.flow(
+            X_test_chunk,
+            y_test_chunk,
+            batch_size=params.net_batch_size)
+
+        history = resnet18.model.fit(
+                train_generator,
+                steps_per_epoch=len(X_train_chunk) / params.net_batch_size,
+                epochs=params.net_epochs,
+                validation_data=validation_generator,
+                validation_steps=params.validation_steps)
+        
+        print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)))
+
+        # Save Model params to .h5 file
         if chunk_idx % params.chunk_save_interval == 0:
             resnet18.model.save_weights(params.full_path_of_weights)
+
+        # Store loss and accuracy in list
+        loss_per_chunk.append(history.history["loss"][0])
+        bin_acc_per_chunk.append(history.history["binary_accuracy"][0])
+
+        # Plot loss and accuracy on interval
+        if chunk_idx % params.chunk_plot_interval == 0:
+            save_loss_and_acc_figure(loss_per_chunk, bin_acc_per_chunk, params)
+        
+        # Plot history of the model and save to a .png file
+        plot_history(history)
 
 except KeyboardInterrupt:
     resnet18.model.save_weights(params.full_path_of_weights)
     print("Interrupted by KEYBOARD!", flush=True)
     print("saved weights to: {}".format(params.full_path_of_weights), flush=True)
 
-end_time = time.time()
+end_train_session = time.time()
 
+# Safe Model parameters to .h5 file after training.
 resnet18.model.save_weights(params.full_path_of_weights)
 print("\nSaved weights to: {}".format(params.full_path_of_weights), flush=True)
 print("\nSaved results to: {}".format(params.full_path_of_history), flush=True)
-final_time = end_time - begin_train_session
-print("\nTotal time employed ", hms(final_time), flush=True)
+print("\nTotal time employed ",hms(end_train_session - begin_train_session), flush=True)

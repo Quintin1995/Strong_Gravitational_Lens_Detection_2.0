@@ -60,18 +60,18 @@ class Parameters(object):
         # Path to weights file for prediction (the referenced file should be a .h5 file that is trained)
         # self.full_path_predict_weights = os.path.join(settings["path_trained_folder"], settings["filename_trained_weights"])
 
-        #path stuff
+        # Path stuff
         self.root_dir_models        = settings["root_dir_models"]
         self.model_folder           = get_time_string()     #A model will be stored in a folder with just a date&time as folder name
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
         self.make_model_dir()       #create directory for all data concerning this model.
         
-        #weights .h5 file
+        # Weights .h5 file
         self.weights_extension      = ".h5"                 #Extension for saving weights
         self.filename_weights       = self.model_name + "_weights_only" + self.weights_extension
         self.full_path_of_weights   = os.path.join(self.model_path, self.filename_weights)
 
-        #csv logger file to store the callback of the .fit function. It stores the history of the training session.
+        # Csv logger file to store the callback of the .fit function. It stores the history of the training session.
         self.history_extension      = ".csv"                 #Extension for history callback
         self.filename_history       = self.model_name + "_history" + self.history_extension
         self.full_path_of_history   = os.path.join(self.model_path, self.filename_history)
@@ -81,14 +81,17 @@ class Parameters(object):
         self.filename_figure       = self.model_name + "_results" + self.figure_extension
         self.full_path_of_figure   = os.path.join(self.model_path, self.filename_figure)
 
-        #output path of .json       dumps all parameters into a json file
+        # Output path of .json       dumps all parameters into a json file
         self.param_dump_extension  = ".json"                #Extension for the paramters being written to a file
         self.filename_param_dump   = self.model_name + "_param_dump" + self.param_dump_extension
         self.full_path_param_dump  = os.path.join(self.model_path, self.filename_param_dump)
 
-        # plot parameters
+        # Plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
+
+        # Validation_steps - Number of validation images that will be tested during training. (per chunk)
+        self.validation_steps      = settings["validation_steps"]
 
         #store all parameters of this object into a json file
         self.write_parameters_to_file()
