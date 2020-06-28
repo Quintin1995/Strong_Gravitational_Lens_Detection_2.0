@@ -21,9 +21,9 @@ create_dir_if_not_exists("slurms")
 
 
 ###### Step 1.0: Create and store normalized data arrays.
-lenses_array    = get_data_array(params.img_dims, path=params.lenses_path, fraction_to_load=params.fraction_to_load_lenses, are_sources=False, normalize=normalize)
-negatives_array = get_data_array(params.img_dims, path=params.negatives_path, fraction_to_load=params.fraction_to_load_negatives, are_sources=False, normalize=normalize)
-sources_array   = get_data_array(params.img_dims, path=params.sources_path, fraction_to_load=params.fraction_to_load_sources, are_sources=True, normalize=normalize)
+lenses_array    = get_data_array(params.img_dims, path=params.lenses_path, fraction_to_load=params.fraction_to_load_lenses, are_sources=False, normalize_dat=params.normalize)
+negatives_array = get_data_array(params.img_dims, path=params.negatives_path, fraction_to_load=params.fraction_to_load_negatives, are_sources=False, normalize_dat=params.normalize)
+sources_array   = get_data_array(params.img_dims, path=params.sources_path, fraction_to_load=params.fraction_to_load_sources, are_sources=True, normalize_dat=params.normalize)
 
 
 ###### Step 1.1: show some of the stored images from the data array to the user.
@@ -73,9 +73,28 @@ resnet18   = Network(params.net_name, params.net_learning_rate, params.net_model
 
 
 ###### Step 7.0 - Training
-for chunk_idx in range(params.num_chunks):
-    X_train_chunk, y_train_chunk = load_chunk(params.chunksize, X_train_lenses, X_train_negatives, X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
-    start_time = time.time()
-    resnet18.model.fit_generator(datagen.flow(X_train_chunk, y_train_chunk, batch_size=params.net_batch_size),
-                        steps_per_epoch=len(X_train_chunk) / params.net_batch_size, epochs=params.net_epochs)
-    print("Training on chunk took: {}".format(hms(time.time() - start_time)))
+begin_train_session = time.time()
+try:
+    for chunk_idx in range(params.num_chunks):
+        X_train_chunk, y_train_chunk = load_chunk(params.chunksize, X_train_lenses, X_train_negatives, X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
+        start_time = time.time()
+        print("chunk {}/{}".format(chunk_idx+1, params.num_chunks))
+        resnet18.model.fit_generator(datagen.flow(X_train_chunk, y_train_chunk, batch_size=params.net_batch_size),
+                            steps_per_epoch=len(X_train_chunk) / params.net_batch_size, epochs=params.net_epochs)
+        print("Training on chunk took: {}".format(hms(time.time() - start_time)))
+
+        if chunk_idx % params.chunk_save_interval == 0:
+            resnet18.model.save_weights(params.full_path_of_weights)
+
+except KeyboardInterrupt:
+    resnet18.model.save_weights(params.full_path_of_weights)
+    print("Interrupted by KEYBOARD!", flush=True)
+    print("saved weights to: {}".format(params.full_path_of_weights), flush=True)
+
+end_time = time.time()
+
+resnet18.model.save_weights(params.full_path_of_weights)
+print("\nSaved weights to: {}".format(params.full_path_of_weights), flush=True)
+print("\nSaved results to: {}".format(params.full_path_of_history), flush=True)
+final_time = end_time - begin_train_session
+print("\nTotal time employed ", hms(final_time), flush=True)

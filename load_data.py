@@ -46,7 +46,7 @@ Ri = 1.71
 
 
 # returns a numpy array with lens images from disk
-def get_data_array(img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize = True):
+def get_data_array(img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
     start_time = time.time()
     
     data_paths = []
@@ -77,16 +77,16 @@ def get_data_array(img_dims, path, fraction_to_load = 1.0, data_type = np.float3
         if are_sources:
             img = fits.getdata(filename).astype(data_type)
             img = np.expand_dims(scipy.signal.fftconvolve(img, PSF_r, mode="same"), axis=2)
-            if normalize == "per_image":
+            if normalize_dat == "per_image":
                 img = normalize_img(img)
             data_array[idx] = img
         else:
             img = np.expand_dims(fits.getdata(filename), axis=2).astype(data_type)
-            if normalize == "per_image":
+            if normalize_dat == "per_image":
                 img = normalize_img(img)
             data_array[idx] = img
     
-    if normalize == "per_array":
+    if normalize_dat == "per_array":
         return normalize_data_array(data_array)
 
     print("max array  = {}".format(np.amax(data_array)))

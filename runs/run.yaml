@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "resnet18_model"    #string
+model_name: "resnet18_model"    # String
 root_dir_models: models         # string
 
 ##### Paths to data
@@ -29,7 +29,7 @@ mock_lens_alpha_scaling_min: 0.02     #float
 mock_lens_alpha_scaling_max: 0.30     #float
 
 # Whether you want to see plots and extra print output
-verbatim: False
+verbatim: True
 
 # Augmenation Parameters:
 aug_zoom_range_min: 1.0             #float# This range will be sampled from uniformly.
@@ -48,13 +48,14 @@ net_epochs       : 1                 #int# How many epochs are done. Set to 1, b
 net_batch_size   : 32                #int#
 
 # Loading the input data
-fraction_to_load_lenses   : 1.00     #float# range= [0,1]
-fraction_to_load_negatives: 1.00     #float# range = [0,1]
+fraction_to_load_lenses   : 0.25     #float# range= [0,1]
+fraction_to_load_negatives: 0.25     #float# range = [0,1]
 fraction_to_load_sources  : 0.02     #float# range = [0,1]
 
 # Chunk Parameters
-num_chunks: 10                       #int # Number of chunks to be generated 
+num_chunks: 2                       #int # Number of chunks to be generated 
 chunksize : 640                     #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
-chunk_plot_interval: 5               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_plot_interval: 1               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_save_interval: 1               #int # After this amount of chunks the model will be saved.

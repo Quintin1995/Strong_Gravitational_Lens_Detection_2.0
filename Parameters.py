@@ -88,6 +88,7 @@ class Parameters(object):
 
         # plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
+        self.chunk_save_interval   = settings["chunk_save_interval"]
 
         #store all parameters of this object into a json file
         self.write_parameters_to_file()
