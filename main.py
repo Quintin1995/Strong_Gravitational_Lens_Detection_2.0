@@ -102,28 +102,34 @@ try:
         #                                                                 batch_size=params.net_batch_size),
         #                                                                 steps_per_epoch=len(X_train_chunk) / params.net_batch_size,
         #                                                                 epochs=params.net_epochs)
-        train_generator = train_generator.flow(
+        
+                
+
+        train_generator_flowed = train_generator.flow(
             X_train_chunk,
             y_train_chunk,
             batch_size=params.net_batch_size)
 
-        validation_generator = validation_generator.flow(
+        validation_generator_flowed = validation_generator.flow(
             X_test_chunk,
             y_test_chunk,
             batch_size=params.net_batch_size)
 
-        history = resnet18.model.fit(
-                train_generator,
+        history = resnet18.model.fit_generator(
+                train_generator_flowed,
                 steps_per_epoch=len(X_train_chunk) / params.net_batch_size,
                 epochs=params.net_epochs,
-                validation_data=validation_generator,
+                validation_data=validation_generator_flowed,
                 validation_steps=params.validation_steps)
+
+        # history = resnet18.model.fit_generator(generator=train_generator, validation_generator=validation_generator, use_multiprocessing=True, workers=6)
         
         print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)))
 
         # Save Model params to .h5 file
         if chunk_idx % params.chunk_save_interval == 0:
             resnet18.model.save_weights(params.full_path_of_weights)
+            print("Saved model weights to: {}".format(params.full_path_of_weights))
 
         # Store loss and accuracy in list
         loss_per_chunk.append(history.history["loss"][0])

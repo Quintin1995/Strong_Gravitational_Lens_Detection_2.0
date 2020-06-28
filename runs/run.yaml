@@ -57,8 +57,8 @@ num_chunks: 30                       #int # Number of chunks to be generated
 chunksize : 320                     #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
-chunk_plot_interval: 1               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_plot_interval: 5               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
 chunk_save_interval: 5               #int # After this amount of chunks the model will be saved.
 
 # Validation Params
-validation_steps: 250                # Amount of Validation steps to be performed during training of the model.
+validation_steps: 25                # Amount of Validation steps to be performed during training of the model.
