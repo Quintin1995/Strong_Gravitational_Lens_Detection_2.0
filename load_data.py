@@ -46,7 +46,7 @@ Ri = 1.71
 
 
 # returns a numpy array with lens images from disk
-def get_data_array(img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize = True):
+def get_data_array(img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize = "per_image"):
     start_time = time.time()
     
     data_paths = []
