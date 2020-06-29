@@ -36,6 +36,7 @@ for ii in range(nx_):  # iterating over input array
     for jj in range(ny_):
         PSF_r[ii + dx][jj + dy] = d1[ii][jj]
 
+
 seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
 
 Rg = 3.30
