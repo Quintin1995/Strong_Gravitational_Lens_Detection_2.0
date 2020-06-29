@@ -87,21 +87,25 @@ def test_split_train_test_data(dg, lenses):
 
 def test_it_loads_a_chunk_of_size_N(dg, lenses):
     N = 2
-    chunk = dg.load_chunk(N, lenses, lenses, lenses, np.float32, (0.02, 0.3))
-    assert np.shape(chunk)[0] == N
-    max_val, min_val = (np.amax(chunk), np.amin(chunk))
+    X_chunk, y_chunk = dg.load_chunk(N, lenses, lenses, lenses, np.float32, (0.02, 0.3))
+    assert np.shape(X_chunk)[0] == N
+    min_val = np.amin(X_chunk)
+    max_val = np.amax(X_chunk)
     assert max_val == 1.0
     assert min_val == 0.0
 
-def test_it_merges_lenses_and_sources_correctly(dg):
-    raise "not implemented"
+# def test_it_merges_lenses_and_sources_correctly(dg):
+#     raise "not implemented"
 
-def test_merge_lense_and_source(dg):
+def test_merge_lens_and_source(dg):
     # Merge a single lens and source together into a mock lens.
 
     lens = dg.normalize_img(np.expand_dims(fits.getdata("data/training/lenses/KIDS_216.0_1.5_ra_215.885864819_dec_1.37332389553__OCAM_r_.fits"), axis=2).astype(np.float32))
-    source = fits.getdata("data/training/sources/1/1.fits").astype(data_type)
-    source = dg.normalize_img(np.expand_dims(scipy.signal.fftconvolve(source, PSF_r, mode="same"), axis=2))
+    source = fits.getdata("data/training/sources/1/1.fits").astype(np.float32)
+    source = dg.normalize_img(np.expand_dims(scipy.signal.fftconvolve(source, dg.PSF_r, mode="same"), axis=2))
     mock_lens_alpha_scaling = (0.1, 0.1)
     
     mock_lens = dg.merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
+    with open('mock_lens', 'rb') as f:
+        expected_lens = np.load(f)
+    assert np.array_equal(mock_lens, expected_lens)
