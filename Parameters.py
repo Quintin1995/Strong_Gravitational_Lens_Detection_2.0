@@ -5,6 +5,11 @@ import json
 class Parameters(object):
     def __init__(self, settings):
 
+        # Check if the following folders exists, if not create them first
+        create_dir_if_not_exists("models")
+        create_dir_if_not_exists("runs")
+        create_dir_if_not_exists("slurms")
+
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
         
@@ -112,7 +117,7 @@ class Parameters(object):
         with open(self.full_path_param_dump, 'w') as outfile:
             json_content = self.toJSON()
             outfile.write(json_content)
-            print("Wrote all run parameters to directory: {}".format(self.full_path_param_dump), flush=True)
+            print("\nWrote all run parameters to directory: {}\n".format(self.full_path_param_dump), flush=True)
 
 
     # Dump all object properties to a .json file.
