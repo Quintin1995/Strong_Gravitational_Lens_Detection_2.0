@@ -197,6 +197,25 @@ class DataGenerator:
         print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize))
 
         return X_chunk, y_chunk
+    
+        # Merge a single lens and source together into a mock lens.
+    def merge_lens_and_source(self, lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
+
+        # Add lens and source together | We rescale the brightness of the simulated source to the peak brightness of the LRG in the r-band multiplied by a factor of alpha randomly drawn from the interval [0.02,0.3]
+        mock_lens = lens + source / np.amax(source) * np.amax(lens) * np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
+
+        # Take a square root stretch to emphesize lower luminosity features.
+        mock_lens_sqrt = np.sqrt(mock_lens)
+        
+        # Basically removes negative values - should not be necessary, because all input data should be normalized anyway. (I will leave it for now, but should be removed soon.)
+        mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
+        mock_lens = mock_lens.clip(min=0.0, max=1.0)
+
+        if show_imgs:
+            show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
+            show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
+
+        return mock_lens_sqrt
 
     # This function should read images from the lenses- and sources data array,
     # and merge them together into a lensing system, further described as 'mock lens'.

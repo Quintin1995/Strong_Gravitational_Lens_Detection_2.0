@@ -4,6 +4,8 @@ from DataGenerator import *
 from Parameters import *
 from utils import *
 import numpy as np
+import scipy
+from astropy.io import fits
 
 num_imgs = 10
 
@@ -93,3 +95,13 @@ def test_it_loads_a_chunk_of_size_N(dg, lenses):
 
 def test_it_merges_lenses_and_sources_correctly(dg):
     raise "not implemented"
+
+def test_merge_lense_and_source(dg):
+    # Merge a single lens and source together into a mock lens.
+
+    lens = dg.normalize_img(np.expand_dims(fits.getdata("data/training/lenses/KIDS_216.0_1.5_ra_215.885864819_dec_1.37332389553__OCAM_r_.fits"), axis=2).astype(np.float32))
+    source = fits.getdata("data/training/sources/1/1.fits").astype(data_type)
+    source = dg.normalize_img(np.expand_dims(scipy.signal.fftconvolve(source, PSF_r, mode="same"), axis=2))
+    mock_lens_alpha_scaling = (0.1, 0.1)
+    
+    mock_lens = dg.merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
