@@ -53,7 +53,7 @@ fraction_to_load_negatives: 0.25     #float# range = [0,1]
 fraction_to_load_sources  : 0.02     #float# range = [0,1]
 
 # Chunk Parameters
-num_chunks: 30                       #int # Number of chunks to be generated 
+num_chunks: 100                       #int # Number of chunks to be generated 
 chunksize : 320                     #int # The number of images that will fit into one chunk
 
 # Storing results parameters.

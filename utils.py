@@ -112,11 +112,7 @@ def save_loss_and_acc_figure(loss_per_chunk, bin_acc_per_chunk, params):
 
 # Define a nice plot function for the accuracy and loss over time
 # History is the object returns by a model.fit()
-def plot_history(history):
-    acc = history.history['binary_accuracy']
-    val_acc = history.history['val_binary_accuracy']
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
+def plot_history(acc, val_acc, loss, val_loss, params):
     x = range(1, len(acc) + 1)
 
     plt.figure(figsize=(12, 5))
@@ -130,3 +126,5 @@ def plot_history(history):
     plt.plot(x, val_loss, 'r', label='Validation loss')
     plt.title('Training and validation loss')
     plt.legend()
+    plt.savefig(params.full_path_of_figure)
+    print("\nsaved Loss and Accuracy figure to: {}".format(params.full_path_of_figure), flush=True)
