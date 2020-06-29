@@ -19,6 +19,8 @@ import time
 from PIL import Image
 import random
 from utils import *
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 
 class DataGenerator:
     def __init__(self, params, *args, **kwargs):
@@ -54,6 +56,27 @@ class DataGenerator:
                                             "no_label", 
                                             test_fraction=self.params.test_fraction)
         self.X_train_sources, self.X_test_sources, _, _ = splits
+
+
+        ###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
+        self.train_generator = ImageDataGenerator(
+                rotation_range=params.aug_rotation_range,
+                width_shift_range=params.aug_width_shift_range,
+                height_shift_range=params.aug_height_shift_range,
+                zoom_range=params.aug_zoom_range,
+                horizontal_flip=params.aug_do_horizontal_flip,
+                fill_mode=params.aug_default_fill_mode
+                )
+
+        ###### Step 5.1 - Data Augmentation - Data Generator Keras - Validation Generator is based on test data for now
+        self.validation_generator = ImageDataGenerator(
+                # rotation_range=params.aug_rotation_range,
+                # width_shift_range=params.aug_width_shift_range,
+                # height_shift_range=params.aug_height_shift_range,
+                # zoom_range=params.aug_zoom_range,
+                horizontal_flip=params.aug_do_horizontal_flip,
+                fill_mode=params.aug_default_fill_mode
+                )
 
     
     

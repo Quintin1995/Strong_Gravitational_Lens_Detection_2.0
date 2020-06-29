@@ -19,7 +19,6 @@ import time
 from PIL import Image
 import random
 from utils import *
-from tensorflow.keras.utils import normalize
 
 
 ## This piece of code is needed for some reason that i will try to find out later.

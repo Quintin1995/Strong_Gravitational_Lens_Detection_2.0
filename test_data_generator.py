@@ -109,3 +109,8 @@ def test_merge_lens_and_source(dg):
     with open('mock_lens', 'rb') as f:
         expected_lens = np.load(f)
     assert np.array_equal(mock_lens, expected_lens)
+
+
+def test_merge_lenses_and_sources_large_source_batch(dg, lenses):
+    X_train, y_train = dg.merge_lenses_and_sources(lenses, lenses, num_imgs*2, np.float32, mock_lens_alpha_scaling = (0.1, 0.1))
+    assert np.shape(X_train)[0] == num_imgs*2

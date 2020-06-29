@@ -8,6 +8,12 @@ class Parameters(object):
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
         
+        # Create Directories used throughout the project
+        create_dir_if_not_exists("models")
+        create_dir_if_not_exists("runs")
+        create_dir_if_not_exists("slurms")
+
+
         ##### Paths to data
         self.lenses_path     = settings["lenses_path"]
         self.negatives_path  = settings["negatives_path"]

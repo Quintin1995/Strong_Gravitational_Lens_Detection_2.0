@@ -48,17 +48,17 @@ net_epochs       : 1                 #int# How many epochs are done. Set to 1, b
 net_batch_size   : 32                #int#
 
 # Loading the input data
-fraction_to_load_lenses   : 0.25     #float# range= [0,1]
+fraction_to_load_lenses   : 0.25     #float# range = [0,1]
 fraction_to_load_negatives: 0.25     #float# range = [0,1]
 fraction_to_load_sources  : 0.02     #float# range = [0,1]
 
 # Chunk Parameters
-num_chunks: 100                       #int # Number of chunks to be generated 
-chunksize : 320                     #int # The number of images that will fit into one chunk
+num_chunks: 1000                       #int # Number of chunks to be generated 
+chunksize : 32                     #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
-chunk_plot_interval: 5               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
-chunk_save_interval: 5               #int # After this amount of chunks the model will be saved.
+chunk_plot_interval: 10               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
 
 # Validation Params
-validation_steps: 25                # Amount of Validation steps to be performed during training of the model.
+validation_steps: 32                # Amount of Validation steps to be performed during training of the model.
