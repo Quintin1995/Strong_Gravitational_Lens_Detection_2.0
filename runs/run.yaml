@@ -19,7 +19,7 @@ img_height: 101
 img_channels: 1
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
-normalize: "adapt_hist_eq"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
+normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Determines the splitting point of the data. Splitting percentage between test and train data.
 test_fraction: 0.2             # 0.2 means that 20% of the data will be reserved for test data.

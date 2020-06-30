@@ -24,17 +24,36 @@ from skimage import exposure
 from multiprocessing import Pool
 import functools
 
-def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, normalize_function, idx_filename):
+
+# Normalizationp per image
+def normalize_img(numpy_img):
+    return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
+
+
+# Simple case function to reduce line count in other function
+def normalize_function(img, norm_type, data_type):
+    a = img.shape
+    if norm_type == "per_image":
+        img = normalize_img(img)
+    if norm_type == "adapt_hist_eq":
+        img = normalize_img(img)
+        # img[np.where(img==0.0)] = 0.000001         #pixel values cannot be zero it seems
+        img = exposure.equalize_adapthist(img).astype(data_type)
+    return img
+
+
+
+def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_filename):
     idx, filename = idx_filename
     if idx % 1000 == 0:
         print("loaded {} images".format(idx), flush=True)
     if are_sources:
         img = fits.getdata(filename).astype(data_type)                                         #read file
         img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                           #convolve with psf_r and expand dims
-        return np.expand_dims(normalize_function(img, normalize_dat), axis=2)              #normalize
+        return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)              #normalize
     else:
         img = fits.getdata(filename).astype(data_type)                                         #read file and expand dims
-        return np.expand_dims(normalize_function(img, normalize_dat), axis=2)                   #normalize
+        return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)                   #normalize
 
 
 class DataGenerator:
@@ -42,22 +61,25 @@ class DataGenerator:
         self.params = params
 
         self.PSF_r = self.compute_PSF_r()
-
-        self.negatives_array = self.get_data_array(self.params.img_dims,
-                                                    path=self.params.negatives_path,
-                                                    fraction_to_load=self.params.fraction_to_load_negatives,
-                                                    are_sources=False,
-                                                    normalize_dat=self.params.normalize)
-        self.lenses_array    = self.get_data_array(self.params.img_dims,
-                                                    path=self.params.lenses_path,
-                                                    fraction_to_load=self.params.fraction_to_load_lenses,
-                                                    are_sources=False,
-                                                    normalize_dat=self.params.normalize)
-        self.sources_array   = self.get_data_array(self.params.img_dims,
-                                                    path=self.params.sources_path,
-                                                    fraction_to_load=self.params.fraction_to_load_sources,
-                                                    are_sources=True,
-                                                    normalize_dat=self.params.normalize)
+        with Pool(24) as p:
+            self.sources_array   = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.sources_path,
+                                                        fraction_to_load=self.params.fraction_to_load_sources,
+                                                        are_sources=True,
+                                                        normalize_dat=self.params.normalize,
+                                                        pool=p)
+            self.negatives_array = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.negatives_path,
+                                                        fraction_to_load=self.params.fraction_to_load_negatives,
+                                                        are_sources=False,
+                                                        normalize_dat=self.params.normalize,
+                                                        pool=p)
+            self.lenses_array    = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.lenses_path,
+                                                        fraction_to_load=self.params.fraction_to_load_lenses,
+                                                        are_sources=False,
+                                                        normalize_dat=self.params.normalize,
+                                                        pool=p)
          ###### Step 3.1: Split the data into train and test data.
         splits = self.split_train_test_data(self.lenses_array,
                                             0.0,
@@ -126,7 +148,7 @@ class DataGenerator:
 
 
     # Returns a numpy array with lens images from disk
-    def get_data_array(self, img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
+    def get_data_array(self, img_dims, path, pool, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
         
         if normalize_dat not in ("per_image", "per_array", "adapt_hist_eq"):
             raise Exception('Normalization is not initialized, check if normalization is set correctly in run.yaml')
@@ -152,14 +174,15 @@ class DataGenerator:
         data_paths = data_paths[0:num_to_actually_load]
 
         # Pre-allocate numpy array for the data
-        data_array = np.zeros((len(data_paths),img_dims[0], img_dims[1], img_dims[2]),dtype=data_type)
-        print("data array shape: {}".format(data_array.shape), flush=True)
+        # data_array = np.zeros((len(data_paths),img_dims[0], img_dims[1], img_dims[2]),dtype=data_type)
+
+        # print("data array shape: {}".format(data_array.shape), flush=True)
         print("Loading...", flush=True)
+
         # Load all the data in into the numpy array:
-        f = functools.partial(load_and_normalize_img, data_type, are_sources, normalize_dat, self.PSF_r, self.normalize_function)
-        with Pool(24) as p:
-            data_array = np.asarray(p.map(f, enumerate(data_paths)))
-        
+        f = functools.partial(load_and_normalize_img, data_type, are_sources, normalize_dat, self.PSF_r)
+
+        data_array = np.asarray(pool.map(f, enumerate(data_paths), chunksize=128))           # amount of data that will be given to one thread
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
 
@@ -174,29 +197,13 @@ class DataGenerator:
         return data_array
 
 
-    # Simple case function to reduce line count in other function
-    def normalize_function(self, img, norm_type):
-        a = img.shape
-        if norm_type == "per_image":
-            img = self.normalize_img(img)
-        if norm_type == "adapt_hist_eq":
-            img = self.normalize_img(img)
-            # img[np.where(img==0.0)] = 0.000001         #pixel values cannot be zero it seems
-            img = exposure.equalize_adapthist(img).astype(self.params.data_type)
-        return img
-    
-
-    # Normalizationp per image
-    def normalize_img(self, numpy_img):
-        return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
-
-
     # A normlize function that normalizes a data array based on its maximum pixel value and minimum pixel value.
     # So not normalization per image
     def normalize_data_array(self, data_array):
         #at this point we are unsure what kind of value range is in the data array.
         return ((data_array - np.amin(data_array)) / (np.amax(data_array) - np.amin(data_array)))
     
+
 
         # Data_rray = numpy data array that has 4 dimensions (num_imgs, img_width, img_height, num_channels)
     # Label = label that is assigned to the data array, preferably 0.0 or 1.0, set to anything else like a string or something, to not assign a label vector.
