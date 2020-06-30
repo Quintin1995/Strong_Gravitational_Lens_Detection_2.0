@@ -45,16 +45,16 @@ net_learning_rate: 0.0001            #float#
 net_model_metrics: "binary_accuracy" #string#
 net_num_outputs  : 1                 #int# How many output neurons does the network need?
 net_epochs       : 1                 #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
-net_batch_size   : 64                #int#
+net_batch_size   : 16                #int#
 
 # Loading the input data
-fraction_to_load_lenses   : 1.0     #float# range = [0,1]
-fraction_to_load_negatives: 1.0     #float# range = [0,1]
-fraction_to_load_sources  : 0.25     #float# range = [0,1]
+fraction_to_load_lenses   : 0.25     #float# range = [0,1]
+fraction_to_load_negatives: 0.25     #float# range = [0,1]
+fraction_to_load_sources  : 0.001     #float# range = [0,1]
 
 # Chunk Parameters
 num_chunks: 6000                       #int # Number of chunks to be generated 
-chunksize : 2048                        #int # The number of images that will fit into one chunk
+chunksize : 512                        #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 10               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
@@ -62,7 +62,7 @@ chunk_save_interval: 50               #int # After this amount of chunks the mod
 
 # Validation Params
 # validation_steps: 8                # int # Amount of Validation steps to be performed during training of the model.
-validation_chunksize: 64
+validation_chunksize: 512
 
 ## EXPERIMENT PARAMETERS
 use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
