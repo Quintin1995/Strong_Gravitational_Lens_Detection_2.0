@@ -69,10 +69,6 @@ def normalize_data_array(data_array):
     return ((data_array - np.amin(data_array)) / (np.amax(data_array) - np.amin(data_array)))
 
 
-
-
-
-
 def plot_img_and_hist(image, axes, bins=256):
     """Plot an image along with its histogram and cumulative histogram.
     """
@@ -99,16 +95,13 @@ def plot_img_and_hist(image, axes, bins=256):
     return ax_img, ax_hist, ax_cdf
 
 
-
 # Normalizationp per image
 def normalize_img(numpy_img):
     return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
 
 
-
-
 data_type = np.float32
-lenses_array = get_data_array((101,101,1), path="data/training/lenses/", fraction_to_load=0.25, data_type=data_type, are_sources=False, normalize="per_image")
+lenses_array = get_data_array((101,101,1), path="data/training/negatives/", fraction_to_load=0.25, data_type=data_type, are_sources=False, normalize="per_image")
 
 for i in range(30):
     # Load img
@@ -131,14 +124,14 @@ for i in range(30):
         axes[1, i] = fig.add_subplot(2, 4, 5+i)
 
     ax_img, ax_hist, ax_cdf = plot_img_and_hist(img, axes[:, 0])
-    ax_img.set_title('Low contrast image')
+    ax_img.set_title('Original Image')
 
     y_min, y_max = ax_hist.get_ylim()
     ax_hist.set_ylabel('Number of pixels')
     ax_hist.set_yticks(np.linspace(0, y_max, 5))
 
     ax_img, ax_hist, ax_cdf = plot_img_and_hist(img, axes[:, 1])
-    ax_img.set_title('img')
+    ax_img.set_title('Original Image')
 
     ax_img, ax_hist, ax_cdf = plot_img_and_hist(img_eq, axes[:, 2])
     ax_img.set_title('Histogram equalization')
