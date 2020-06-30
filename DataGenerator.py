@@ -21,6 +21,8 @@ import random
 from utils import *
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from skimage import exposure
+from sys import getsizeof
+
 
 
 class DataGenerator:
@@ -134,38 +136,42 @@ class DataGenerator:
         # Pre-allocate numpy array for the data
         data_array = np.zeros((len(data_paths),img_dims[0], img_dims[1], img_dims[2]),dtype=data_type)
         print("data array shape: {}".format(data_array.shape))
-
+        print("Loading...")
         # Load all the data in into the numpy array:
         for idx, filename in enumerate(data_paths):
 
             if are_sources:
                 img = fits.getdata(filename).astype(data_type)                                         #read file
-                img = np.expand_dims(scipy.signal.fftconvolve(img, self.PSF_r, mode="same"), axis=2)   #convolve with psf_r and expand dims
-                img = self.normalize_function(img, normalize_dat)                                      #normalize
+                img = scipy.signal.fftconvolve(img, self.PSF_r, mode="same")                           #convolve with psf_r and expand dims
+                img = np.expand_dims(self.normalize_function(img, normalize_dat), axis=2)              #normalize
             else:
-                img = np.expand_dims(fits.getdata(filename), axis=2).astype(data_type)                 #read file and expand dims
-                img = self.normalize_function(img, normalize_dat)                                      #normalize
+                img = fits.getdata(filename).astype(data_type)                                         #read file and expand dims
+                img = np.expand_dims(self.normalize_function(img, normalize_dat), axis=2)              #normalize
             data_array[idx] = img
         
-        if normalize_dat == "per_array":                                                          #normalize
+        if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
 
         print("max array  = {}".format(np.amax(data_array)))
         print("min array  = {}".format(np.amin(data_array)))
         print("mean array = {}".format(np.mean(data_array)))
         print("median array = {}".format(np.median(data_array)))
-
+        print("numpy nbytes = {},  GBs = {}".format(data_array.nbytes, bytes2gigabyes(data_array.nbytes)))
+        print("system getsizeof = {},  GBs = {}".format(getsizeof(data_array), bytes2gigabyes(getsizeof(data_array))))
         print("Loading data took: {} for folder: {}".format(hms(time.time() - start_time), path))
+
         return data_array
 
 
     # Simple case function to reduce line count in other function
     def normalize_function(self, img, norm_type):
+        a = img.shape
         if norm_type == "per_image":
             img = self.normalize_img(img)
         if norm_type == "adapt_hist_eq":
             img = self.normalize_img(img)
-            img = exposure.equalize_adapthist(img)
+            # img[np.where(img==0.0)] = 0.000001         #pixel values cannot be zero it seems
+            img = exposure.equalize_adapthist(img).astype(self.params.data_type)
         return img
     
 

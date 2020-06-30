@@ -8,6 +8,7 @@ from Parameters import Parameters
 from DataGenerator import *
 import csv
 
+
 ###### Step 0.1: Load all settings from .yaml file
 settings_yaml = load_settings_yaml("runs/run.yaml")
 params = Parameters(settings_yaml)

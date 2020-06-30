@@ -48,9 +48,9 @@ net_epochs       : 1                 #int# How many epochs are done. Set to 1, b
 net_batch_size   : 64                #int#
 
 # Loading the input data
-fraction_to_load_lenses   : 0.5     #float# range = [0,1]
-fraction_to_load_negatives: 0.5     #float# range = [0,1]
-fraction_to_load_sources  : 0.1     #float# range = [0,1]
+fraction_to_load_lenses   : 1.0     #float# range = [0,1]
+fraction_to_load_negatives: 1.0     #float# range = [0,1]
+fraction_to_load_sources  : 1.0     #float# range = [0,1]
 
 # Chunk Parameters
 num_chunks: 6000                       #int # Number of chunks to be generated 

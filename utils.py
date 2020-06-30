@@ -128,3 +128,8 @@ def plot_history(acc, val_acc, loss, val_loss, params):
     plt.legend()
     plt.savefig(params.full_path_of_figure)
     print("\nsaved Loss and Accuracy figure to: {}".format(params.full_path_of_figure), flush=True)
+
+def bytes2gigabyes(num_bytes):
+    gbs = (num_bytes/1024)/1024/1024
+    # print("GBs: {}".format(gbs))
+    return gbs
