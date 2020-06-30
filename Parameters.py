@@ -96,8 +96,8 @@ class Parameters(object):
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
 
-        # Validation_steps - Number of validation images that will be tested during training. (per chunk)
-        self.validation_steps      = settings["validation_steps"]
+        # Validation chunk size - Number of validation images that will be tested during training. (per chunk)
+        self.validation_chunksize  = settings["validation_chunksize"]
 
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]

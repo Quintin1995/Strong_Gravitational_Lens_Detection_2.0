@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "rn18_pere_no_avg_pool_adHist"    # String
+model_name: "rn18_pere_no_avg_pool_multi"    # String
 root_dir_models: models         # string
 
 ##### Paths to data
@@ -50,7 +50,7 @@ net_batch_size   : 64                #int#
 # Loading the input data
 fraction_to_load_lenses   : 1.0     #float# range = [0,1]
 fraction_to_load_negatives: 1.0     #float# range = [0,1]
-fraction_to_load_sources  : 0.1     #float# range = [0,1]
+fraction_to_load_sources  : 0.25     #float# range = [0,1]
 
 # Chunk Parameters
 num_chunks: 6000                       #int # Number of chunks to be generated 
@@ -61,7 +61,8 @@ chunk_plot_interval: 10               #int # Determines at which training interv
 chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
 
 # Validation Params
-validation_steps: 32                # int # Amount of Validation steps to be performed during training of the model.
+# validation_steps: 8                # int # Amount of Validation steps to be performed during training of the model.
+validation_chunksize: 64
 
 ## EXPERIMENT PARAMETERS
-use_avg_pooling_2D: False            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
+use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING

@@ -39,7 +39,7 @@ with open(params.full_path_of_history, 'w', newline='') as history_file:
 
             # Load chunk
             X_train_chunk, y_train_chunk = dg.load_chunk(params.chunksize, dg.X_train_lenses, dg.X_train_negatives, dg.X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
-            X_test_chunk, y_test_chunk = dg.load_chunk(params.validation_steps, dg.X_test_lenses, dg.X_test_negatives, dg.X_test_sources, params.data_type, params.mock_lens_alpha_scaling)
+            X_test_chunk, y_test_chunk = dg.load_chunk(params.validation_chunksize, dg.X_test_lenses, dg.X_test_negatives, dg.X_test_sources, params.data_type, params.mock_lens_alpha_scaling)
 
             # Fit model on data with a keras image data generator
             network_fit_time_start = time.time()
@@ -62,7 +62,7 @@ with open(params.full_path_of_history, 'w', newline='') as history_file:
                     steps_per_epoch=len(X_train_chunk) / params.net_batch_size,
                     epochs=params.net_epochs,
                     validation_data=validation_generator_flowed,
-                    validation_steps=params.validation_steps)
+                    validation_steps=len(X_test_chunk) / params.net_batch_size)
 
             print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
