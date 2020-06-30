@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "resnet18_baseline_pere"    # String
+model_name: "rn18_base_pere_avg_pool"    # String
 root_dir_models: models         # string
 
 ##### Paths to data
