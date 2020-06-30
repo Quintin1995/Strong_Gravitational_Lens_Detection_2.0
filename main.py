@@ -41,7 +41,7 @@ if params.verbatim:
 
 
 ###### Step 6.0 - Create Neural Network - Resnet18
-resnet18   = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs)
+resnet18   = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
 
 
 ###### Step 7.0 - Init list for storing results of network

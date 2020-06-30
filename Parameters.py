@@ -99,6 +99,9 @@ class Parameters(object):
         # Validation_steps - Number of validation images that will be tested during training. (per chunk)
         self.validation_steps      = settings["validation_steps"]
 
+        # EXPERIMENT PARAMTERS
+        self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
+
         #store all parameters of this object into a json file
         self.write_parameters_to_file()
 

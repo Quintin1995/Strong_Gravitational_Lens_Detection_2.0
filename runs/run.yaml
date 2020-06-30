@@ -62,3 +62,7 @@ chunk_save_interval: 50               #int # After this amount of chunks the mod
 
 # Validation Params
 validation_steps: 32                # int # Amount of Validation steps to be performed during training of the model.
+
+## EXPERIMENT PARAMETERS
+# Whether the resnet contains GLOBAL AVG POOLING
+use_avg_pooling_2D: True

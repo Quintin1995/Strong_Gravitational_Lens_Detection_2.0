@@ -17,7 +17,7 @@ from tensorflow.keras import backend as K
 
 
 class Network:
-    def __init__(self, model_name, learning_rate, model_metrics, input_shape, num_outputs):
+    def __init__(self, model_name, learning_rate, model_metrics, input_shape, num_outputs, params):
         print("Initializing model.")
         self.row_axis      = 1
         self.col_axis      = 2
@@ -29,6 +29,8 @@ class Network:
         self.input_shape   = input_shape
         self.num_outputs   = num_outputs
         self.metrics       = [metrics.binary_accuracy] if model_metrics == "binary_accuracy" else None
+
+        self.use_avg_pooling_2D = params.use_avg_pooling_2D
 
         if model_name == "resnet18":
             self.model = self.build_resnet(self.input_shape, self.num_outputs, self.basic_block, [2, 2, 2, 2])
@@ -218,8 +220,11 @@ class Network:
 
         # Classifier block
         block_shape = K.int_shape(block)
-        pool2 = AveragePooling2D(pool_size=(block_shape[self.row_axis], block_shape[self.col_axis]), strides=(1, 1))(block)
-        flatten1 = Flatten()(pool2)
+        if self.use_avg_pooling_2D:
+            pool2 = AveragePooling2D(pool_size=(block_shape[self.row_axis], block_shape[self.col_axis]), strides=(1, 1))(block)
+            flatten1 = Flatten()(pool2)
+        else:
+            flatten1 = Flatten()(block)
         dense = Dense(units=num_outputs, kernel_initializer="he_normal", activation="sigmoid")(flatten1)
 
         model = Model(inputs=input, outputs=dense)
