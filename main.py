@@ -1,5 +1,4 @@
 import numpy as np
-from load_data import *
 from utils import *
 import random
 import matplotlib.pyplot as plt
