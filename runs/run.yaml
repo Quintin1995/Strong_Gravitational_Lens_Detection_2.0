@@ -50,7 +50,7 @@ net_batch_size   : 32                #int#
 # Loading the input data
 fraction_to_load_lenses   : 1.0     #float# range = [0,1]
 fraction_to_load_negatives: 1.0     #float# range = [0,1]
-fraction_to_load_sources  : 0.01     #float# range = [0,1]
+fraction_to_load_sources  : 1.0     #float# range = [0,1]
 
 # Chunk Parameters
 num_chunks: 6000                       #int # Number of chunks to be generated 
