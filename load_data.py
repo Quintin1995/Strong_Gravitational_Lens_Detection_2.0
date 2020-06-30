@@ -19,7 +19,6 @@ import time
 from PIL import Image
 import random
 from utils import *
-from tensorflow.keras.utils import normalize
 
 
 ## This piece of code is needed for some reason that i will try to find out later.
@@ -35,6 +34,7 @@ dy = (ny - ny_) // 2  # shift in y
 for ii in range(nx_):  # iterating over input array
     for jj in range(ny_):
         PSF_r[ii + dx][jj + dy] = d1[ii][jj]
+
 
 seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
 

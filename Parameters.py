@@ -8,6 +8,12 @@ class Parameters(object):
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
         
+        # Create Directories used throughout the project
+        create_dir_if_not_exists("models")
+        create_dir_if_not_exists("runs")
+        create_dir_if_not_exists("slurms")
+
+
         ##### Paths to data
         self.lenses_path     = settings["lenses_path"]
         self.negatives_path  = settings["negatives_path"]
@@ -49,9 +55,9 @@ class Parameters(object):
         self.net_batch_size    = settings["net_batch_size"]
 
         # Loading the input data - What fraction of the data should be loaded into ram?
-        self.fraction_to_load_lenses    = settings["fraction_to_load_lenses"]       #range= [0,1]
-        self.fraction_to_load_negatives = settings["fraction_to_load_negatives"]    #range = [0,1]
-        self.fraction_to_load_sources   = settings["fraction_to_load_sources"]      #range = [0,1]
+        self.fraction_to_load_lenses    = settings["fraction_to_load_lenses"]       # range = [0,1]
+        self.fraction_to_load_negatives = settings["fraction_to_load_negatives"]    # range = [0,1]
+        self.fraction_to_load_sources   = settings["fraction_to_load_sources"]      # range = [0,1]
 
         # Chunk Parameters
         self.num_chunks = settings["num_chunks"]  # Number of chunks to be generated 
@@ -62,7 +68,7 @@ class Parameters(object):
 
         # Path stuff
         self.root_dir_models        = settings["root_dir_models"]
-        self.model_folder           = get_time_string()     #A model will be stored in a folder with just a date&time as folder name
+        self.model_folder           = get_time_string() + "_" +self.model_name   #A model will be stored in a folder with just a date&time as folder name
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
         self.make_model_dir()       #create directory for all data concerning this model.
         
