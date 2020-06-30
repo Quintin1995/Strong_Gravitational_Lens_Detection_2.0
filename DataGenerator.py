@@ -21,6 +21,20 @@ import random
 from utils import *
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from skimage import exposure
+from multiprocessing import Pool
+import functools
+
+def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, normalize_function, idx_filename):
+    idx, filename = idx_filename
+    if idx % 1000 == 0:
+        print("loaded {} images".format(idx), flush=True)
+    if are_sources:
+        img = fits.getdata(filename).astype(data_type)                                         #read file
+        img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                           #convolve with psf_r and expand dims
+        return np.expand_dims(normalize_function(img, normalize_dat), axis=2)              #normalize
+    else:
+        img = fits.getdata(filename).astype(data_type)                                         #read file and expand dims
+        return np.expand_dims(normalize_function(img, normalize_dat), axis=2)                   #normalize
 
 
 class DataGenerator:
@@ -109,7 +123,8 @@ class DataGenerator:
         Ri = 1.71
         return PSF_r
         ### END OF IMPORTANT PIECE.
-    
+
+
 
     # Returns a numpy array with lens images from disk
     def get_data_array(self, img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
@@ -142,17 +157,9 @@ class DataGenerator:
         print("data array shape: {}".format(data_array.shape), flush=True)
         print("Loading...", flush=True)
         # Load all the data in into the numpy array:
-        for idx, filename in enumerate(data_paths):
-            if idx % 1000 == 0:
-                print("loaded {} images".format(idx), flush=True)
-            if are_sources:
-                img = fits.getdata(filename).astype(data_type)                                         #read file
-                img = scipy.signal.fftconvolve(img, self.PSF_r, mode="same")                           #convolve with psf_r and expand dims
-                img = np.expand_dims(self.normalize_function(img, normalize_dat), axis=2)              #normalize
-            else:
-                img = fits.getdata(filename).astype(data_type)                                         #read file and expand dims
-                img = np.expand_dims(self.normalize_function(img, normalize_dat), axis=2)              #normalize
-            data_array[idx] = img
+        f = functools.partial(load_and_normalize_img, data_type, are_sources, normalize_dat, self.PSF_r, self.normalize_function)
+        with Pool(24) as p:
+            data_array = np.asarray(p.map(f, enumerate(data_paths)))
         
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
