@@ -14,31 +14,8 @@ settings_yaml = load_settings_yaml("runs/run.yaml")
 params = Parameters(settings_yaml)
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
-
+###### Step 2.0 Create Image Data Generator
 dg = DataGenerator(params)
-
-###### Step 1.1: show some of the stored images from the data array to the user.
-if params.verbatim:
-    show_random_img_plt_and_stats(lenses_array,    num_imgs=1, title="lenses")
-    show_random_img_plt_and_stats(negatives_array, num_imgs=1, title="negatives")
-    show_random_img_plt_and_stats(sources_array,   num_imgs=1, title="sources")
-
-
-###### Step 4.1 - Sanity check of the train and test chunk
-# 1: Are both positive and negative examples within the same brightness ranges?
-# 2: I have added a per image normalization, because a couple of outliers ruin the normalization per data array (That is my hypothesis at least.)
-if params.verbatim:
-    print(y_train_chunk)
-    idxs_pos = np.where(y_train_chunk == 1.0)
-    idxs_neg = np.where(y_train_chunk == 0.0)
-
-    for i in range(25):
-        pos_img = X_train_chunk[random.choice(list(idxs_pos[0]))]
-        neg_img = X_train_chunk[random.choice(list(idxs_neg[0]))]
-        show2Imgs(pos_img, neg_img, "pos max pixel: {0:.3f}".format(np.amax(pos_img)), "neg max pixel: {0:.3f}".format(np.amax(neg_img)))
-
-
-
 
 ###### Step 6.0 - Create Neural Network - Resnet18
 resnet18   = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
@@ -58,7 +35,7 @@ with open(params.full_path_of_history, 'w', newline='') as history_file:
     begin_train_session = time.time()       # Records beginning of training time
     try:
         for chunk_idx in range(params.num_chunks):
-            print("chunk {}/{}".format(chunk_idx+1, params.num_chunks))
+            print("chunk {}/{}".format(chunk_idx+1, params.num_chunks), flush=True)
 
             # Load chunk
             X_train_chunk, y_train_chunk = dg.load_chunk(params.chunksize, dg.X_train_lenses, dg.X_train_negatives, dg.X_train_sources, params.data_type, params.mock_lens_alpha_scaling)
@@ -87,12 +64,12 @@ with open(params.full_path_of_history, 'w', newline='') as history_file:
                     validation_data=validation_generator_flowed,
                     validation_steps=params.validation_steps)
 
-            print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)))
+            print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
             # Save Model params to .h5 file
             if chunk_idx % params.chunk_save_interval == 0:
                 resnet18.model.save_weights(params.full_path_of_weights)
-                print("Saved model weights to: {}".format(params.full_path_of_weights))
+                print("Saved model weights to: {}".format(params.full_path_of_weights), flush=True)
 
             # Write results to csv for later use
             writer.writerow([str(chunk_idx),

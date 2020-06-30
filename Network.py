@@ -18,7 +18,7 @@ from tensorflow.keras import backend as K
 
 class Network:
     def __init__(self, model_name, learning_rate, model_metrics, input_shape, num_outputs, params):
-        print("Initializing model.")
+        print("Initializing model.", flush=True)
         self.row_axis      = 1
         self.col_axis      = 2
         self.channel_axis  = 3
@@ -36,7 +36,7 @@ class Network:
             self.model = self.build_resnet(self.input_shape, self.num_outputs, self.basic_block, [2, 2, 2, 2])
 
         if self.model == None:
-            print("Model of the network class is not set.")
+            print("Model of the network class is not set.", flush=True)
 
 
     def basic_block(self, filters, init_strides=(1, 1), is_first_block_of_first_layer=False):

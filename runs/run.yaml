@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "rn18_base_pere_avg_pool"    # String
+model_name: "rn18_pere_no_avg_pool_adHist"    # String
 root_dir_models: models         # string
 
 ##### Paths to data
@@ -64,4 +64,4 @@ chunk_save_interval: 50               #int # After this amount of chunks the mod
 validation_steps: 32                # int # Amount of Validation steps to be performed during training of the model.
 
 ## EXPERIMENT PARAMETERS
-use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
+use_avg_pooling_2D: False            #boolean, # Whether the resnet contains GLOBAL AVG POOLING

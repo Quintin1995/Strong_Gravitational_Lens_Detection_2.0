@@ -12,10 +12,10 @@ def show_random_img_plt_and_stats(data_array, num_imgs, title):
         random_idx = random.randint(0, data_array.shape[0])
         img = np.squeeze(data_array[random_idx])                    #remove the color channel from the image for matplotlib
         print("\n")
-        print(title + " image data type: {}".format(img.dtype.name))
-        print(title + " image shape: {}".format(img.shape))
-        print(title + " image min: {}".format(np.amin(img)))
-        print(title + " image max: {}".format(np.amax(img)))
+        print(title + " image data type: {}".format(img.dtype.name), flush=True)
+        print(title + " image shape: {}".format(img.shape), flush=True)
+        print(title + " image min: {}".format(np.amin(img)), flush=True)
+        print(title + " image max: {}".format(np.amax(img)), flush=True)
         plt.title(title)
         plt.imshow(img, norm=None)
         plt.show()
@@ -62,9 +62,9 @@ def hms(seconds):
 def create_dir_if_not_exists(dirName):
     try:
         os.makedirs(dirName)    
-        print("Directory " , dirName ,  " Created ")
+        print("Directory " , dirName ,  " Created ", flush=True)
     except FileExistsError:
-        print("Directory " , dirName ,  " already exists")
+        print("Directory " , dirName ,  " already exists", flush=True)
 
 
 # Load all settings from a yaml file and stores it in a settings dictionary.
@@ -133,3 +133,21 @@ def bytes2gigabyes(num_bytes):
     gbs = (num_bytes/1024)/1024/1024
     # print("GBs: {}".format(gbs))
     return gbs
+
+
+
+###################################3
+# Piece of code that might be usefull for later:
+###### Step 4.1 - Sanity check of the train and test chunk
+# 1: Are both positive and negative examples within the same brightness ranges?
+# 2: I have added a per image normalization, because a couple of outliers ruin the normalization per data array (That is my hypothesis at least.)
+# if params.verbatim:
+#     print(y_train_chunk)
+#     idxs_pos = np.where(y_train_chunk == 1.0)
+#     idxs_neg = np.where(y_train_chunk == 0.0)
+
+#     for i in range(25):
+#         pos_img = X_train_chunk[random.choice(list(idxs_pos[0]))]
+#         neg_img = X_train_chunk[random.choice(list(idxs_neg[0]))]
+#         show2Imgs(pos_img, neg_img, "pos max pixel: {0:.3f}".format(np.amax(pos_img)), "neg max pixel: {0:.3f}".format(np.amax(neg_img)))
+#####################################3

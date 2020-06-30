@@ -1,5 +1,5 @@
-- No avg pooling - Remove the global average pooling layer from resnet18            - use_avg_pooling_2D: False 
-- Yes avg pooling - Do not Remove the global average pooling layer from resnet18    - use_avg_pooling_2D: True 
-- Run "adapt_hist_eq" - normalization                                               - normalize: "adapt_hist_eq"
-- Run "per_image" - normalization                                                   - normalize: "per_image"
-- Run "per_array" - normalization                                                   - normalize: "per_array
+1 - No avg pooling - Remove the global average pooling layer from resnet18            - use_avg_pooling_2D: False               : Running
+2 - Yes avg pooling - Do not Remove the global average pooling layer from resnet18    - use_avg_pooling_2D: True 
+3 - Run "adapt_hist_eq" - normalization                                               - normalize: "adapt_hist_eq"
+4 - Run "per_image" - normalization                                                   - normalize: "per_image"
+5 - Run "per_array" - normalization                                                   - normalize: "per_array

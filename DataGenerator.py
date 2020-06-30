@@ -81,6 +81,15 @@ class DataGenerator:
                 fill_mode=params.aug_default_fill_mode
                 )
 
+
+                ###### Step 1.1: show some of the stored images from the data array to the user.
+        if params.verbatim:
+            show_random_img_plt_and_stats(lenses_array,    num_imgs=1, title="lenses")
+            show_random_img_plt_and_stats(negatives_array, num_imgs=1, title="negatives")
+            show_random_img_plt_and_stats(sources_array,   num_imgs=1, title="sources")
+
+
+
     
     
     def compute_PSF_r(self):
@@ -127,7 +136,7 @@ class DataGenerator:
         random.shuffle(data_paths)
 
         # How many are on disk?
-        print("\nNumber of images on disk: {}, for {}".format(len(data_paths), path))
+        print("\nNumber of images on disk: {}, for {}".format(len(data_paths), path), flush=True)
 
         # How many does the user actually want?
         num_to_actually_load = int(fraction_to_load*len(data_paths))
@@ -135,8 +144,8 @@ class DataGenerator:
 
         # Pre-allocate numpy array for the data
         data_array = np.zeros((len(data_paths),img_dims[0], img_dims[1], img_dims[2]),dtype=data_type)
-        print("data array shape: {}".format(data_array.shape))
-        print("Loading...")
+        print("data array shape: {}".format(data_array.shape), flush=True)
+        print("Loading...", flush=True)
         # Load all the data in into the numpy array:
         for idx, filename in enumerate(data_paths):
 
@@ -152,13 +161,13 @@ class DataGenerator:
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
 
-        print("max array  = {}".format(np.amax(data_array)))
-        print("min array  = {}".format(np.amin(data_array)))
-        print("mean array = {}".format(np.mean(data_array)))
-        print("median array = {}".format(np.median(data_array)))
-        print("numpy nbytes = {},  GBs = {}".format(data_array.nbytes, bytes2gigabyes(data_array.nbytes)))
-        print("system getsizeof = {},  GBs = {}".format(getsizeof(data_array), bytes2gigabyes(getsizeof(data_array))))
-        print("Loading data took: {} for folder: {}".format(hms(time.time() - start_time), path))
+        print("max array  = {}".format(np.amax(data_array)), flush=True)
+        print("min array  = {}".format(np.amin(data_array)), flush=True)
+        print("mean array = {}".format(np.mean(data_array)), flush=True)
+        print("median array = {}".format(np.median(data_array)), flush=True)
+        print("numpy nbytes = {},  GBs = {}".format(data_array.nbytes, bytes2gigabyes(data_array.nbytes)), flush=True)
+        print("system getsizeof = {},  GBs = {}".format(getsizeof(data_array), bytes2gigabyes(getsizeof(data_array))), flush=True)
+        print("Loading data took: {} for folder: {}".format(hms(time.time() - start_time), path), flush=True)
 
         return data_array
 
@@ -234,7 +243,7 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
-        print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize))
+        print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
 
         return X_chunk, y_chunk
     
