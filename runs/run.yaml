@@ -54,7 +54,7 @@ fraction_to_load_sources  : 0.1     #float# range = [0,1]
 
 # Chunk Parameters
 num_chunks: 6000                       #int # Number of chunks to be generated 
-chunksize : 1024                        #int # The number of images that will fit into one chunk
+chunksize : 2048                        #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 10               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.

@@ -43,14 +43,14 @@ class DataGenerator:
 
         self.PSF_r = self.compute_PSF_r()
 
-        self.lenses_array    = self.get_data_array(self.params.img_dims,
-                                                    path=self.params.lenses_path,
-                                                    fraction_to_load=self.params.fraction_to_load_lenses,
-                                                    are_sources=False,
-                                                    normalize_dat=self.params.normalize)
         self.negatives_array = self.get_data_array(self.params.img_dims,
                                                     path=self.params.negatives_path,
                                                     fraction_to_load=self.params.fraction_to_load_negatives,
+                                                    are_sources=False,
+                                                    normalize_dat=self.params.normalize)
+        self.lenses_array    = self.get_data_array(self.params.img_dims,
+                                                    path=self.params.lenses_path,
+                                                    fraction_to_load=self.params.fraction_to_load_lenses,
                                                     are_sources=False,
                                                     normalize_dat=self.params.normalize)
         self.sources_array   = self.get_data_array(self.params.img_dims,
@@ -125,7 +125,6 @@ class DataGenerator:
         ### END OF IMPORTANT PIECE.
 
 
-
     # Returns a numpy array with lens images from disk
     def get_data_array(self, img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
         
@@ -191,12 +190,14 @@ class DataGenerator:
     def normalize_img(self, numpy_img):
         return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
 
+
     # A normlize function that normalizes a data array based on its maximum pixel value and minimum pixel value.
     # So not normalization per image
     def normalize_data_array(self, data_array):
         #at this point we are unsure what kind of value range is in the data array.
         return ((data_array - np.amin(data_array)) / (np.amax(data_array) - np.amin(data_array)))
     
+
         # Data_rray = numpy data array that has 4 dimensions (num_imgs, img_width, img_height, num_channels)
     # Label = label that is assigned to the data array, preferably 0.0 or 1.0, set to anything else like a string or something, to not assign a label vector.
     # Test_fraction = Percentage of the data array that will be assigned to the test data_array
