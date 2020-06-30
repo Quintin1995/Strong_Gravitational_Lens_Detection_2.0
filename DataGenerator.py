@@ -21,8 +21,6 @@ import random
 from utils import *
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from skimage import exposure
-from sys import getsizeof
-
 
 
 class DataGenerator:
@@ -89,9 +87,6 @@ class DataGenerator:
             show_random_img_plt_and_stats(sources_array,   num_imgs=1, title="sources")
 
 
-
-    
-    
     def compute_PSF_r(self):
         ## This piece of code is needed for some reason that i will try to find out later.
         nx = 101
@@ -116,7 +111,7 @@ class DataGenerator:
         ### END OF IMPORTANT PIECE.
     
 
-    # returns a numpy array with lens images from disk
+    # Returns a numpy array with lens images from disk
     def get_data_array(self, img_dims, path, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
         
         if normalize_dat not in ("per_image", "per_array", "adapt_hist_eq"):
@@ -148,7 +143,8 @@ class DataGenerator:
         print("Loading...", flush=True)
         # Load all the data in into the numpy array:
         for idx, filename in enumerate(data_paths):
-
+            if idx % 1000 == 0:
+                print("loaded {} images".format(idx), flush=True)
             if are_sources:
                 img = fits.getdata(filename).astype(data_type)                                         #read file
                 img = scipy.signal.fftconvolve(img, self.PSF_r, mode="same")                           #convolve with psf_r and expand dims
@@ -161,12 +157,12 @@ class DataGenerator:
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
 
-        print("max array  = {}".format(np.amax(data_array)), flush=True)
-        print("min array  = {}".format(np.amin(data_array)), flush=True)
-        print("mean array = {}".format(np.mean(data_array)), flush=True)
-        print("median array = {}".format(np.median(data_array)), flush=True)
-        print("numpy nbytes = {},  GBs = {}".format(data_array.nbytes, bytes2gigabyes(data_array.nbytes)), flush=True)
-        print("system getsizeof = {},  GBs = {}".format(getsizeof(data_array), bytes2gigabyes(getsizeof(data_array))), flush=True)
+        print("Max array  = {}".format(np.amax(data_array)), flush=True)
+        print("Min array  = {}".format(np.amin(data_array)), flush=True)
+        print("Mean array = {}".format(np.mean(data_array)), flush=True)
+        print("Median array = {}".format(np.median(data_array)), flush=True)
+        print("Numpy nbytes = {},  GBs = {}".format(data_array.nbytes, bytes2gigabyes(data_array.nbytes)), flush=True)
+        print("Normalization = {}".format(normalize_dat), flush=True)
         print("Loading data took: {} for folder: {}".format(hms(time.time() - start_time), path), flush=True)
 
         return data_array
