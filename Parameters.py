@@ -68,7 +68,7 @@ class Parameters(object):
 
         # Path stuff
         self.root_dir_models        = settings["root_dir_models"]
-        self.model_folder           = get_time_string()     #A model will be stored in a folder with just a date&time as folder name
+        self.model_folder           = get_time_string() + self.model_name   #A model will be stored in a folder with just a date&time as folder name
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
         self.make_model_dir()       #create directory for all data concerning this model.
         

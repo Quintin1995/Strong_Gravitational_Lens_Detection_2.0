@@ -62,11 +62,6 @@ try:
 
         # Fit model on data with a keras image data generator
         network_fit_time_start = time.time()
-        # history = resnet18.model.fit_generator(train_generator.flow(    X_train_chunk,
-        #                                                                 y_train_chunk,
-        #                                                                 batch_size=params.net_batch_size),
-        #                                                                 steps_per_epoch=len(X_train_chunk) / params.net_batch_size,
-        #                                                                 epochs=params.net_epochs)
 
         # Define a train generator flow based on the ImageDataGenerator
         train_generator_flowed = dg.train_generator.flow(
