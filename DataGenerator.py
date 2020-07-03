@@ -119,14 +119,12 @@ class DataGenerator:
                 height_shift_range=params.aug_height_shift_range,
                 zoom_range=params.aug_zoom_range,
                 horizontal_flip=params.aug_do_horizontal_flip,
-                fill_mode=params.aug_default_fill_mode
-                )
+                fill_mode=params.aug_default_fill_mode)
 
         ###### Step 5.1 - Data Augmentation - Data Generator Keras - Validation Generator is based on test data for now
         self.validation_generator = ImageDataGenerator(
                 horizontal_flip=params.aug_do_horizontal_flip,
-                fill_mode=params.aug_default_fill_mode
-                )
+                fill_mode=params.aug_default_fill_mode)
 
 
                 ###### Step 1.1: show some of the stored images from the data array to the user.

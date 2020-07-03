@@ -5,9 +5,9 @@
 model_name: "test1"    # String
 
 # Loading the input data
-fraction_to_load_lenses   : 1.0     #float# range = [0,1]
-fraction_to_load_negatives: 1.0     #float# range = [0,1]
-fraction_to_load_sources  : 1.0     #float# range = [0,1]
+fraction_to_load_lenses   : 0.1     #float# range = [0,1]
+fraction_to_load_negatives: 0.1     #float# range = [0,1]
+fraction_to_load_sources  : 0.01     #float# range = [0,1]
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
@@ -33,7 +33,7 @@ net_learning_rate: 0.0001            #float#
 net_model_metrics: "binary_accuracy" #string#
 net_num_outputs  : 1                 #int# How many output neurons does the network need?
 net_epochs       : 1                 #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
-net_batch_size   : 64                #int#
+net_batch_size   : 32                #int#
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"

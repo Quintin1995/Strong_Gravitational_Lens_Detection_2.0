@@ -30,8 +30,8 @@ val_loss = []              # Store validation loss of the model
 val_acc  = []              # Store validation binary accuracy
 
 with open(params.full_path_of_history, 'w', newline='') as history_file:
-    writer = csv.writer(history_file)
-    writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time"])
+    # writer = csv.writer(history_file)
+    # writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time"])
 
     ###### Step 7.1 - Training the model
     begin_train_session = time.time()       # Records beginning of training time
@@ -68,18 +68,26 @@ with open(params.full_path_of_history, 'w', newline='') as history_file:
 
             print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
+            # Try to reset data
+            X_train_chunk = None
+            y_train_chunk = None
+            X_validation_chunk = None
+            y_validation_chunk = None
+            train_generator_flowed = None
+            validation_generator_flowed = None
+
             # Save Model params to .h5 file
             if chunk_idx % params.chunk_save_interval == 0:
                 resnet18.model.save_weights(params.full_path_of_weights)
                 print("Saved model weights to: {}".format(params.full_path_of_weights), flush=True)
 
             # Write results to csv for later use
-            writer.writerow([str(chunk_idx),
-                            str(history.history["loss"][0]),
-                            str(history.history["binary_accuracy"][0]),
-                            str(history.history["val_loss"][0]),
-                            str(history.history["val_binary_accuracy"][0]),
-                            str(hms(time.time()-begin_train_session))])
+            # writer.writerow([str(chunk_idx),
+            #                 str(history.history["loss"][0]),
+            #                 str(history.history["binary_accuracy"][0]),
+            #                 str(history.history["val_loss"][0]),
+            #                 str(history.history["val_binary_accuracy"][0]),
+            #                 str(hms(time.time()-begin_train_session))])
 
             # Store loss and accuracy in list
             loss.append(history.history["loss"][0])
