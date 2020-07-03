@@ -62,38 +62,55 @@ class DataGenerator:
 
         self.PSF_r = self.compute_PSF_r()
         with Pool(24) as p:
-            self.sources_array   = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.sources_path,
+            # Load all training data
+            print("\n\n\nLoading Training Data", flush=True)
+            self.Xsources_train   = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.sources_path_train,
                                                         fraction_to_load=self.params.fraction_to_load_sources,
                                                         are_sources=True,
                                                         normalize_dat=self.params.normalize,
                                                         pool=p)
-            self.negatives_array = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.negatives_path,
+            self.Xnegatives_train = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.negatives_path_train,
                                                         fraction_to_load=self.params.fraction_to_load_negatives,
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
                                                         pool=p)
-            self.lenses_array    = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.lenses_path,
+            self.Xlenses_train = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.lenses_path_train,
                                                         fraction_to_load=self.params.fraction_to_load_lenses,
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
                                                         pool=p)
-         ###### Step 3.1: Split the data into train and test data.
-        splits = self.split_train_test_data(self.lenses_array,
-                                            0.0,
-                                            test_fraction=self.params.test_fraction)
-        self.X_train_lenses, self.X_test_lenses, self.y_train_lenses, self.y_test_lenses = splits
-        splits = self.split_train_test_data(self.negatives_array,
-                                            0.0,
-                                            test_fraction=self.params.test_fraction)
-        self.X_train_negatives, self.X_test_negatives, self.y_train_negatives, self.y_test_negatives = splits
-        splits = self.split_train_test_data(self.sources_array,
-                                            "no_label", 
-                                            test_fraction=self.params.test_fraction)
-        self.X_train_sources, self.X_test_sources, _, _ = splits
 
+            # Load all validation data.
+            print("\n\n\nLoading Validation Data", flush=True)
+            self.Xsources_validation = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.sources_path_validation,
+                                                        fraction_to_load=self.params.fraction_to_load_sources,
+                                                        are_sources=True,
+                                                        normalize_dat=self.params.normalize,
+                                                        pool=p)
+            self.Xnegatives_validation = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.negatives_path_validation,
+                                                        fraction_to_load=self.params.fraction_to_load_negatives,
+                                                        are_sources=False,
+                                                        normalize_dat=self.params.normalize,
+                                                        pool=p)
+            self.Xlenses_validation    = self.get_data_array(self.params.img_dims,
+                                                        path=self.params.lenses_path_validation,
+                                                        fraction_to_load=self.params.fraction_to_load_lenses,
+                                                        are_sources=False,
+                                                        normalize_dat=self.params.normalize,
+                                                        pool=p)
+        p.join()
+
+        # This code is calculated in load_chunk instead
+        if False:
+            self.ylenses_train          = np.zeros(self.Xlenses_train.shape[0])
+            self.ynegatives_train       = np.zeros(self.Xnegatives_train.shape[0])
+            self.ylenses_validation     = np.zeros(self.Xlenses_validation.shape[0])
+            self.ynegatives_validation  = np.zeros(self.Xnegatives_validation.shape[0])
 
         ###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
         self.train_generator = ImageDataGenerator(
@@ -107,10 +124,6 @@ class DataGenerator:
 
         ###### Step 5.1 - Data Augmentation - Data Generator Keras - Validation Generator is based on test data for now
         self.validation_generator = ImageDataGenerator(
-                # rotation_range=params.aug_rotation_range,
-                # width_shift_range=params.aug_width_shift_range,
-                # height_shift_range=params.aug_height_shift_range,
-                # zoom_range=params.aug_zoom_range,
                 horizontal_flip=params.aug_do_horizontal_flip,
                 fill_mode=params.aug_default_fill_mode
                 )
@@ -118,9 +131,9 @@ class DataGenerator:
 
                 ###### Step 1.1: show some of the stored images from the data array to the user.
         if params.verbatim:
-            show_random_img_plt_and_stats(lenses_array,    num_imgs=1, title="lenses")
-            show_random_img_plt_and_stats(negatives_array, num_imgs=1, title="negatives")
-            show_random_img_plt_and_stats(sources_array,   num_imgs=1, title="sources")
+            show_random_img_plt_and_stats(Xsources_train,    num_imgs=1, title="lenses")
+            show_random_img_plt_and_stats(Xnegatives_train, num_imgs=1, title="negatives")
+            show_random_img_plt_and_stats(Xlenses_train,   num_imgs=1, title="sources")
 
 
     def compute_PSF_r(self):
@@ -152,9 +165,7 @@ class DataGenerator:
         
         if normalize_dat not in ("per_image", "per_array", "adapt_hist_eq"):
             raise Exception('Normalization is not initialized, check if normalization is set correctly in run.yaml')
-        
         start_time = time.time()
-        
         data_paths = []
 
         # Get all file names
@@ -176,13 +187,13 @@ class DataGenerator:
         # Pre-allocate numpy array for the data
         # data_array = np.zeros((len(data_paths),img_dims[0], img_dims[1], img_dims[2]),dtype=data_type)
 
-        # print("data array shape: {}".format(data_array.shape), flush=True)
         print("Loading...", flush=True)
 
         # Load all the data in into the numpy array:
         f = functools.partial(load_and_normalize_img, data_type, are_sources, normalize_dat, self.PSF_r)
 
         data_array = np.asarray(pool.map(f, enumerate(data_paths), chunksize=128))           # amount of data that will be given to one thread
+        print("data array shape: {}".format(data_array.shape), flush=True)
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
 
@@ -203,7 +214,6 @@ class DataGenerator:
         #at this point we are unsure what kind of value range is in the data array.
         return ((data_array - np.amin(data_array)) / (np.amax(data_array) - np.amin(data_array)))
     
-
 
         # Data_rray = numpy data array that has 4 dimensions (num_imgs, img_width, img_height, num_channels)
     # Label = label that is assigned to the data array, preferably 0.0 or 1.0, set to anything else like a string or something, to not assign a label vector.

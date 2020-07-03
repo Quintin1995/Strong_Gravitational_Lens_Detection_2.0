@@ -15,9 +15,13 @@ class Parameters(object):
 
 
         ##### Paths to data
-        self.lenses_path     = settings["lenses_path"]
-        self.negatives_path  = settings["negatives_path"]
-        self.sources_path    = settings["sources_path"]
+        self.lenses_path_train     = settings["lenses_path_train"]
+        self.negatives_path_train  = settings["negatives_path_train"]
+        self.sources_path_train    = settings["sources_path_train"]
+
+        self.lenses_path_validation     = settings["lenses_path_validation"]
+        self.negatives_path_validation  = settings["negatives_path_validation"]
+        self.sources_path_validation    = settings["sources_path_validation"]
 
         # Data type of images in the numpy array
         self.data_type = None
@@ -29,7 +33,7 @@ class Parameters(object):
         self.normalize = settings["normalize"]        #options = {"None", "per_image", "per_array"}
 
         # Determines the splitting point of the data. Splitting percentage between test and train data.
-        self.test_fraction = settings["test_fraction"]            # 0.2 means that 20% of the data will be reserved for test data.
+        # self.test_fraction = settings["test_fraction"]            # 0.2 means that 20% of the data will be reserved for test data.
 
         # Alpha scaling, randomly drawn from this uniform distribution. Because the lensing features usually are of a lower luminosity than the LRG. Source scaling factor.
         self.mock_lens_alpha_scaling = (settings["mock_lens_alpha_scaling_min"],settings["mock_lens_alpha_scaling_max"])
