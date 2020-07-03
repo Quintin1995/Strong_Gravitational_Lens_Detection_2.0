@@ -2,27 +2,27 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "yes_avg_pool_multi"    # String
+model_name: "test1"    # String
 
 # Loading the input data
-fraction_to_load_lenses   : 0.5     #float# range = [0,1]
-fraction_to_load_negatives: 0.5     #float# range = [0,1]
-fraction_to_load_sources  : 0.1     #float# range = [0,1]
+fraction_to_load_lenses   : 1.0     #float# range = [0,1]
+fraction_to_load_negatives: 1.0     #float# range = [0,1]
+fraction_to_load_sources  : 1.0     #float# range = [0,1]
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
 num_chunks: 6000                       #int # Number of chunks to be generated 
-chunksize : 512                        #int # The number of images that will fit into one chunk
+chunksize : 1024                        #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
-chunk_plot_interval: 1               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_plot_interval: 10               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
 chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
 
 # Validation Params
 # validation_steps: 8                # int # Amount of Validation steps to be performed during training of the model.
-validation_chunksize: 512
+validation_chunksize: 128
 
 ## EXPERIMENT PARAMETERS
 use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
@@ -33,7 +33,7 @@ net_learning_rate: 0.0001            #float#
 net_model_metrics: "binary_accuracy" #string#
 net_num_outputs  : 1                 #int# How many output neurons does the network need?
 net_epochs       : 1                 #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
-net_batch_size   : 16                #int#
+net_batch_size   : 64                #int#
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"
