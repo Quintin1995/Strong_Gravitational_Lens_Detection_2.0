@@ -61,6 +61,9 @@ class DataGenerator:
         self.params = params
 
         self.PSF_r = self.compute_PSF_r()
+
+        print_stats_program()
+
         with Pool(24) as p:
             # Load all training data
             print("\n\n\nLoading Training Data", flush=True)
@@ -83,6 +86,7 @@ class DataGenerator:
                                                         normalize_dat=self.params.normalize,
                                                         pool=p)
 
+            print_stats_program()
             # Load all validation data.
             print("\n\n\nLoading Validation Data", flush=True)
             self.Xsources_validation = self.get_data_array(self.params.img_dims,
@@ -103,7 +107,10 @@ class DataGenerator:
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
                                                         pool=p)
+            print_stats_program()
         p.join()
+
+        print_stats_program()
 
         # This code is calculated in load_chunk instead
         if False:
@@ -132,6 +139,8 @@ class DataGenerator:
             show_random_img_plt_and_stats(Xsources_train,    num_imgs=1, title="lenses")
             show_random_img_plt_and_stats(Xnegatives_train, num_imgs=1, title="negatives")
             show_random_img_plt_and_stats(Xlenses_train,   num_imgs=1, title="sources")
+        
+        print_stats_program()
 
 
     def compute_PSF_r(self):
@@ -235,6 +244,7 @@ class DataGenerator:
 
         return X_train, X_test, y_train, y_test
     
+
     # Loading a chunk into memory
     def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
@@ -263,27 +273,30 @@ class DataGenerator:
         y_chunk = np.concatenate((y_pos, y_neg))
 
         print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
+        print_stats_program()
 
         return X_chunk, y_chunk
     
-        # Merge a single lens and source together into a mock lens.
+
+    # Merge a single lens and source together into a mock lens.
     def merge_lens_and_source(self, lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
 
         # Add lens and source together | We rescale the brightness of the simulated source to the peak brightness of the LRG in the r-band multiplied by a factor of alpha randomly drawn from the interval [0.02,0.3]
         mock_lens = lens + source / np.amax(source) * np.amax(lens) * np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
 
         # Take a square root stretch to emphesize lower luminosity features.
-        mock_lens_sqrt = np.sqrt(mock_lens)
+        mock_lens = np.sqrt(mock_lens)
         
         # Basically removes negative values - should not be necessary, because all input data should be normalized anyway. (I will leave it for now, but should be removed soon.)
-        mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
+        # mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
         mock_lens = mock_lens.clip(min=0.0, max=1.0)
 
-        if show_imgs:
-            show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
-            show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
+        # if show_imgs:
+        #     show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
+        #     show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
 
-        return mock_lens_sqrt
+        return mock_lens
+
 
     # This function should read images from the lenses- and sources data array,
     # and merge them together into a lensing system, further described as 'mock lens'.

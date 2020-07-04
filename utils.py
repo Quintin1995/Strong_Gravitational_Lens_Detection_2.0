@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 import yaml
+import psutil
 
 
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
@@ -134,6 +135,23 @@ def bytes2gigabyes(num_bytes):
     # print("GBs: {}".format(gbs))
     return gbs
 
+
+
+def print_stats_program():
+    # gives a single float value
+    print("\nCPU usage: {}%".format(psutil.cpu_percent()))
+
+    # gives an object with many fields
+    # print("Virtual Memory: {}".format(psutil.virtual_memory()))
+
+    # you can convert that object to a dictionary 
+    # print("Virtual Memory Properties: {}".format(dict(psutil.virtual_memory()._asdict())))
+
+    # you can have the percentage of used RAM
+    print("RAM usage: {}%".format(psutil.virtual_memory().percent))
+
+    # you can calculate percentage of available memory
+    print("Available memory: {:.01f}%".format(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total))
 
 
 ###################################3
