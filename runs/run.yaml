@@ -5,9 +5,9 @@
 model_name: "test_ram_logging"    # String
 
 # Loading the input data
-fraction_to_load_lenses   : 1.0     #float# range = [0,1]
-fraction_to_load_negatives: 1.0     #float# range = [0,1]
-fraction_to_load_sources  : 1.0     #float# range = [0,1]
+fraction_to_load_lenses   : 0.5     #float# range = [0,1]
+fraction_to_load_negatives: 0.5     #float# range = [0,1]
+fraction_to_load_sources  : 0.05     #float# range = [0,1]
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}

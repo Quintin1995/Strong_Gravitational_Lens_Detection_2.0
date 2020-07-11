@@ -45,17 +45,26 @@ def get_jsons(models):
     return jsons, model_paths_json
 
 
-def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
+def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend):
     axiss = []
-    for idx in range(len(dfs)):
+    for idx in range(len(dfs)):         # loop over each model dataframe
         data = dfs[idx][comparing_headerName_df]
+        
+        if comparing_headerName_df == "time":
+            data = list(data)
+            formatted_time_data = []     # in minutes
+            for timestamp in data:
+                parts = timestamp.split(":")
+                formatted_time_data.append(int(parts[0])*60 + int(parts[1]) + int(parts[2])/60)
+            data = formatted_time_data
+
         plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
 
-
     plt.title(comparing_headerName_df)
-    plt.ylabel(comparing_headerName_df)
+    plt.ylabel(comparing_headerName_df + " %")
     plt.xlabel("Trained Chunks")
-    plt.legend()
+    if do_legend:
+        plt.legend()
     plt.show()
 
 ####################################
@@ -63,11 +72,12 @@ root_models = "models"
 
 ######### Settable Paramters
 models = [
-    "07_03_2020_19h_41m_46s_test1_ja",
-    "07_03_2020_16h_25m_43s_yes_avg_pool_multi_ja"
+    "07_04_2020_18h_27m_45s_test_ram_logging_ownPC",
+    "07_04_2020_20h_03m_34s_test_ram_logging_peregrine"
 ]
-comparing_headerName_df = "loss"
+comparing_headerName_df = "ram_usage"
 json_comp_key           = "fraction_to_load_lenses"
+do_legend               = False
 #########
 
 ## 1.0 - Get list dataframes
@@ -77,4 +87,4 @@ dfs, csv_paths = get_dataframes(models)
 jsons, json_paths = get_jsons(models)
 
 ## 3.0 - Plot the data
-compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key)
+compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend)
