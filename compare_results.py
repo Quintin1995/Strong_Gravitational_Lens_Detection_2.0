@@ -207,8 +207,8 @@ root_models = "models"
 
 ######### Settable Paramters
 models = [
-    "resnet_single_newtr_last_last_weights_only",
-    # "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
+    # "resnet_single_newtr_last_last_weights_only",
+    "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
     "07_11_2020_15h_11m_03s_test_ram_logging_pere4"
 ]
 comparing_headerName_df = "binary_accuracy"
@@ -224,7 +224,7 @@ validation_chunks_size = 1100                           # Approximately double t
 #########
 
 ## 1.0 - Get list dataframes
-if False:
+if True:
     dfs, csv_paths = get_dataframes(models)
 
 ## 2.0 - Get list of jsons
@@ -234,7 +234,7 @@ jsons, json_paths = get_jsons(models)
 paths_h5s = get_h5s_paths(models)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
-if False:
+if True:
     for columnname in dfs[0].columns:
         if columnname == "chunk":
             continue
