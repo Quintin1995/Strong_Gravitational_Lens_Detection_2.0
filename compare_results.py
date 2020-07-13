@@ -63,7 +63,8 @@ def get_dataframes(models):
         path = os.path.join(root_models, model)
         history_csv_path = glob.glob(path + "/*history.csv")[0]
         model_paths_csv.append(history_csv_path)
-        dfs.append(pd.read_csv(history_csv_path))
+        # dfs.append(pd.read_csv(history_csv_path))
+        dfs.insert(0, pd.read_csv(history_csv_path))
         print("path = {}".format(history_csv_path))
         print(dfs[idx].head())
         print("\n")
@@ -82,7 +83,8 @@ def get_jsons(models):
         path = os.path.join(root_models, model)
         paramDump_json_path = glob.glob(path + "/*.json")[0]
         model_paths_json.append(paramDump_json_path)
-        jsons.append(json.load(open(paramDump_json_path)))
+        # jsons.append(json.load(open(paramDump_json_path)))
+        jsons.insert(0, json.load(open(paramDump_json_path)))
         print("path = {}".format(paramDump_json_path))
         for i in jsons[idx]:
             print("\t" + i + ": " + str(jsons[idx][i]))
@@ -98,7 +100,8 @@ def get_h5s_paths(models):
         print("Model: {} - h5 file".format(idx))
         path = os.path.join(root_models, model)
         h5_path = glob.glob(path + "/*.h5")[0]
-        paths_h5s.append(h5_path)
+        # paths_h5s.append(h5_path)
+        paths_h5s.insert(0, h5_path)
     return paths_h5s
 
 
@@ -143,7 +146,10 @@ def store_fbeta_results(models, jsons, json_comp_key):
                 writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
         print("saved csv with f_beta scores to: ".format(f_beta_full_path), flush=True)
 
-        plt.plot(list(threshold_range), f_betas, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+        if label_override:
+            plt.plot(list(threshold_range), f_betas, label = models[idx])
+        else:
+            plt.plot(list(threshold_range), f_betas, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
         plt.xlabel("p threshold")
         plt.ylabel("F")
         plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
@@ -159,6 +165,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
     for idx in range(len(dfs)):         # loop over each model dataframe
         data = dfs[idx][comparing_headerName_df]
         
+        # time needs to be formatted before it can be plotted
         if comparing_headerName_df == "time":
             data = list(data)
             formatted_time_data = []     # in minutes
@@ -167,7 +174,10 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
                 formatted_time_data.append(int(parts[0])*60 + int(parts[1]) + int(parts[2])/60)
             data = formatted_time_data
 
-        plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+        if label_override:
+            plt.plot(data, label = models[idx])
+        else:
+            plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
 
     plt.title(comparing_headerName_df)
     plt.ylabel(comparing_headerName_df)
@@ -184,9 +194,10 @@ models = [
     "07_04_2020_18h_27m_45s_test_ram_logging_ownPC",
     "07_04_2020_20h_03m_34s_test_ram_logging_peregrine"
 ]
-comparing_headerName_df = "ram_usage"
-json_comp_key           = "fraction_to_load_lenses"
+comparing_headerName_df = "time"
+json_comp_key           = "model_name"
 do_legend               = True
+label_override          = False
 
 # f-beta
 beta_squarred = 0.03                                    # For f-beta calculation
@@ -201,13 +212,13 @@ dfs, csv_paths = get_dataframes(models)
 ## 2.0 - Get list of jsons
 jsons, json_paths = get_jsons(models)
 
-## 2.1 - get list of .h5 files
+## 3.0 - get list of .h5 files
 paths_h5s = get_h5s_paths(models)
 
-## 3.0 - Plot the data from the csvs - legend determined by json parameter dump file
+## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
 if True:
     compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend)
 
-## 4.0 - Calculate f-beta score per model - based on validation data
+## 5.0 - Calculate f-beta score per model - based on validation data
 if True:
     store_fbeta_results(models, jsons, json_comp_key)
