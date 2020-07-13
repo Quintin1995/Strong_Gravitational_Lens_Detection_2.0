@@ -63,11 +63,13 @@ def get_dataframes(models):
         path = os.path.join(root_models, model)
         history_csv_path = glob.glob(path + "/*history.csv")[0]
         model_paths_csv.append(history_csv_path)
-        # dfs.append(pd.read_csv(history_csv_path))
-        dfs.insert(0, pd.read_csv(history_csv_path))
+        dfs.append(pd.read_csv(history_csv_path))
+        # dfs.insert(0, pd.read_csv(history_csv_path))
         print("path = {}".format(history_csv_path))
         print(dfs[idx].head())
         print("\n")
+    # dfs.reverse()
+    # model_paths_csv.reverse()
     return dfs, model_paths_csv
 
 
@@ -83,12 +85,14 @@ def get_jsons(models):
         path = os.path.join(root_models, model)
         paramDump_json_path = glob.glob(path + "/*.json")[0]
         model_paths_json.append(paramDump_json_path)
-        # jsons.append(json.load(open(paramDump_json_path)))
-        jsons.insert(0, json.load(open(paramDump_json_path)))
+        jsons.append(json.load(open(paramDump_json_path)))
+        # jsons.insert(0, json.load(open(paramDump_json_path)))
         print("path = {}".format(paramDump_json_path))
         for i in jsons[idx]:
             print("\t" + i + ": " + str(jsons[idx][i]))
         print("\n")
+    # jsons.reverse()
+    # model_paths_json.reverse()
     return jsons, model_paths_json
 
 
@@ -100,8 +104,9 @@ def get_h5s_paths(models):
         print("Model: {} - h5 file".format(idx))
         path = os.path.join(root_models, model)
         h5_path = glob.glob(path + "/*.h5")[0]
-        # paths_h5s.append(h5_path)
-        paths_h5s.insert(0, h5_path)
+        paths_h5s.append(h5_path)
+        # paths_h5s.insert(0, h5_path)
+    # paths_h5s.reverse()
     return paths_h5s
 
 
@@ -178,6 +183,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
             plt.plot(data, label = models[idx])
         else:
             plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+            print(str(str(json_comp_key) + ": " + str(jsons[idx][json_comp_key])))
 
     plt.title(comparing_headerName_df)
     plt.ylabel(comparing_headerName_df)
@@ -191,10 +197,10 @@ root_models = "models"
 
 ######### Settable Paramters
 models = [
-    "07_04_2020_18h_27m_45s_test_ram_logging_ownPC",
-    "07_04_2020_20h_03m_34s_test_ram_logging_peregrine"
+    "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
+    "07_11_2020_15h_11m_03s_test_ram_logging_pere4"
 ]
-comparing_headerName_df = "time"
+comparing_headerName_df = "binary_accuracy"
 json_comp_key           = "model_name"
 do_legend               = True
 label_override          = False
