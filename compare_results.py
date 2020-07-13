@@ -121,6 +121,8 @@ def store_fbeta_results(models, jsons, json_comp_key):
         # Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")
         params.fraction_to_load_sources = 0.1    # we don't want to load so many sources at this time
+        if params.model_name == "Baseline_Enrico":
+            params.img_dims = (101,101,3)
         
         # Define a DataGenerator that can generate validation chunks based on validation data.
         dg = DataGenerator(params, mode="no_training")
@@ -132,6 +134,14 @@ def store_fbeta_results(models, jsons, json_comp_key):
         # Load weights of the neural network
         resnet18.model.load_weights(paths_h5s[idx])
         
+        # dstack images for enrico neural network
+        if params.model_name == "Baseline_Enrico":
+            dstack_data = np.empty((X_validation_chunk.shape[0], X_validation_chunk.shape[1], X_validation_chunk.shape[2], 3), dtype=np.float32)
+            for i in range(X_validation_chunk.shape[0]):
+                img = X_validation_chunk[i]
+                dstack_data[i] = np.dstack((img,img,img))
+            X_validation_chunk = dstack_data
+
         # Predict the labels of the validation chunk on the loaded neural network
         prediction_vector = resnet18.model.predict(X_validation_chunk)
         print("Length prediction vector: {}".format(len(prediction_vector)), flush=True)
@@ -197,9 +207,9 @@ root_models = "models"
 
 ######### Settable Paramters
 models = [
-    "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
-    "07_11_2020_15h_11m_03s_test_ram_logging_pere4",
-    "resnet_single_newtr_last_last_weights_only"
+    "resnet_single_newtr_last_last_weights_only",
+    # "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
+    "07_11_2020_15h_11m_03s_test_ram_logging_pere4"
 ]
 comparing_headerName_df = "binary_accuracy"
 json_comp_key           = "model_name"
@@ -214,7 +224,8 @@ validation_chunks_size = 1100                           # Approximately double t
 #########
 
 ## 1.0 - Get list dataframes
-dfs, csv_paths = get_dataframes(models)
+if False:
+    dfs, csv_paths = get_dataframes(models)
 
 ## 2.0 - Get list of jsons
 jsons, json_paths = get_jsons(models)
@@ -223,7 +234,7 @@ jsons, json_paths = get_jsons(models)
 paths_h5s = get_h5s_paths(models)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
-if True:
+if False:
     for columnname in dfs[0].columns:
         if columnname == "chunk":
             continue
