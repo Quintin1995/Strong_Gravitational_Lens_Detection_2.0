@@ -46,7 +46,6 @@ def get_jsons(models):
 
 
 def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend):
-    axiss = []
     for idx in range(len(dfs)):         # loop over each model dataframe
         data = dfs[idx][comparing_headerName_df]
         
@@ -61,7 +60,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
         plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
 
     plt.title(comparing_headerName_df)
-    plt.ylabel(comparing_headerName_df + " %")
+    plt.ylabel(comparing_headerName_df)
     plt.xlabel("Trained Chunks")
     if do_legend:
         plt.legend()
@@ -86,5 +85,7 @@ dfs, csv_paths = get_dataframes(models)
 ## 2.0 - Get list of jsons
 jsons, json_paths = get_jsons(models)
 
-## 3.0 - Plot the data
+## 3.0 - Plot the data from the csvs - legend determined by json parameter dump file
 compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend)
+
+## 4.0 - Calculate f-beta score per model - based on a couple of validation chunks

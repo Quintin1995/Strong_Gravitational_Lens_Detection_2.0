@@ -1,9 +1,10 @@
 import os
 from utils import *
 import json
+from shutil import copyfile
 
 class Parameters(object):
-    def __init__(self, settings):
+    def __init__(self, settings, yaml_fpath):
 
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
@@ -105,6 +106,9 @@ class Parameters(object):
 
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
+
+        #copy run.yaml to model folder
+        copyfile(yaml_fpath, os.path.join(self.model_path, "run.yaml"))
 
         #store all parameters of this object into a json file
         self.write_parameters_to_file()

@@ -11,8 +11,9 @@ import psutil
 
 
 ###### Step 1.0: Load all settings from .yaml file
-settings_yaml = load_settings_yaml("runs/run.yaml")
-params = Parameters(settings_yaml)
+yaml_path = "runs/run.yaml"
+settings_yaml = load_settings_yaml(yaml_path)
+params = Parameters(settings_yaml, yaml_path)
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
 
