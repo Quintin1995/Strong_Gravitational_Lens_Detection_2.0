@@ -198,7 +198,8 @@ root_models = "models"
 ######### Settable Paramters
 models = [
     "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
-    "07_11_2020_15h_11m_03s_test_ram_logging_pere4"
+    "07_11_2020_15h_11m_03s_test_ram_logging_pere4",
+    "resnet_single_newtr_last_last_weights_only"
 ]
 comparing_headerName_df = "binary_accuracy"
 json_comp_key           = "model_name"
@@ -223,7 +224,10 @@ paths_h5s = get_h5s_paths(models)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
 if True:
-    compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend)
+    for columnname in dfs[0].columns:
+        if columnname == "chunk":
+            continue
+        compare_plot_models(columnname, dfs, jsons, json_comp_key, do_legend)
 
 ## 5.0 - Calculate f-beta score per model - based on validation data
 if True:
