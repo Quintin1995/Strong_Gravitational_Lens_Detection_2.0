@@ -57,7 +57,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 
 
 class DataGenerator:
-    def __init__(self, params, *args, **kwargs):
+    def __init__(self, params, mode="training", *args, **kwargs):
         self.params = params
 
         self.PSF_r = self.compute_PSF_r()
@@ -65,26 +65,27 @@ class DataGenerator:
         print_stats_program()
 
         with Pool(24) as p:
-            # Load all training data
-            print("\n\n\nLoading Training Data", flush=True)
-            self.Xsources_train   = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.sources_path_train,
-                                                        fraction_to_load=self.params.fraction_to_load_sources,
-                                                        are_sources=True,
-                                                        normalize_dat=self.params.normalize,
-                                                        pool=p)
-            self.Xnegatives_train = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.negatives_path_train,
-                                                        fraction_to_load=self.params.fraction_to_load_negatives,
-                                                        are_sources=False,
-                                                        normalize_dat=self.params.normalize,
-                                                        pool=p)
-            self.Xlenses_train = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.lenses_path_train,
-                                                        fraction_to_load=self.params.fraction_to_load_lenses,
-                                                        are_sources=False,
-                                                        normalize_dat=self.params.normalize,
-                                                        pool=p)
+            if mode == "training":
+                # Load all training data
+                print("\n\n\nLoading Training Data", flush=True)
+                self.Xsources_train   = self.get_data_array(self.params.img_dims,
+                                                            path=self.params.sources_path_train,
+                                                            fraction_to_load=self.params.fraction_to_load_sources,
+                                                            are_sources=True,
+                                                            normalize_dat=self.params.normalize,
+                                                            pool=p)
+                self.Xnegatives_train = self.get_data_array(self.params.img_dims,
+                                                            path=self.params.negatives_path_train,
+                                                            fraction_to_load=self.params.fraction_to_load_negatives,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            pool=p)
+                self.Xlenses_train = self.get_data_array(self.params.img_dims,
+                                                            path=self.params.lenses_path_train,
+                                                            fraction_to_load=self.params.fraction_to_load_lenses,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            pool=p)
 
             print_stats_program()
             # Load all validation data.
@@ -264,9 +265,9 @@ class DataGenerator:
         negative_sample_contaminant_prob = 0.8
         for i in range(num_negative):
             if random.random() <= negative_sample_contaminant_prob:
-                X_neg[i] = np.sqrt(X_negatives[random.randint(0, X_negatives.shape[0] - 1)])
+                X_neg[i] = np.sqrt(X_negatives[random.randint(0, X_negatives.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
             else:
-                X_neg[i] = np.sqrt(X_lenses[random.randint(0, X_lenses.shape[0] - 1)])
+                X_neg[i] = np.sqrt(X_lenses[random.randint(0, X_lenses.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
 
         # Concatenate the positive and negative examples into one chunk (also the labels)
         X_chunk = np.concatenate((X_pos, X_neg))

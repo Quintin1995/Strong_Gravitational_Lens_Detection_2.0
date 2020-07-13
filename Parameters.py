@@ -4,7 +4,7 @@ import json
 from shutil import copyfile
 
 class Parameters(object):
-    def __init__(self, settings, yaml_fpath):
+    def __init__(self, settings, yaml_fpath, mode="training"):
 
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
@@ -13,7 +13,6 @@ class Parameters(object):
         create_dir_if_not_exists("models")
         create_dir_if_not_exists("runs")
         create_dir_if_not_exists("slurms")
-
 
         ##### Paths to data
         self.lenses_path_train     = settings["lenses_path_train"]
@@ -75,7 +74,8 @@ class Parameters(object):
         self.root_dir_models        = settings["root_dir_models"]
         self.model_folder           = get_time_string() + "_" +self.model_name   #A model will be stored in a folder with just a date&time as folder name
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
-        self.make_model_dir()       #create directory for all data concerning this model.
+        if mode == "training":
+            self.make_model_dir()       #create directory for all data concerning this model.
         
         # Weights .h5 file
         self.weights_extension      = ".h5"                 #Extension for saving weights
@@ -107,11 +107,12 @@ class Parameters(object):
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
 
-        #copy run.yaml to model folder
-        copyfile(yaml_fpath, os.path.join(self.model_path, "run.yaml"))
+        if mode == "training":
+            #copy run.yaml to model folder
+            copyfile(yaml_fpath, os.path.join(self.model_path, "run.yaml"))
 
-        #store all parameters of this object into a json file
-        self.write_parameters_to_file()
+            #store all parameters of this object into a json file
+            self.write_parameters_to_file()
 
 
     # Create a folder where all model input/ouput is stored.
