@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "no_avg_pooling"    # String
+model_name: "norm_per_array"    # String
 
 # Loading the input data
 fraction_to_load_sources_train  : 1.0     #float# range = [0,1]
@@ -14,7 +14,7 @@ fraction_to_load_negatives_vali: 1.0     #float# range = [0,1]
 fraction_to_load_lenses_vali   : 1.0     #float# range = [0,1]
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
-normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
+normalize: "per_array"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
 num_chunks: 6000                      #int # Number of chunks to be generated 
@@ -29,7 +29,7 @@ chunk_save_interval: 50               #int # After this amount of chunks the mod
 validation_chunksize: 128
 
 ## EXPERIMENT PARAMETERS
-use_avg_pooling_2D: False            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
+use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Network Paramters
 net_name         : "resnet18"        #string# Determines which model will be loaded: options={"resnet18"}
