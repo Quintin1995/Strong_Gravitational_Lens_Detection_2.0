@@ -8,6 +8,7 @@ from Parameters import Parameters
 from DataGenerator import *
 import csv
 import psutil
+import tensorflow as tf
 
 
 ###### Step 1.0: Load all settings from .yaml file
@@ -72,18 +73,17 @@ try:
 
         print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
-        # Try to reset data
-        X_train_chunk = None
-        y_train_chunk = None
-        X_validation_chunk = None
-        y_validation_chunk = None
-        train_generator_flowed = None
-        validation_generator_flowed = None
-
         # Save Model params to .h5 file
         if chunk_idx % params.chunk_save_interval == 0:
             resnet18.model.save_weights(params.full_path_of_weights)
             print("Saved model weights to: {}".format(params.full_path_of_weights), flush=True)
+
+        # Reset backend of tensorflow so that memory might not be leaked??
+        if chunk_idx % params.mem_leak_save_interval == 0:
+            tf.keras.backend.clear_session()
+            resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
+            resnet18.model.load_weights(params.full_path_of_weights)
+            print("reseting tensorflow keras backend",flush=True)
 
         # Write results to csv for later use
         writer.writerow([str(chunk_idx),

@@ -104,6 +104,7 @@ class Parameters(object):
         # Plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
+        self.mem_leak_save_interval= settings["mem_leak_save_interval"]
 
         # Validation chunk size - Number of validation images that will be tested during training. (per chunk)
         self.validation_chunksize  = settings["validation_chunksize"]
