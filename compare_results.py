@@ -12,6 +12,7 @@ from Network import *
 import csv
 import math
 
+
 # Count the number of true positive, true negative, false positive and false negative in for a prediction vector relative to the label vector.
 def count_TP_TN_FP_FN_and_FB(prediction_vector, y_test, threshold, beta_squarred, verbatim = False):
     TP = 0 #true positive
@@ -110,11 +111,32 @@ def get_h5s_paths(models):
     return paths_h5s
 
 
+# dstack the data to three channels instead of one
+def dstack_data(data):
+    dstack_data = np.empty((data.shape[0], data.shape[1], data.shape[2], 3), dtype=np.float32)
+    for i in range(data.shape[0]):
+        img = data[i]
+        dstack_data[i] = np.dstack((img,img,img))
+    return dstack_data
+
+
+def average_prediction_results(network, data, avg_iter_counter=10, verbose=False):
+    avg_preds = np.zeros((data.shape[0],1), dtype=np.float32)
+    for i in range(avg_iter_counter):
+        if verbose:
+            print("avg iter counter = {}".format(i))
+        prediction_vector = network.model.predict(data)
+        avg_preds = np.add(avg_preds, prediction_vector)
+    avg_preds = avg_preds / avg_iter_counter
+    if verbose:
+        print("Length prediction vector: {}".format(len(avg_preds)), flush=True)
+    return avg_preds
+
+
 # Load validation chunk and calculate per model folder its model performance evaluated on f-beta score
 def store_fbeta_results(models, jsons, json_comp_key):
-    
     for idx, model_folder in enumerate(models):
-
+        
         # Load settings of the model
         yaml_path = glob.glob(os.path.join(root_models, model_folder) + "/*.yaml")[0]
         settings_yaml = load_settings_yaml(yaml_path)
@@ -125,28 +147,25 @@ def store_fbeta_results(models, jsons, json_comp_key):
         if params.model_name == "Baseline_Enrico":
             params.img_dims = (101,101,3)
         
-        # Define a DataGenerator that can generate validation chunks based on validation data.
-        dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
-        placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
-        X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
-        
         # Construct a neural network with the same architecture as that it was trained with.
         resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
+        resnet18.model.trainable = False
         
         # Load weights of the neural network
         resnet18.model.load_weights(paths_h5s[idx])
+
+        # Define a DataGenerator that can generate validation chunks based on validation data.
+        dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
+        placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
+        
+        X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
         
         # dstack images for enrico neural network
         if params.model_name == "Baseline_Enrico":
-            dstack_data = np.empty((X_validation_chunk.shape[0], X_validation_chunk.shape[1], X_validation_chunk.shape[2], 3), dtype=np.float32)
-            for i in range(X_validation_chunk.shape[0]):
-                img = X_validation_chunk[i]
-                dstack_data[i] = np.dstack((img,img,img))
-            X_validation_chunk = dstack_data
+            X_validation_chunk = dstack_data(X_validation_chunk)
 
-        # Predict the labels of the validation chunk on the loaded neural network
-        prediction_vector = resnet18.model.predict(X_validation_chunk)
-        print("Length prediction vector: {}".format(len(prediction_vector)), flush=True)
+        # Predict the labels of the validation chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
+        avg_preds = average_prediction_results(resnet18, X_validation_chunk, avg_iter_counter=10, verbose=False)
         
         # Define paths to filenames for f-beta saving and its plot
         f_beta_full_path = os.path.join(root_models, model_folder, "f_beta_results.csv")
@@ -158,7 +177,7 @@ def store_fbeta_results(models, jsons, json_comp_key):
             writer = csv.writer(f_beta_file)
             writer.writerow(["p_threshold", "TP", "TN", "FP", "FN", "precision", "recall", "fp_rate", "accuracy", "f_beta"])
             for p_threshold in threshold_range:
-                (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(prediction_vector, y_validation_chunk, p_threshold, beta_squarred)
+                (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(avg_preds, y_validation_chunk, p_threshold, beta_squarred)
                 f_betas.append(F_beta)
                 writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
         print("saved csv with f_beta scores to: ".format(f_beta_full_path), flush=True)

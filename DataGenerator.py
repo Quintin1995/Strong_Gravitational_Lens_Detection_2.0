@@ -90,7 +90,6 @@ class DataGenerator:
                                                             do_shuffle=do_shuffle_data,
                                                             pool=p)
 
-            print_stats_program()
             # Load all validation data.
             print("\n\n\nLoading Validation Data", flush=True)
             self.Xsources_validation = self.get_data_array(self.params.img_dims,
@@ -114,10 +113,7 @@ class DataGenerator:
                                                         normalize_dat=self.params.normalize,
                                                         do_shuffle=do_shuffle_data,
                                                         pool=p)
-            print_stats_program()
         p.join()
-
-        print_stats_program()
 
         # This code is calculated in load_chunk instead
         if False:
@@ -297,7 +293,7 @@ class DataGenerator:
 
         # Add lens and source together | We rescale the brightness of the simulated source to the peak brightness of the LRG in the r-band multiplied by a factor of alpha randomly drawn from the interval [0.02,0.3]
         mock_lens = lens + source / np.amax(source) * np.amax(lens) * np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
-
+        
         # Take a square root stretch to emphesize lower luminosity features.
         mock_lens = np.sqrt(mock_lens)
         
