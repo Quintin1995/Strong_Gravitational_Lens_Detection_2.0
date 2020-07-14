@@ -80,10 +80,10 @@ try:
 
         # Reset backend of tensorflow so that memory might not be leaked??
         if chunk_idx % params.mem_leak_save_interval == 0:
-            tf.keras.backend.clear_session()
-            resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
-            resnet18.model.load_weights(params.full_path_of_weights)
             print("reseting tensorflow keras backend",flush=True)
+            resnet18.model.save(params.full_path_model_storage)
+            tf.keras.backend.clear_session()
+            resnet18.model = tf.keras.models.load_model(params.full_path_model_storage)
 
         # Write results to csv for later use
         writer.writerow([str(chunk_idx),
