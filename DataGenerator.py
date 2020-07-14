@@ -57,7 +57,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 
 
 class DataGenerator:
-    def __init__(self, params, mode="training", *args, **kwargs):
+    def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
         self.params = params
 
         self.PSF_r = self.compute_PSF_r()
@@ -70,21 +70,24 @@ class DataGenerator:
                 print("\n\n\nLoading Training Data", flush=True)
                 self.Xsources_train   = self.get_data_array(self.params.img_dims,
                                                             path=self.params.sources_path_train,
-                                                            fraction_to_load=self.params.fraction_to_load_sources,
+                                                            fraction_to_load=self.params.fraction_to_load_sources_train,
                                                             are_sources=True,
                                                             normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
                                                             pool=p)
                 self.Xnegatives_train = self.get_data_array(self.params.img_dims,
                                                             path=self.params.negatives_path_train,
-                                                            fraction_to_load=self.params.fraction_to_load_negatives,
+                                                            fraction_to_load=self.params.fraction_to_load_negatives_train,
                                                             are_sources=False,
                                                             normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
                                                             pool=p)
                 self.Xlenses_train = self.get_data_array(self.params.img_dims,
                                                             path=self.params.lenses_path_train,
-                                                            fraction_to_load=self.params.fraction_to_load_lenses,
+                                                            fraction_to_load=self.params.fraction_to_load_lenses_train,
                                                             are_sources=False,
                                                             normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
                                                             pool=p)
 
             print_stats_program()
@@ -92,21 +95,24 @@ class DataGenerator:
             print("\n\n\nLoading Validation Data", flush=True)
             self.Xsources_validation = self.get_data_array(self.params.img_dims,
                                                         path=self.params.sources_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_sources,
+                                                        fraction_to_load=self.params.fraction_to_load_sources_vali,
                                                         are_sources=True,
                                                         normalize_dat=self.params.normalize,
+                                                        do_shuffle=do_shuffle_data,
                                                         pool=p)
             self.Xnegatives_validation = self.get_data_array(self.params.img_dims,
                                                         path=self.params.negatives_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_negatives,
+                                                        fraction_to_load=self.params.fraction_to_load_negatives_vali,
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
+                                                        do_shuffle=do_shuffle_data,
                                                         pool=p)
             self.Xlenses_validation    = self.get_data_array(self.params.img_dims,
                                                         path=self.params.lenses_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_lenses,
+                                                        fraction_to_load=self.params.fraction_to_load_lenses_vali,
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
+                                                        do_shuffle=do_shuffle_data,
                                                         pool=p)
             print_stats_program()
         p.join()
@@ -169,7 +175,7 @@ class DataGenerator:
 
 
     # Returns a numpy array with lens images from disk
-    def get_data_array(self, img_dims, path, pool, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image"):
+    def get_data_array(self, img_dims, path, pool, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image", do_shuffle=True):
         
         if normalize_dat not in ("per_image", "per_array", "adapt_hist_eq"):
             raise Exception('Normalization is not initialized, check if normalization is set correctly in run.yaml')
@@ -183,7 +189,8 @@ class DataGenerator:
             data_paths = glob.glob(path + "*_r_*.fits")
 
         # Shuffle the filenames
-        random.shuffle(data_paths)
+        if do_shuffle:
+            random.shuffle(data_paths)
 
         # How many are on disk?
         print("\nNumber of images on disk: {}, for {}".format(len(data_paths), path), flush=True)
@@ -200,7 +207,7 @@ class DataGenerator:
         # Load all the data in into the numpy array:
         f = functools.partial(load_and_normalize_img, data_type, are_sources, normalize_dat, self.PSF_r)
 
-        data_array = np.asarray(pool.map(f, enumerate(data_paths), chunksize=128))           # amount of data that will be given to one thread
+        data_array = np.asarray(pool.map(f, enumerate(data_paths), chunksize=128),dtype=data_type)           # amount of data that will be given to one thread
         print("data array shape: {}".format(data_array.shape), flush=True)
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
@@ -223,7 +230,7 @@ class DataGenerator:
         return ((data_array - np.amin(data_array)) / (np.amax(data_array) - np.amin(data_array)))
     
 
-        # Data_rray = numpy data array that has 4 dimensions (num_imgs, img_width, img_height, num_channels)
+    # Data_rray = numpy data array that has 4 dimensions (num_imgs, img_width, img_height, num_channels)
     # Label = label that is assigned to the data array, preferably 0.0 or 1.0, set to anything else like a string or something, to not assign a label vector.
     # Test_fraction = Percentage of the data array that will be assigned to the test data_array
     def split_train_test_data(self, data_array, label, test_fraction=0.2):
@@ -247,16 +254,20 @@ class DataGenerator:
     
 
     # Loading a chunk into memory
-    def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
+    def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling, do_deterministic=False):
         start_time = time.time()
 
-        # Half a chunk positive and half negative
-        num_positive = int(chunksize / 2)       
-        num_negative = int(chunksize / 2)
-
-        # Get mock lenses data and labels
-        X_pos, y_pos = self.merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling)
+        if do_deterministic:            #do_deterministic is called when you always want the same chunk based on the same X_lenses, X_negatives and X_sources
+            num_positive = X_lenses.shape[0]       
+            num_negative = X_negatives.shape[0]
+        else:
+            # Half a chunk positive and half negative
+            num_positive = int(chunksize / 2)       
+            num_negative = int(chunksize / 2)
         
+        # Get mock lenses data and labels
+        X_pos, y_pos = self.merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=do_deterministic)
+            
         # Store Negative data in numpy array and create label vector
         X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)
         y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
@@ -273,8 +284,10 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
-        print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
-        print_stats_program()
+        if do_deterministic:
+            print("Creating deterministic chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
+        else:
+            print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
 
         return X_chunk, y_chunk
     
@@ -303,17 +316,21 @@ class DataGenerator:
     # and merge them together into a lensing system, further described as 'mock lens'.
     # These mock lenses represent a strong gravitational lensing system that should 
     # get the label 1.0 (positive label). 
-    def merge_lenses_and_sources(self, lenses_array, sources_array, num_mock_lenses, data_type, mock_lens_alpha_scaling = (0.02, 0.30)):
+    def merge_lenses_and_sources(self, lenses_array, sources_array, num_mock_lenses, data_type, mock_lens_alpha_scaling = (0.02, 0.30), do_deterministic=False):
         num_lenses  = lenses_array.shape[0]
         num_sources = sources_array.shape[0]
 
         X_train_positive = np.empty((num_mock_lenses, lenses_array.shape[1], lenses_array.shape[2], lenses_array.shape[3]), dtype=data_type)
         Y_train_positive = np.ones(num_mock_lenses, dtype=data_type)
-
-        # Which indexes to load from sources and lenses (these will be merged together)
-        idxs_lenses = random.choices(list(range(num_lenses)), k=num_mock_lenses)
-        idxs_sources = random.choices(list(range(num_sources)), k=num_mock_lenses)
         
+        # Which indexes to load from sources and lenses (these will be merged together)
+        if do_deterministic:    
+            idxs_lenses = list(range(num_lenses))       # if deterministic we always want the same set
+            idxs_sources = idxs_lenses
+        else:
+            idxs_lenses = random.choices(list(range(num_lenses)), k=num_mock_lenses)
+            idxs_sources = random.choices(list(range(num_sources)), k=num_mock_lenses)
+
         for i in range(num_mock_lenses):
             lens   = lenses_array[idxs_lenses[i]]
             source = sources_array[idxs_sources[i]]

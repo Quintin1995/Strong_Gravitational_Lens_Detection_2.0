@@ -112,6 +112,7 @@ def get_h5s_paths(models):
 
 # Load validation chunk and calculate per model folder its model performance evaluated on f-beta score
 def store_fbeta_results(models, jsons, json_comp_key):
+    
     for idx, model_folder in enumerate(models):
 
         # Load settings of the model
@@ -120,13 +121,14 @@ def store_fbeta_results(models, jsons, json_comp_key):
         
         # Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")
-        params.fraction_to_load_sources = 0.1    # we don't want to load so many sources at this time
+        params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
         if params.model_name == "Baseline_Enrico":
             params.img_dims = (101,101,3)
         
         # Define a DataGenerator that can generate validation chunks based on validation data.
-        dg = DataGenerator(params, mode="no_training")
-        X_validation_chunk, y_validation_chunk = dg.load_chunk(validation_chunks_size, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling)
+        dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
+        placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
+        X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
         
         # Construct a neural network with the same architecture as that it was trained with.
         resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
@@ -214,16 +216,16 @@ models = [
 json_comp_key           = "model_name"              # is the label in generated plots
 do_legend               = True                      # whether legend needs to be present in the plot
 label_override          = False                     # assign labels in the legend based on model folder instead of json_comp_key
+show_all_step4_plots    = False
 
 # f-beta
 beta_squarred = 0.03                                    # For f-beta calculation
 stepsize = 0.01                                         # For f-beta calculation
 threshold_range = np.arange(stepsize,1.0,stepsize)      # For f-beta calculation
-validation_chunks_size = 1100                           # Approximately double the amount of lenses in the validation data
 #########
 
 ## 1.0 - Get list dataframes
-if True:
+if show_all_step4_plots:
     dfs, csv_paths = get_dataframes(models)
 
 ## 2.0 - Get list of jsons
@@ -233,7 +235,7 @@ jsons, json_paths = get_jsons(models)
 paths_h5s = get_h5s_paths(models)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
-if True:
+if show_all_step4_plots:
     for columnname in dfs[0].columns:
         if columnname == "chunk":
             continue
