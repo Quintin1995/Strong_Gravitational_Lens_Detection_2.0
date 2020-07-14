@@ -59,9 +59,13 @@ class Parameters(object):
         self.net_batch_size    = settings["net_batch_size"]
 
         # Loading the input data - What fraction of the data should be loaded into ram?
-        self.fraction_to_load_lenses    = settings["fraction_to_load_lenses"]       # range = [0,1]
-        self.fraction_to_load_negatives = settings["fraction_to_load_negatives"]    # range = [0,1]
-        self.fraction_to_load_sources   = settings["fraction_to_load_sources"]      # range = [0,1]
+        self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]
+        self.fraction_to_load_negatives_train = settings["fraction_to_load_negatives_train"]  # range = [0,1]
+        self.fraction_to_load_sources_train   = settings["fraction_to_load_sources_train"]    # range = [0,1]
+
+        self.fraction_to_load_lenses_vali    = settings["fraction_to_load_lenses_vali"]       # range = [0,1]
+        self.fraction_to_load_negatives_vali = settings["fraction_to_load_negatives_vali"]    # range = [0,1]
+        self.fraction_to_load_sources_vali   = settings["fraction_to_load_sources_vali"]      # range = [0,1]
 
         # Chunk Parameters
         self.num_chunks = settings["num_chunks"]  # Number of chunks to be generated 
