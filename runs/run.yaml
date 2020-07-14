@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "test_ram_logging"    # String
+model_name: "adapt_hist_eq"    # String
 
 # Loading the input data
 fraction_to_load_sources_train  : 0.05     #float# range = [0,1]
@@ -14,14 +14,14 @@ fraction_to_load_negatives_vali: 1.0     #float# range = [0,1]
 fraction_to_load_lenses_vali   : 1.0     #float# range = [0,1]
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
-normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
+normalize: "adapt_hist_eq"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
 num_chunks: 6000                      #int # Number of chunks to be generated 
 chunksize : 1024                      #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
-chunk_plot_interval: 10               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_plot_interval: 50               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
 chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
 
 # Validation Params
