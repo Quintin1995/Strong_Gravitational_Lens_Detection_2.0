@@ -211,10 +211,9 @@ models = [
     "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
     "07_11_2020_15h_11m_03s_test_ram_logging_pere4"
 ]
-comparing_headerName_df = "binary_accuracy"
-json_comp_key           = "model_name"
-do_legend               = True
-label_override          = False
+json_comp_key           = "model_name"              # is the label in generated plots
+do_legend               = True                      # whether legend needs to be present in the plot
+label_override          = False                     # assign labels in the legend based on model folder instead of json_comp_key
 
 # f-beta
 beta_squarred = 0.03                                    # For f-beta calculation
