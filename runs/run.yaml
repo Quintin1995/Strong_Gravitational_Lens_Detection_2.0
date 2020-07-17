@@ -2,18 +2,18 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "mem_leak_test_save_store"    # String
+model_name: "Base"    # String
 
-mem_leak_save_interval: 500        # int - after this amount of chunks the keras backend will be reset and the model loaded in order to adress the tensorflow memory leaks in ternsorflow version 2.x
+mem_leak_save_interval: 500               # int - after this amount of chunks the keras backend will be reset and the model loaded in order to adress the tensorflow memory leaks in ternsorflow version 2.x
 
 # Loading the input data
-fraction_to_load_sources_train  : 1.0     #float# range = [0,1]  train
-fraction_to_load_negatives_train: 1.0     #float# range = [0,1]  train
-fraction_to_load_lenses_train   : 1.0     #float# range = [0,1]  train
+fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
+fraction_to_load_negatives_train: 1.0     #float # range = [0,1]  train
+fraction_to_load_lenses_train   : 1.0     #float # range = [0,1]  train
 
-fraction_to_load_sources_vali  : 1.0     #float# range = [0,1]   validation
-fraction_to_load_negatives_vali: 1.0     #float# range = [0,1]   validation
-fraction_to_load_lenses_vali   : 1.0     #float# range = [0,1]   validation
+fraction_to_load_sources_vali  : 1.0     #float # range = [0,1]   validation
+fraction_to_load_negatives_vali: 1.0     #float # range = [0,1]   validation
+fraction_to_load_lenses_vali   : 1.0     #float # range = [0,1]   validation
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
@@ -27,7 +27,6 @@ chunk_plot_interval: 50               #int # Determines at which training interv
 chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
 
 # Validation Params
-# validation_steps: 8                # int # Amount of Validation steps to be performed during training of the model.
 validation_chunksize: 128
 
 ## EXPERIMENT PARAMETERS
