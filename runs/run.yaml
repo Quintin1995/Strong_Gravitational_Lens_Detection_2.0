@@ -2,13 +2,54 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "rn18_pere_no_avg_pool_adHist"    # String
-root_dir_models: models         # string
+model_name: "Base"    # String
+
+mem_leak_save_interval: 500               # int - after this amount of chunks the keras backend will be reset and the model loaded in order to adress the tensorflow memory leaks in ternsorflow version 2.x
+
+# Loading the input data
+fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
+fraction_to_load_negatives_train: 1.0     #float # range = [0,1]  train
+fraction_to_load_lenses_train   : 1.0     #float # range = [0,1]  train
+
+fraction_to_load_sources_vali  : 1.0     #float # range = [0,1]   validation
+fraction_to_load_negatives_vali: 1.0     #float # range = [0,1]   validation
+fraction_to_load_lenses_vali   : 1.0     #float # range = [0,1]   validation
+
+# Whether to normalize (normalize per data array and not per image) the data during the image loading process.
+normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
+
+# Chunk Parameters
+num_chunks: 6000                      #int # Number of chunks to be generated 
+chunksize : 1024                      #int # The number of images that will fit into one chunk
+
+# Storing results parameters.
+chunk_plot_interval: 50               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
+
+# Validation Params
+validation_chunksize: 128
+
+## EXPERIMENT PARAMETERS
+use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
+
+# Network Paramters
+net_name         : "resnet18"        #string# Determines which model will be loaded: options={"resnet18"}
+net_learning_rate: 0.0001            #float#
+net_model_metrics: "binary_accuracy" #string#
+net_num_outputs  : 1                 #int# How many output neurons does the network need?
+net_epochs       : 1                 #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
+net_batch_size   : 32                #int#
 
 ##### Paths to data
-lenses_path   : "data/training/lenses/"
-negatives_path: "data/training/negatives/"
-sources_path  : "data/training/sources/"
+lenses_path_train   : "data/train/lenses/"
+negatives_path_train: "data/train/negatives/"
+sources_path_train  : "data/train/sources/"
+
+lenses_path_validation   : "data/validation/lenses/"
+negatives_path_validation: "data/validation/negatives/"
+sources_path_validation  : "data/validation/sources/"
+
+root_dir_models: models         # string
 
 # Data type of images in the numpy array
 data_type: "np.float32"
@@ -18,11 +59,9 @@ img_width: 101
 img_height: 101
 img_channels: 1
 
-# Whether to normalize (normalize per data array and not per image) the data during the image loading process.
-normalize: "adapt_hist_eq"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
-
 # Determines the splitting point of the data. Splitting percentage between test and train data.
-test_fraction: 0.2             # 0.2 means that 20% of the data will be reserved for test data.
+#test_fraction: 0.2             # 0.2 means that 20% of the data will be reserved for test data.
+# The data fractions in this project is 80% training, 10% validation and 10% test. This has been chosen at a folder level.
 
 # Alpha scaling, randomly drawn from this uniform distribution. Because the lensing features usually are of a lower luminosity than the LRG. Source scaling factor.
 mock_lens_alpha_scaling_min: 0.02     #float
@@ -38,30 +77,3 @@ aug_num_pixels_shift_allowed: 4     #int# In Pixels
 aug_rotation_range    : 360         #int# In Degrees
 aug_do_horizontal_flip: True        #boolean# 50% of the time do a horizontal flip)  
 aug_default_fill_mode : 'nearest'   #string# Interpolation method, for data augmentation.
-
-# Network Paramters
-net_name         : "resnet18"        #string# Determines which model will be loaded: options={"resnet18"}
-net_learning_rate: 0.0001            #float#
-net_model_metrics: "binary_accuracy" #string#
-net_num_outputs  : 1                 #int# How many output neurons does the network need?
-net_epochs       : 1                 #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
-net_batch_size   : 64                #int#
-
-# Loading the input data
-fraction_to_load_lenses   : 1.0     #float# range = [0,1]
-fraction_to_load_negatives: 1.0     #float# range = [0,1]
-fraction_to_load_sources  : 0.1     #float# range = [0,1]
-
-# Chunk Parameters
-num_chunks: 6000                       #int # Number of chunks to be generated 
-chunksize : 1024                        #int # The number of images that will fit into one chunk
-
-# Storing results parameters.
-chunk_plot_interval: 10               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
-chunk_save_interval: 50               #int # After this amount of chunks the model will be saved.
-
-# Validation Params
-validation_steps: 32                # int # Amount of Validation steps to be performed during training of the model.
-
-## EXPERIMENT PARAMETERS
-use_avg_pooling_2D: False            #boolean, # Whether the resnet contains GLOBAL AVG POOLING

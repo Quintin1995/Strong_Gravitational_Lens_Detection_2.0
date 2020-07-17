@@ -1,9 +1,10 @@
 import os
 from utils import *
 import json
+from shutil import copyfile
 
 class Parameters(object):
-    def __init__(self, settings):
+    def __init__(self, settings, yaml_fpath, mode="training"):
 
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
@@ -13,11 +14,14 @@ class Parameters(object):
         create_dir_if_not_exists("runs")
         create_dir_if_not_exists("slurms")
 
-
         ##### Paths to data
-        self.lenses_path     = settings["lenses_path"]
-        self.negatives_path  = settings["negatives_path"]
-        self.sources_path    = settings["sources_path"]
+        self.lenses_path_train     = settings["lenses_path_train"]
+        self.negatives_path_train  = settings["negatives_path_train"]
+        self.sources_path_train    = settings["sources_path_train"]
+
+        self.lenses_path_validation     = settings["lenses_path_validation"]
+        self.negatives_path_validation  = settings["negatives_path_validation"]
+        self.sources_path_validation    = settings["sources_path_validation"]
 
         # Data type of images in the numpy array
         self.data_type = None
@@ -29,7 +33,7 @@ class Parameters(object):
         self.normalize = settings["normalize"]        #options = {"None", "per_image", "per_array"}
 
         # Determines the splitting point of the data. Splitting percentage between test and train data.
-        self.test_fraction = settings["test_fraction"]            # 0.2 means that 20% of the data will be reserved for test data.
+        # self.test_fraction = settings["test_fraction"]            # 0.2 means that 20% of the data will be reserved for test data.
 
         # Alpha scaling, randomly drawn from this uniform distribution. Because the lensing features usually are of a lower luminosity than the LRG. Source scaling factor.
         self.mock_lens_alpha_scaling = (settings["mock_lens_alpha_scaling_min"],settings["mock_lens_alpha_scaling_max"])
@@ -55,9 +59,13 @@ class Parameters(object):
         self.net_batch_size    = settings["net_batch_size"]
 
         # Loading the input data - What fraction of the data should be loaded into ram?
-        self.fraction_to_load_lenses    = settings["fraction_to_load_lenses"]       # range = [0,1]
-        self.fraction_to_load_negatives = settings["fraction_to_load_negatives"]    # range = [0,1]
-        self.fraction_to_load_sources   = settings["fraction_to_load_sources"]      # range = [0,1]
+        self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]
+        self.fraction_to_load_negatives_train = settings["fraction_to_load_negatives_train"]  # range = [0,1]
+        self.fraction_to_load_sources_train   = settings["fraction_to_load_sources_train"]    # range = [0,1]
+
+        self.fraction_to_load_lenses_vali    = settings["fraction_to_load_lenses_vali"]       # range = [0,1]
+        self.fraction_to_load_negatives_vali = settings["fraction_to_load_negatives_vali"]    # range = [0,1]
+        self.fraction_to_load_sources_vali   = settings["fraction_to_load_sources_vali"]      # range = [0,1]
 
         # Chunk Parameters
         self.num_chunks = settings["num_chunks"]  # Number of chunks to be generated 
@@ -70,7 +78,8 @@ class Parameters(object):
         self.root_dir_models        = settings["root_dir_models"]
         self.model_folder           = get_time_string() + "_" +self.model_name   #A model will be stored in a folder with just a date&time as folder name
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
-        self.make_model_dir()       #create directory for all data concerning this model.
+        if mode == "training":
+            self.make_model_dir()       #create directory for all data concerning this model.
         
         # Weights .h5 file
         self.weights_extension      = ".h5"                 #Extension for saving weights
@@ -92,18 +101,27 @@ class Parameters(object):
         self.filename_param_dump   = self.model_name + "_param_dump" + self.param_dump_extension
         self.full_path_param_dump  = os.path.join(self.model_path, self.filename_param_dump)
 
+        # In this folder a complete set of the model is stored, so that i can be rebuild later. This includes where it is in training stage (learning rate etc.)
+        self.saved_model_folder      = "my_model_storage"
+        self.full_path_model_storage = os.path.join(self.model_path, self.saved_model_folder)
+
         # Plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
+        self.mem_leak_save_interval= settings["mem_leak_save_interval"]
 
-        # Validation_steps - Number of validation images that will be tested during training. (per chunk)
-        self.validation_steps      = settings["validation_steps"]
+        # Validation chunk size - Number of validation images that will be tested during training. (per chunk)
+        self.validation_chunksize  = settings["validation_chunksize"]
 
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
 
-        #store all parameters of this object into a json file
-        self.write_parameters_to_file()
+        if mode == "training":
+            #copy run.yaml to model folder
+            copyfile(yaml_fpath, os.path.join(self.model_path, "run.yaml"))
+
+            #store all parameters of this object into a json file
+            self.write_parameters_to_file()
 
 
     # Create a folder where all model input/ouput is stored.
