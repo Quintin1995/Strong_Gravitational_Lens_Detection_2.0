@@ -101,9 +101,14 @@ class Parameters(object):
         self.filename_param_dump   = self.model_name + "_param_dump" + self.param_dump_extension
         self.full_path_param_dump  = os.path.join(self.model_path, self.filename_param_dump)
 
+        # In this folder a complete set of the model is stored, so that i can be rebuild later. This includes where it is in training stage (learning rate etc.)
+        self.saved_model_folder      = "my_model_storage"
+        self.full_path_model_storage = os.path.join(self.model_path, self.saved_model_folder)
+
         # Plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
+        self.mem_leak_save_interval= settings["mem_leak_save_interval"]
 
         # Validation chunk size - Number of validation images that will be tested during training. (per chunk)
         self.validation_chunksize  = settings["validation_chunksize"]
