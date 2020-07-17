@@ -226,11 +226,15 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
 ############## Parameters ##############
 root_models = "models"
 
+root_models = os.path.join(root_models, "good_models")
+
 ######### Settable Paramters
 models = [
-    # "resnet_single_newtr_last_last_weights_only",
-    "07_11_2020_14h_39m_01s_test_ram_logging_3700chunks_ownPC",
-    "07_11_2020_15h_11m_03s_test_ram_logging_pere4"
+    "resnet_single_newtr_last_last_weights_only",
+    "07_14_2020_18h_08m_33s_mem_leak_test_save_store",
+    "07_11_2020_15h_11m_03s_test_ram_logging_pere4",
+    "07_14_2020_16h_19m_59s_adapt_hist_eq"
+
 ]
 json_comp_key           = "model_name"              # is the label in generated plots
 do_legend               = True                      # whether legend needs to be present in the plot
