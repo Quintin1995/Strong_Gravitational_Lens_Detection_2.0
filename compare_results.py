@@ -60,17 +60,16 @@ def get_dataframes(models):
     dfs = []    # list of dataframes - for each csv
     model_paths_csv = []
     for idx, model in enumerate(models):
-        print("Model: {} - csv data".format(idx))
+        if verbatim:
+            print("Model: {} - csv data".format(idx))
         path = os.path.join(root_models, model)
         history_csv_path = glob.glob(path + "/*history.csv")[0]
         model_paths_csv.append(history_csv_path)
         dfs.append(pd.read_csv(history_csv_path))
-        # dfs.insert(0, pd.read_csv(history_csv_path))
-        print("path = {}".format(history_csv_path))
-        print(dfs[idx].head())
-        print("\n")
-    # dfs.reverse()
-    # model_paths_csv.reverse()
+        if verbatim:
+            print("path = {}".format(history_csv_path))
+            print(dfs[idx].head())
+            print("\n")
     return dfs, model_paths_csv
 
 
@@ -78,36 +77,36 @@ def get_dataframes(models):
 # This will be used to get model paramters when plotting
 # json - Input Parameter Dump
 def get_jsons(models):
-    print("\n\njson files: ")
+    if verbatim:
+        print("\n\njson files: ")
     jsons = []
     model_paths_json = []
     for idx, model in enumerate(models):
-        print("Model: {} - json data".format(idx))
+        if verbatim:
+            print("Model: {} - json data".format(idx))
         path = os.path.join(root_models, model)
         paramDump_json_path = glob.glob(path + "/*.json")[0]
         model_paths_json.append(paramDump_json_path)
         jsons.append(json.load(open(paramDump_json_path)))
-        # jsons.insert(0, json.load(open(paramDump_json_path)))
-        print("path = {}".format(paramDump_json_path))
-        for i in jsons[idx]:
-            print("\t" + i + ": " + str(jsons[idx][i]))
-        print("\n")
-    # jsons.reverse()
-    # model_paths_json.reverse()
+        if verbatim:
+            print("path = {}".format(paramDump_json_path))
+            for i in jsons[idx]:
+                print("\t" + i + ": " + str(jsons[idx][i]))
+            print("\n")
     return jsons, model_paths_json
 
 
 # For each model path in models find a .h5 file path and return it.
 def get_h5s_paths(models):
-    print("\n\nh5 files: ")
+    if verbatim:
+        print("\n\nh5 files: ")
     paths_h5s = []
     for idx, model in enumerate(models):
-        print("Model: {} - h5 file".format(idx))
+        if verbatim:
+            print("Model: {} - h5 file".format(idx))
         path = os.path.join(root_models, model)
         h5_path = glob.glob(path + "/*.h5")[0]
         paths_h5s.append(h5_path)
-        # paths_h5s.insert(0, h5_path)
-    # paths_h5s.reverse()
     return paths_h5s
 
 
@@ -223,32 +222,72 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
         plt.legend()
     plt.show()
 
+
+# Plot the losses of the trained model over training time. Plot the average loss based on a windows size given as parameter.
+def plot_losses_avg(models, window_size=10):
+    for j in range(len(models)):
+        df_val_loss = dfs[j]["val_loss"]
+        df_loss     = dfs[j]["loss"]
+
+        val_loss_avg = []
+        for i in range(len(df_val_loss) - window_size):
+            val_loss_avg.append(sum(list(df_val_loss[i:i+window_size])) / window_size)
+            
+        loss_avg = []
+        for i in range(len(df_loss) - window_size):
+            loss_avg.append(sum(list(df_loss[i:i+window_size])) / window_size) 
+
+        diff_loss = []
+        for k in range(len(loss_avg)):
+            diff_loss.append(val_loss_avg[k] - loss_avg[k])
+
+        plt.plot(val_loss_avg, label="val loss - avg window {}".format(window_size))
+        plt.plot(loss_avg, label="train loss - avg window {}".format(window_size))
+        plt.plot(diff_loss, label="diff loss")
+
+        plt.title("Model losses - {}".format(models[j]))
+        plt.ylabel("loss")
+        plt.xlabel("Trained Chunks")
+        if do_legend:
+            plt.legend()
+        plt.savefig(os.path.join(root_models, models[j], "avg_loss_Window{}".format(window_size)))
+        plt.show()
+
+
+
+
+
 ############## Parameters ##############
 root_models = "models"
-
 root_models = os.path.join(root_models, "good_models")
 
 ######### Settable Paramters
 models = [
-    "resnet_single_newtr_last_last_weights_only",
-    "07_14_2020_18h_08m_33s_mem_leak_test_save_store",
+    # "resnet_single_newtr_last_last_weights_only",
+    # "07_14_2020_18h_08m_33s_mem_leak_test_save_store",
     "07_11_2020_15h_11m_03s_test_ram_logging_pere4",
-    "07_14_2020_16h_19m_59s_adapt_hist_eq"
+    # "07_14_2020_16h_19m_59s_adapt_hist_eq"
 
 ]
 json_comp_key           = "model_name"              # is the label in generated plots
 do_legend               = True                      # whether legend needs to be present in the plot
 label_override          = False                     # assign labels in the legend based on model folder instead of json_comp_key
 show_all_step4_plots    = False
+do_show_overfit_plot    = True
 
 # f-beta
 beta_squarred = 0.03                                    # For f-beta calculation
 stepsize = 0.01                                         # For f-beta calculation
 threshold_range = np.arange(stepsize,1.0,stepsize)      # For f-beta calculation
-#########
+
+verbatim = False
+######################################################
+
+
+
 
 ## 1.0 - Get list dataframes
-if show_all_step4_plots:
+if show_all_step4_plots or do_show_overfit_plot:
     dfs, csv_paths = get_dataframes(models)
 
 ## 2.0 - Get list of jsons
@@ -256,6 +295,13 @@ jsons, json_paths = get_jsons(models)
 
 ## 3.0 - get list of .h5 files
 paths_h5s = get_h5s_paths(models)
+
+## 3.1 - Show the losses nicely for each model
+if do_show_overfit_plot:
+    window_sizes = np.arange(1,100,25)
+    print("Window sizes = {}".format(window_sizes))
+    for window_size in window_sizes:
+        plot_losses_avg(models, window_size)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
 if show_all_step4_plots:
@@ -265,5 +311,5 @@ if show_all_step4_plots:
         compare_plot_models(columnname, dfs, jsons, json_comp_key, do_legend)
 
 ## 5.0 - Calculate f-beta score per model - based on validation data
-if True:
+if False:
     store_fbeta_results(models, jsons, json_comp_key)
