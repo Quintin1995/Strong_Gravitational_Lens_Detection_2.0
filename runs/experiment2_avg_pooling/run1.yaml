@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "Base"    # String
+model_name: "yes_global_avg_pooling-Base"    # String
 
 mem_leak_save_interval: 500               # int - after this amount of chunks the keras backend will be reset and the model loaded in order to adress the tensorflow memory leaks in ternsorflow version 2.x
 

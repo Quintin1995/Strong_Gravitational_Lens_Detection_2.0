@@ -9,16 +9,22 @@ from DataGenerator import *
 import csv
 import psutil
 import tensorflow as tf
+import sys
+import os
+
+###### Step 0.1 settings input file will now be given as an input argument to the program.
+assert len(sys.argv) == 2   #2 input arguments are supposed to be given. main.py run.yaml
+yaml_path = sys.argv[1]
 
 
-###### Step 1.0: Load all settings from .yaml file
-yaml_path = "runs/run.yaml"
+###### Step 1.0 - Load all settings from .yaml file
+# yaml_path = "runs/run.yaml"
 settings_yaml = load_settings_yaml(yaml_path)
 params = Parameters(settings_yaml, yaml_path)
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
 
-###### Step 2.0 Create Image Data Generator
+###### Step 2.0 - Create Image Data Generator
 dg = DataGenerator(params)
 
 
