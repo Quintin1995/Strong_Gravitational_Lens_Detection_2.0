@@ -137,3 +137,6 @@ weights_only_full_trained/
 
 #stored weights files
 *.h5
+
+#slurms
+*.out
