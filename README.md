@@ -10,4 +10,4 @@ python3 main.py runs/experiment_folder/run.yaml
 
 Parameters can be set in runs/experiment_folder/run.yaml.
 
-More detailed information will added later on. At this stage in the project changes will be large and frequent.
+More detailed information will be added later on. At this stage in the project, changes will and frequent.
