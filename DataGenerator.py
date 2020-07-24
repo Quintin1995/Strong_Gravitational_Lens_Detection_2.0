@@ -320,7 +320,7 @@ class DataGenerator:
         Y_train_positive = np.ones(num_mock_lenses, dtype=data_type)
         
         # Which indexes to load from sources and lenses (these will be merged together)
-        if do_deterministic:    
+        if do_deterministic:
             idxs_lenses = list(range(num_lenses))       # if deterministic we always want the same set
             idxs_sources = idxs_lenses
         else:

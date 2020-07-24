@@ -119,7 +119,7 @@ def dstack_data(data):
     return dstack_data
 
 
-def average_prediction_results(network, data, avg_iter_counter=10, verbose=False):
+def average_prediction_results(network, data, avg_iter_counter=10, verbose=True):
     avg_preds = np.zeros((data.shape[0],1), dtype=np.float32)
     for i in range(avg_iter_counter):
         if verbose:
@@ -142,6 +142,8 @@ def store_fbeta_results(models, jsons, json_comp_key):
         
         # Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")
+        params.fraction_to_load_sources_vali = 0.15
+
         params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
         if params.model_name == "Baseline_Enrico":
             params.img_dims = (101,101,3)
@@ -197,7 +199,7 @@ def store_fbeta_results(models, jsons, json_comp_key):
     
 
 def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend):
-    for idx in range(len(dfs)):         # loop over each model dataframe
+    for idx in range(len(dfs)):         # loop over each model dataframe        
         data = dfs[idx][comparing_headerName_df]
         
         # time needs to be formatted before it can be plotted
@@ -259,21 +261,36 @@ def plot_losses_avg(models, window_size=10):
 
 ############## Parameters ##############
 root_models = "models"
-root_models = os.path.join(root_models, "good_models")
+experiment_folder = "experiment3_chunk_amount"
+root_models = os.path.join(root_models, experiment_folder)
 
 ######### Settable Paramters
 models = [
-    # "resnet_single_newtr_last_last_weights_only",
-    "07_14_2020_18h_08m_33s_mem_leak_test_save_store",
-    # "07_11_2020_15h_11m_03s_test_ram_logging_pere4",
-    # "07_14_2020_16h_19m_59s_adapt_hist_eq"
-
+    "07_19_2020_13h_53m_36s_25Percent_chunks",
+    "07_19_2020_13h_53m_35s_50Percent_chunks",
+    "07_19_2020_13h_53m_35s_75Percent_chunks",
+    "07_17_2020_13h_47m_10s_100PercChunks",
+    "resnet_single_newtr_last_last_weights_only"
 ]
+
 json_comp_key           = "model_name"              # is the label in generated plots
 do_legend               = True                      # whether legend needs to be present in the plot
 label_override          = False                     # assign labels in the legend based on model folder instead of json_comp_key
-show_all_step4_plots    = True
-do_show_overfit_plot    = True
+
+show_all_step4_plots    = False
+do_show_overfit_plot    = False
+do_show_fbeta_plot      = True
+plots_to_show = {
+    # "loss",
+    "binary_accuracy",
+    # "val_loss",
+    "val_binary_accuracy",
+    "time",
+    # "cpu_percentage",
+    # "ram_usage",
+    # "available_mem",
+    # "chunk"
+}
 
 # f-beta
 beta_squarred = 0.03                                    # For f-beta calculation
@@ -282,7 +299,6 @@ threshold_range = np.arange(stepsize,1.0,stepsize)      # For f-beta calculation
 
 verbatim = False
 ######################################################
-
 
 
 
@@ -298,18 +314,18 @@ paths_h5s = get_h5s_paths(models)
 
 ## 3.1 - Show the losses nicely for each model
 if do_show_overfit_plot:
-    window_sizes = np.arange(1,100,25)
-    print("Window sizes = {}".format(window_sizes))
-    for window_size in window_sizes:
-        plot_losses_avg(models, window_size)
+    # window_sizes = np.arange(33,100,50)
+    # print("Window sizes = {}".format(window_sizes))
+    # for window_size in window_sizes:
+    plot_losses_avg(models, 50)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
 if show_all_step4_plots:
     for columnname in dfs[0].columns:
-        if columnname == "chunk":
+        if columnname not in plots_to_show:
             continue
         compare_plot_models(columnname, dfs, jsons, json_comp_key, do_legend)
 
 ## 5.0 - Calculate f-beta score per model - based on validation data
-if False:
+if do_show_fbeta_plot:
     store_fbeta_results(models, jsons, json_comp_key)
