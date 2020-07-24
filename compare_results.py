@@ -133,14 +133,18 @@ def average_prediction_results(network, data, avg_iter_counter=10, verbose=True)
 
 
 # Load validation chunk and calculate per model folder its model performance evaluated on f-beta score
-def store_fbeta_results(models, jsons, json_comp_key):
+def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
     for idx, model_folder in enumerate(models):
-        
-        # Load settings of the model
+        # Step 0.0 - inits
+        colors = ['green', 'orangered', 'lawngreen', 'c', 'b', 'plum', 'darkturquoise', 'm']
+        f_beta_full_path = os.path.join(root_models, model_folder, "f_beta_results.csv")
+        full_path_fBeta_figure = os.path.join(root_models, model_folder, "f_beta_graph.png")
+
+        # Step 1.0 - Load settings of the model
         yaml_path = glob.glob(os.path.join(root_models, model_folder) + "/*.yaml")[0]
         settings_yaml = load_settings_yaml(yaml_path)
         
-        # Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
+        # Step 2.0 Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")
         params.fraction_to_load_sources_vali = 0.15
 
@@ -148,53 +152,67 @@ def store_fbeta_results(models, jsons, json_comp_key):
         if params.model_name == "Baseline_Enrico":
             params.img_dims = (101,101,3)
         
-        # Construct a neural network with the same architecture as that it was trained with.
+        # Step 3.0 - Construct a neural network with the same architecture as that it was trained with.
         resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
         resnet18.model.trainable = False
         
-        # Load weights of the neural network
+        # Step 4.0 - Load weights of the neural network
         resnet18.model.load_weights(paths_h5s[idx])
 
-        # Define a DataGenerator that can generate validation chunks based on validation data.
+        # Step 5.0 - Define a DataGenerator that can generate validation chunks based on validation data.
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
         placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
         
-        X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
-        
-        # dstack images for enrico neural network
-        if params.model_name == "Baseline_Enrico":
-            X_validation_chunk = dstack_data(X_validation_chunk)
+        # Step 6.0 - we want a nice plot with standard deviation.
+        f_beta_vectors = []
+        for i in range(f_beta_avg_count):
+            X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
+            
+            # Step 6.1 - dstack images for enrico neural network
+            if params.model_name == "Baseline_Enrico":
+                X_validation_chunk = dstack_data(X_validation_chunk)
 
-        # Predict the labels of the validation chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
-        avg_preds = average_prediction_results(resnet18, X_validation_chunk, avg_iter_counter=10, verbose=False)
-        
-        # Define paths to filenames for f-beta saving and its plot
-        f_beta_full_path = os.path.join(root_models, model_folder, "f_beta_results.csv")
-        full_path_fBeta_figure = os.path.join(root_models, model_folder, "f_beta_graph.png")
+            # Step 6.2 - Predict the labels of the validation chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
+            # avg_preds = average_prediction_results(resnet18, X_validation_chunk, avg_iter_counter=11, verbose=False)
+            preds = resnet18.model.predict(X_validation_chunk)
 
-        # Begin f-beta calculation and store into csv file
-        f_betas = []
-        with open(f_beta_full_path, 'w', newline='') as f_beta_file:
-            writer = csv.writer(f_beta_file)
-            writer.writerow(["p_threshold", "TP", "TN", "FP", "FN", "precision", "recall", "fp_rate", "accuracy", "f_beta"])
-            for p_threshold in threshold_range:
-                (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(avg_preds, y_validation_chunk, p_threshold, beta_squarred)
-                f_betas.append(F_beta)
-                writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
+            # Step 6.3 - Begin f-beta calculation and store into csv file
+            f_betas = []
+            with open(f_beta_full_path, 'w', newline='') as f_beta_file:
+                writer = csv.writer(f_beta_file)
+                writer.writerow(["p_threshold", "TP", "TN", "FP", "FN", "precision", "recall", "fp_rate", "accuracy", "f_beta"])
+                for p_threshold in threshold_range:
+                    (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(preds, y_validation_chunk, p_threshold, beta_squarred)
+                    f_betas.append(F_beta)
+                    writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
+            f_beta_vectors.append(f_betas)
         print("saved csv with f_beta scores to: ".format(f_beta_full_path), flush=True)
+        
+        # step 7.0 - calculate std and mean - based on f_beta_vectors
+        colls = list(zip(*f_beta_vectors))
+        means = np.asarray(list(map(np.mean, map(np.asarray, colls))))
+        stds = np.asarray(list(map(np.std, map(np.asarray, colls))))
 
-        if label_override:
-            plt.plot(list(threshold_range), f_betas, label = models[idx])
-        else:
-            plt.plot(list(threshold_range), f_betas, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+        # step 7.1 - define upper and lower limits
+        upline  = np.add(means, stds)
+        lowline = np.subtract(means, stds)
+
+        # step 7.2 - Plotting all lines
+        plt.plot(list(threshold_range), upline, colors[idx])
+        plt.plot(list(threshold_range), means, colors[idx], label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+        plt.plot(list(threshold_range), lowline, colors[idx])
+        plt.fill_between(list(threshold_range), upline, lowline, color=colors[idx], alpha=0.5) 
+            
+        # plt.plot(list(threshold_range), f_betas, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
         plt.xlabel("p threshold")
         plt.ylabel("F")
+        
         plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
 
         plt.savefig(full_path_fBeta_figure)
         print("figure saved: {}".format(full_path_fBeta_figure), flush=True)
-    if do_legend:
-        plt.legend()
+
+    plt.legend()
     plt.show()
     
 
@@ -211,11 +229,8 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
                 formatted_time_data.append(int(parts[0])*60 + int(parts[1]) + int(parts[2])/60)
             data = formatted_time_data
 
-        if label_override:
-            plt.plot(data, label = models[idx])
-        else:
-            plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
-            print(str(str(json_comp_key) + ": " + str(jsons[idx][json_comp_key])))
+        plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+        print(str(str(json_comp_key) + ": " + str(jsons[idx][json_comp_key])))
 
     plt.title(comparing_headerName_df)
     plt.ylabel(comparing_headerName_df)
@@ -261,25 +276,27 @@ def plot_losses_avg(models, window_size=10):
 
 ############## Parameters ##############
 root_models = "models"
-experiment_folder = "experiment3_chunk_amount"
+experiment_folder = "experiment4_learning_rate"
 root_models = os.path.join(root_models, experiment_folder)
 
 ######### Settable Paramters
 models = [
-    "07_19_2020_13h_53m_36s_25Percent_chunks",
-    "07_19_2020_13h_53m_35s_50Percent_chunks",
-    "07_19_2020_13h_53m_35s_75Percent_chunks",
-    "07_17_2020_13h_47m_10s_100PercChunks",
-    "resnet_single_newtr_last_last_weights_only"
+    "07_17_2020_13h_47m_10s_learning_rate_0001",
+    "07_17_2020_14h_13m_09s_learning_rate_001",
+    "07_19_2020_13h_54m_04s_learning_rate_00001",
+    # "07_19_2020_13h_53m_36s_25Percent_chunks",
+    # "resnet_single_newtr_last_last_weights_only"
+    # "07_17_2020_13h_47m_10s_100PercChunks",
+    # "resnet_single_newtr_last_last_weights_only"
 ]
 
 json_comp_key           = "model_name"              # is the label in generated plots
 do_legend               = True                      # whether legend needs to be present in the plot
-label_override          = False                     # assign labels in the legend based on model folder instead of json_comp_key
 
 show_all_step4_plots    = False
 do_show_overfit_plot    = False
 do_show_fbeta_plot      = True
+f_beta_avg_count        = 10                         # how many chunks should be evaluated, over which the mean and standard deviation will be calculated
 plots_to_show = {
     # "loss",
     "binary_accuracy",
@@ -328,4 +345,4 @@ if show_all_step4_plots:
 
 ## 5.0 - Calculate f-beta score per model - based on validation data
 if do_show_fbeta_plot:
-    store_fbeta_results(models, jsons, json_comp_key)
+    store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count)
