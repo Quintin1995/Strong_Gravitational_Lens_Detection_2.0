@@ -12,13 +12,16 @@ import tensorflow as tf
 import sys
 import os
 
+def get_string(string_in):
+    return str(string_in)
+
+
 ###### Step 0.1 settings input file will now be given as an input argument to the program.
 assert len(sys.argv) == 2   #2 input arguments are supposed to be given. main.py run.yaml
 yaml_path = sys.argv[1]
 
 
 ###### Step 1.0 - Load all settings from .yaml file
-# yaml_path = "runs/run.yaml"
 settings_yaml = load_settings_yaml(yaml_path)
 params = Parameters(settings_yaml, yaml_path)
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
@@ -30,6 +33,12 @@ dg = DataGenerator(params)
 
 ###### Step 3.0 - Create Neural Network - Resnet18
 resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
+
+
+###### Step 3.1 - Store neural net summary to file
+with open(params.full_path_neural_net_printout,'w') as fh:
+    # Pass the file handle in as a lambda function to make it callable
+    resnet18.model.summary(print_fn=lambda x: fh.write(x + '\n'))
 
 
 ###### Step 4.0 - Training

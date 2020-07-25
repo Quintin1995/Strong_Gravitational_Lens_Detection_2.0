@@ -105,6 +105,10 @@ class Parameters(object):
         self.saved_model_folder      = "my_model_storage"
         self.full_path_model_storage = os.path.join(self.model_path, self.saved_model_folder)
 
+        # In this txt a complete printout of the neural net architecture is stored.
+        self.neural_net_txt_printout = "neural_net_printout.txt"
+        self.full_path_neural_net_printout = os.path.join(self.model_path, self.neural_net_txt_printout)
+
         # Plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
