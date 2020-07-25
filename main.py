@@ -85,7 +85,8 @@ try:
             print("Saved model weights to: {}".format(params.full_path_of_weights), flush=True)
 
         # Reset backend of tensorflow so that memory does not leak
-        if chunk_idx % params.mem_leak_save_interval == 0:
+        if(psutil.virtual_memory().percent > 90.0):
+        # if chunk_idx % params.mem_leak_save_interval == 0:
             print("reseting tensorflow keras backend",flush=True)
             resnet18.model.save(params.full_path_model_storage)
             tf.keras.backend.clear_session()
