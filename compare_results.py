@@ -56,7 +56,8 @@ def count_TP_TN_FP_FN_and_FB(prediction_vector, y_test, threshold, beta_squarred
 # This will be used for plotting data about the model
 # csv - Output Dump
 def get_dataframes(models):
-    print("\n\nReadin in csv data:")
+    if verbatim:
+        print("\n\nReading in csv data:")
     dfs = []    # list of dataframes - for each csv
     model_paths_csv = []
     for idx, model in enumerate(models):
@@ -136,7 +137,6 @@ def average_prediction_results(network, data, avg_iter_counter=10, verbose=True)
 def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
     for idx, model_folder in enumerate(models):
         # Step 0.0 - inits
-        colors = ['green', 'orangered', 'lawngreen', 'c', 'b', 'plum', 'darkturquoise', 'm']
         f_beta_full_path = os.path.join(root_models, model_folder, "f_beta_results.csv")
         full_path_fBeta_figure = os.path.join(root_models, model_folder, "f_beta_graph.png")
 
@@ -216,7 +216,7 @@ def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
     plt.show()
     
 
-def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_legend):
+def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
     for idx in range(len(dfs)):         # loop over each model dataframe        
         data = dfs[idx][comparing_headerName_df]
         
@@ -235,8 +235,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key, do_l
     plt.title(comparing_headerName_df)
     plt.ylabel(comparing_headerName_df)
     plt.xlabel("Trained Chunks")
-    if do_legend:
-        plt.legend()
+    plt.legend()
     plt.show()
 
 
@@ -265,59 +264,127 @@ def plot_losses_avg(models, window_size=10):
         plt.title("Model losses - {}".format(models[j]))
         plt.ylabel("loss")
         plt.xlabel("Trained Chunks")
-        if do_legend:
-            plt.legend()
-        plt.savefig(os.path.join(root_models, models[j], "avg_loss_Window{}".format(window_size)))
-        plt.show()
+    plt.legend()
+    plt.savefig(os.path.join(root_models, models[j], "avg_loss_Window{}".format(window_size)))
+    plt.show()
 
 
+# Plot the sliding window average error (in percentage) of the given models over time/chunks
+def plot_errors(models, jsons, json_comp_key, window_size=50, ylim_top = 1.0, ylim_bottom=0.0):
+    for model_idx in range(len(models)):
 
+        # Selecting columns of interest
+        df_acc     = dfs[model_idx]["binary_accuracy"]
+        df_acc_val = dfs[model_idx]["val_binary_accuracy"]
+
+        # Sliding window average of train accuracy
+        train_error_avg = []
+        for i in range(len(df_acc_val) - window_size):
+            train_error_avg.append(sum(list(100.0-100.0*df_acc[i:i+window_size])) / window_size)
+
+        # Sliding window average of validation accuracy
+        vali_error_avg = []
+        for idx in range(len(df_acc_val) - window_size):
+            vali_error_avg.append(sum(list(100.0-100.0*df_acc_val[idx:idx+window_size])) / window_size)
+        
+        plt.plot(train_error_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(vali_error_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
+
+        plt.title("Error Plot")
+        plt.ylabel("Error (%)")
+        plt.xlabel("Trained Chunks")
+    
+    # Maximize current figure before saving
+    manager = plt.get_current_fig_manager()
+    manager.window.showMaximized()
+
+    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
+    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    figure = plt.gcf() # get current figure
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.savefig(os.path.join(root_models, models[model_idx], "error_train_vali"), dpi=100)
+    plt.show()
+    if verbatim:
+        print("done Plotting Errors")
 
 
 ############## Parameters ##############
-root_models = "models"
+## Set colors to be used in all plots
+colors = ['r', 'c', 'green', 'orangered', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
+
+## Set root
+root_models = "models"                              # Where the experiment folders are located
+
+## Set experiment folder
+# experiment_folder = "experiment1_normalization"
+# experiment_folder = "experiment2_avg_pooling"
 experiment_folder = "experiment3_chunk_amount"
+# experiment_folder = "experiment4_learning_rate"
+
 root_models = os.path.join(root_models, experiment_folder)
 
 ######### Settable Paramters
+# This is a list of folder names. These folders should contain a (.h5, .json, .yaml, .csv - files.)
 models = [
-    "07_25_2020_16h_42m_13s_chunkAmount12000",
-    "07_19_2020_13h_53m_35s_50Percent_chunks",
-    "07_17_2020_13h_47m_10s_100PercChunks"
-    # "resnet_single_newtr_last_last_weights_only"
+    # "07_17_2020_14h_13m_09s_learning_rate_001",         #learning rate
+    # "07_17_2020_13h_47m_10s_learning_rate_0001",        #learning rate
+    # "07_19_2020_13h_54m_04s_learning_rate_00001",       #learning rate
+    # "07_17_2020_13h_47m_10s_norm_perImage",             #normalization
+    # "07_17_2020_13h_48m_02s_norm_perArray",             #normalization
+    # "07_19_2020_13h_53m_16s_norm_adaptHistEq"           #normalization
+    "07_17_2020_13h_47m_10s_100PercChunks",             #chunk amount
+    "07_19_2020_13h_53m_35s_50Percent_chunks",          #chunk amount
+    "07_19_2020_13h_53m_35s_75Percent_chunks",          #chunk amount
+    "07_19_2020_13h_53m_36s_25Percent_chunks",          #chunk amount
+    "07_27_2020_14h_11m_11s_chunkAmount12000"
+    # "resnet_single_newtr_last_last_weights_only"      #enrico baseline
 ]
-
 json_comp_key           = "model_name"              # is the label in generated plots
-do_legend               = True                      # whether legend needs to be present in the plot
+verbatim = False
 
-show_all_step4_plots    = True
-do_show_overfit_plot    = True
-do_show_fbeta_plot      = True
-f_beta_avg_count        = 10                         # how many chunks should be evaluated, over which the mean and standard deviation will be calculated
+### 0 - Error Plot of given Models
+do_show_error_plot      = True
+error_window_size       = 500     # avg window size
+ytop                    = 100.0    # Error plot y upper-limit in percentage
+ybottom                 = 0.00    # Error plot y bottom-limit in percentage
+
+
+### 1a - Overfit plot ###
+# Shows a plot where the loss is average over time. (also plots the difference between training- and validation loss.)
+do_show_overfit_plot    = False
+window_size             = 50      # Determines over how many datapoints the average is taken. (window size in the future. (x = avg(next 50 datapoints) if x=50))
+
+
+### 2a - Barrage of plots ###
+# Show a barrage of plots to the user defined in plots_to_show list.
+show_all_step4_plots    = False
 plots_to_show = {
     # "loss",
-    "binary_accuracy",
+    # "binary_accuracy",
     # "val_loss",
-    "val_binary_accuracy",
+    # "val_binary_accuracy",
     "time",
     # "cpu_percentage",
-    "ram_usage",
+    # "ram_usage",
     # "available_mem",
     # "chunk"
 }
 
-# f-beta
-beta_squarred = 0.03                                    # For f-beta calculation
-stepsize = 0.01                                         # For f-beta calculation
-threshold_range = np.arange(stepsize,1.0,stepsize)      # For f-beta calculation
-
-verbatim = False
+### 3a - f_beta graph and its paramters ###
+# Shows a f_beta plot of the given models (can be time consuming)
+do_show_fbeta_plot      = False
+f_beta_avg_count        = 10                            # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
+beta_squarred           = 0.03                          # For f-beta calculation
+stepsize                = 0.01                          # For f-beta calculation
+threshold_range = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
 ######################################################
 
 
-
+########################## Script ############################
 ## 1.0 - Get list dataframes
-if show_all_step4_plots or do_show_overfit_plot:
+if show_all_step4_plots or do_show_overfit_plot or do_show_error_plot:
     dfs, csv_paths = get_dataframes(models)
 
 ## 2.0 - Get list of jsons
@@ -326,20 +393,23 @@ jsons, json_paths = get_jsons(models)
 ## 3.0 - get list of .h5 files
 paths_h5s = get_h5s_paths(models)
 
+## 3.0.1 - Plot Error for all models given
+if do_show_error_plot:
+    plot_errors(models, jsons, json_comp_key, window_size=error_window_size, ylim_top = ytop, ylim_bottom=ybottom)
+
+
 ## 3.1 - Show the losses nicely for each model
 if do_show_overfit_plot:
-    # window_sizes = np.arange(33,100,50)
-    # print("Window sizes = {}".format(window_sizes))
-    # for window_size in window_sizes:
-    plot_losses_avg(models, 50)
+    plot_losses_avg(models, window_size=window_size)
 
 ## 4.0 - Plot the data from the csvs - legend determined by json parameter dump file
 if show_all_step4_plots:
     for columnname in dfs[0].columns:
         if columnname not in plots_to_show:
             continue
-        compare_plot_models(columnname, dfs, jsons, json_comp_key, do_legend)
+        compare_plot_models(columnname, dfs, jsons, json_comp_key)
 
 ## 5.0 - Calculate f-beta score per model - based on validation data
 if do_show_fbeta_plot:
     store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count)
+######################################################
