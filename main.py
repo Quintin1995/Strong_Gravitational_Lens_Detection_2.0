@@ -12,6 +12,7 @@ import tensorflow as tf
 import sys
 import os
 
+
 def get_string(string_in):
     return str(string_in)
 
