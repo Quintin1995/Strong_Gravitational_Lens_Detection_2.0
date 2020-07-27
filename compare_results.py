@@ -276,25 +276,22 @@ def plot_losses_avg(models, window_size=10):
 
 ############## Parameters ##############
 root_models = "models"
-experiment_folder = "experiment4_learning_rate"
+experiment_folder = "experiment3_chunk_amount"
 root_models = os.path.join(root_models, experiment_folder)
 
 ######### Settable Paramters
 models = [
-    "07_17_2020_13h_47m_10s_learning_rate_0001",
-    "07_17_2020_14h_13m_09s_learning_rate_001",
-    "07_19_2020_13h_54m_04s_learning_rate_00001",
-    # "07_19_2020_13h_53m_36s_25Percent_chunks",
-    # "resnet_single_newtr_last_last_weights_only"
-    # "07_17_2020_13h_47m_10s_100PercChunks",
+    "07_25_2020_16h_42m_13s_chunkAmount12000",
+    "07_19_2020_13h_53m_35s_50Percent_chunks",
+    "07_17_2020_13h_47m_10s_100PercChunks"
     # "resnet_single_newtr_last_last_weights_only"
 ]
 
 json_comp_key           = "model_name"              # is the label in generated plots
 do_legend               = True                      # whether legend needs to be present in the plot
 
-show_all_step4_plots    = False
-do_show_overfit_plot    = False
+show_all_step4_plots    = True
+do_show_overfit_plot    = True
 do_show_fbeta_plot      = True
 f_beta_avg_count        = 10                         # how many chunks should be evaluated, over which the mean and standard deviation will be calculated
 plots_to_show = {
@@ -304,7 +301,7 @@ plots_to_show = {
     "val_binary_accuracy",
     "time",
     # "cpu_percentage",
-    # "ram_usage",
+    "ram_usage",
     # "available_mem",
     # "chunk"
 }

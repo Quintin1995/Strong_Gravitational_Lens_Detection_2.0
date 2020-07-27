@@ -93,8 +93,8 @@ try:
             resnet18.model.save_weights(params.full_path_of_weights)
             print("Saved model weights to: {}".format(params.full_path_of_weights), flush=True)
 
-        # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 90% usage.
-        if(psutil.virtual_memory().percent > 90.0):
+        # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
+        if(psutil.virtual_memory().percent > 75.0):
             print("reseting tensorflow keras backend",flush=True)
             resnet18.model.save(params.full_path_model_storage)
             tf.keras.backend.clear_session()
