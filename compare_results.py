@@ -153,11 +153,11 @@ def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
             params.img_dims = (101,101,3)
         
         # Step 3.0 - Construct a neural network with the same architecture as that it was trained with.
-        resnet18 = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
-        resnet18.model.trainable = False
+        network = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
+        network.model.trainable = False
         
         # Step 4.0 - Load weights of the neural network
-        resnet18.model.load_weights(paths_h5s[idx])
+        network.model.load_weights(paths_h5s[idx])
 
         # Step 5.0 - Define a DataGenerator that can generate validation chunks based on validation data.
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
@@ -173,8 +173,7 @@ def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
                 X_validation_chunk = dstack_data(X_validation_chunk)
 
             # Step 6.2 - Predict the labels of the validation chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
-            # avg_preds = average_prediction_results(resnet18, X_validation_chunk, avg_iter_counter=11, verbose=False)
-            preds = resnet18.model.predict(X_validation_chunk)
+            preds = network.model.predict(X_validation_chunk)
 
             # Step 6.3 - Begin f-beta calculation and store into csv file
             f_betas = []
@@ -202,16 +201,16 @@ def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
         plt.plot(list(threshold_range), means, colors[idx], label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
         plt.plot(list(threshold_range), lowline, colors[idx])
         plt.fill_between(list(threshold_range), upline, lowline, color=colors[idx], alpha=0.5) 
-            
-        # plt.plot(list(threshold_range), f_betas, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+
         plt.xlabel("p threshold")
         plt.ylabel("F")
-        
         plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
-
-        plt.savefig(full_path_fBeta_figure)
+        figure = plt.gcf() # get current figure
+        figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+        plt.savefig(full_path_fBeta_figure, dpi=100)
         print("figure saved: {}".format(full_path_fBeta_figure), flush=True)
 
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
     plt.show()
     
@@ -229,12 +228,13 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
                 formatted_time_data.append(int(parts[0])*60 + int(parts[1]) + int(parts[2])/60)
             data = formatted_time_data
 
-        plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
+        plt.plot(data, label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]), color=colors[idx], linewidth=1)
         print(str(str(json_comp_key) + ": " + str(jsons[idx][json_comp_key])))
 
     plt.title(comparing_headerName_df)
     plt.ylabel(comparing_headerName_df)
     plt.xlabel("Trained Chunks")
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
     plt.show()
 
@@ -257,8 +257,8 @@ def plot_losses_avg(models, window_size=10):
         for k in range(len(loss_avg)):
             diff_loss.append(val_loss_avg[k] - loss_avg[k])
 
-        plt.plot(val_loss_avg, label="val loss - avg window {}".format(window_size))
-        plt.plot(loss_avg, label="train loss - avg window {}".format(window_size))
+        plt.plot(val_loss_avg, label="val loss - avg window {}".format(window_size), color=colors[j], linewidth=3)
+        plt.plot(loss_avg, label="train loss - avg window {}".format(window_size), color=colors[j], linewidth=1)
         plt.plot(diff_loss, label="diff loss")
 
         plt.title("Model losses - {}".format(models[j]))
@@ -312,67 +312,69 @@ def plot_errors(models, jsons, json_comp_key, window_size=50, ylim_top = 1.0, yl
 
 ############## Parameters ##############
 ## Set colors to be used in all plots
-colors = ['r', 'c', 'green', 'orangered', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
+colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 
 ## Set root
 root_models = "models"                              # Where the experiment folders are located
 
 ## Set experiment folder
 # experiment_folder = "experiment1_normalization"
-# experiment_folder = "experiment2_avg_pooling"
+experiment_folder = "experiment2_avg_pooling"
 # experiment_folder = "experiment3_chunk_amount"
 # experiment_folder = "experiment4_learning_rate"
-experiment_folder = "experiment5_resnetX"
+# experiment_folder = "experiment5_resnetX"
 
 root_models = os.path.join(root_models, experiment_folder)
 
 ######### Settable Paramters
 # This is a list of folder names. These folders should contain a (.h5, .json, .yaml, .csv - files.)
 models = [
-    # "07_17_2020_14h_13m_09s_learning_rate_001",         #learning rate
-    # "07_17_2020_13h_47m_10s_learning_rate_0001",        #learning rate
-    # "07_19_2020_13h_54m_04s_learning_rate_00001",       #learning rate
     # "07_17_2020_13h_47m_10s_norm_perImage",             #normalization
     # "07_17_2020_13h_48m_02s_norm_perArray",             #normalization
     # "07_19_2020_13h_53m_16s_norm_adaptHistEq"           #normalization
+    "07_18_2020_15h_36m_29s_no_global_avg_pooling",       #global avg pooling
+    "07_18_2020_15h_36m_29s_yes_global_avg_pooling-Base", #global avg pooling
     # "07_17_2020_13h_47m_10s_100PercChunks",             #chunk amount
     # "07_19_2020_13h_53m_35s_50Percent_chunks",          #chunk amount
     # "07_19_2020_13h_53m_35s_75Percent_chunks",          #chunk amount
     # "07_19_2020_13h_53m_36s_25Percent_chunks",          #chunk amount
-    # "07_27_2020_14h_11m_11s_chunkAmount12000"
-    "07_17_2020_13h_47m_10s_norm_perImage",             # resnetX
-    "07_27_2020_13h_55m_24s_resnet50"                   # resnetx
-    # "resnet_single_newtr_last_last_weights_only"      #enrico baseline
+    # "07_27_2020_14h_11m_11s_chunkAmount12000"           #chunk amount
+    # "07_17_2020_14h_13m_09s_learning_rate_001",         #learning rate
+    # "07_17_2020_13h_47m_10s_learning_rate_0001",        #learning rate
+    # "07_19_2020_13h_54m_04s_learning_rate_00001",       #learning rate
+    # "07_17_2020_13h_47m_10s_resnet18",                  #resnetX
+    # "07_27_2020_13h_55m_24s_resnet50"                   #resnetx
+    "resnet_single_newtr_last_last_weights_only"          #enrico baseline
 ]
 json_comp_key           = "model_name"              # is the label in generated plots
 verbatim = False
 
 ### 0 - Error Plot of given Models
-do_show_error_plot      = True
-error_window_size       = 500     # avg window size
-ytop                    = 20.0    # Error plot y upper-limit in percentage
-ybottom                 = 5.00    # Error plot y bottom-limit in percentage
+do_show_error_plot      = False
+error_window_size       = 150     # avg window size
+ytop                    = 10.0    # Error plot y upper-limit in percentage
+ybottom                 = 4.00    # Error plot y bottom-limit in percentage
 
 
 ### 1a - Overfit plot ###
 # Shows a plot where the loss is average over time. (also plots the difference between training- and validation loss.)
-do_show_overfit_plot    = True
+do_show_overfit_plot    = False
 window_size             = 50      # Determines over how many datapoints the average is taken. (window size in the future. (x = avg(next 50 datapoints) if x=50))
 
 
 ### 2a - Barrage of plots ###
 # Show a barrage of plots to the user defined in plots_to_show list.
-show_all_step4_plots    = True
+show_all_step4_plots    = False
 plots_to_show = {
-    "loss",
-    "binary_accuracy",
-    "val_loss",
-    "val_binary_accuracy",
+    # "loss",
+    # "binary_accuracy",
+    # "val_loss",
+    # "val_binary_accuracy",
     "time",
-    "cpu_percentage",
-    "ram_usage",
-    "available_mem",
-    "chunk"
+    # "cpu_percentage",
+    # "ram_usage",
+    # "available_mem",
+    # "chunk"
 }
 
 ### 3a - f_beta graph and its paramters ###

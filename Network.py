@@ -86,7 +86,7 @@ class Network:
 
         # Compile the Model before returning it.
         model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
-
+        print(model.summary(), flush=True)
         return model
         
     
