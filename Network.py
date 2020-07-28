@@ -227,7 +227,7 @@ class Network:
                 kernel_regularizer=l2(0.0001),
             )(input)
 
-        return add([shortcut, residual])
+        return Add()([shortcut, residual])
 
 
     def bn_relu_conv(self, **conv_params):

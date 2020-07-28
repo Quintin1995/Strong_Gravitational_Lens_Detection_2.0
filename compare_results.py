@@ -320,8 +320,9 @@ root_models = "models"                              # Where the experiment folde
 ## Set experiment folder
 # experiment_folder = "experiment1_normalization"
 # experiment_folder = "experiment2_avg_pooling"
-experiment_folder = "experiment3_chunk_amount"
+# experiment_folder = "experiment3_chunk_amount"
 # experiment_folder = "experiment4_learning_rate"
+experiment_folder = "experiment5_resnetX"
 
 root_models = os.path.join(root_models, experiment_folder)
 
@@ -334,11 +335,13 @@ models = [
     # "07_17_2020_13h_47m_10s_norm_perImage",             #normalization
     # "07_17_2020_13h_48m_02s_norm_perArray",             #normalization
     # "07_19_2020_13h_53m_16s_norm_adaptHistEq"           #normalization
-    "07_17_2020_13h_47m_10s_100PercChunks",             #chunk amount
-    "07_19_2020_13h_53m_35s_50Percent_chunks",          #chunk amount
-    "07_19_2020_13h_53m_35s_75Percent_chunks",          #chunk amount
-    "07_19_2020_13h_53m_36s_25Percent_chunks",          #chunk amount
-    "07_27_2020_14h_11m_11s_chunkAmount12000"
+    # "07_17_2020_13h_47m_10s_100PercChunks",             #chunk amount
+    # "07_19_2020_13h_53m_35s_50Percent_chunks",          #chunk amount
+    # "07_19_2020_13h_53m_35s_75Percent_chunks",          #chunk amount
+    # "07_19_2020_13h_53m_36s_25Percent_chunks",          #chunk amount
+    # "07_27_2020_14h_11m_11s_chunkAmount12000"
+    "07_17_2020_13h_47m_10s_norm_perImage",             # resnetX
+    "07_27_2020_13h_55m_24s_resnet50"                   # resnetx
     # "resnet_single_newtr_last_last_weights_only"      #enrico baseline
 ]
 json_comp_key           = "model_name"              # is the label in generated plots
@@ -347,34 +350,34 @@ verbatim = False
 ### 0 - Error Plot of given Models
 do_show_error_plot      = True
 error_window_size       = 500     # avg window size
-ytop                    = 100.0    # Error plot y upper-limit in percentage
-ybottom                 = 0.00    # Error plot y bottom-limit in percentage
+ytop                    = 20.0    # Error plot y upper-limit in percentage
+ybottom                 = 5.00    # Error plot y bottom-limit in percentage
 
 
 ### 1a - Overfit plot ###
 # Shows a plot where the loss is average over time. (also plots the difference between training- and validation loss.)
-do_show_overfit_plot    = False
+do_show_overfit_plot    = True
 window_size             = 50      # Determines over how many datapoints the average is taken. (window size in the future. (x = avg(next 50 datapoints) if x=50))
 
 
 ### 2a - Barrage of plots ###
 # Show a barrage of plots to the user defined in plots_to_show list.
-show_all_step4_plots    = False
+show_all_step4_plots    = True
 plots_to_show = {
-    # "loss",
-    # "binary_accuracy",
-    # "val_loss",
-    # "val_binary_accuracy",
+    "loss",
+    "binary_accuracy",
+    "val_loss",
+    "val_binary_accuracy",
     "time",
-    # "cpu_percentage",
-    # "ram_usage",
-    # "available_mem",
-    # "chunk"
+    "cpu_percentage",
+    "ram_usage",
+    "available_mem",
+    "chunk"
 }
 
 ### 3a - f_beta graph and its paramters ###
 # Shows a f_beta plot of the given models (can be time consuming)
-do_show_fbeta_plot      = False
+do_show_fbeta_plot      = True
 f_beta_avg_count        = 10                            # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
 beta_squarred           = 0.03                          # For f-beta calculation
 stepsize                = 0.01                          # For f-beta calculation
