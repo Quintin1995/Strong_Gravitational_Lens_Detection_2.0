@@ -6,6 +6,7 @@ import itertools
 import threading
 import skimage.transform
 import skimage.io
+from skimage import exposure
 import gzip
 import os
 import queue
@@ -20,7 +21,6 @@ from PIL import Image
 import random
 from utils import *
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from skimage import exposure
 from multiprocessing import Pool
 import functools
 
