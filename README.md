@@ -16,7 +16,7 @@ pip3 install -r requirements.txt
 python3 main.py runs/experiment_folder/run.yaml
 ~~~
 
-Input parameters of a run can be set in the following file: ~runs/experiment_folder/run.yaml.~
+Input parameters of a run can be set in the following file: runs/experiment_folder/run.yaml.
 
 ## Data
 Data can be requested.
