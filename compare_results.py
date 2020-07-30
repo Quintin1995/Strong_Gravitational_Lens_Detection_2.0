@@ -319,10 +319,10 @@ root_models = "models"                              # Where the experiment folde
 
 ## Set experiment folder
 # experiment_folder = "experiment1_normalization"
-experiment_folder = "experiment2_avg_pooling"
+# experiment_folder = "experiment2_avg_pooling"
 # experiment_folder = "experiment3_chunk_amount"
 # experiment_folder = "experiment4_learning_rate"
-# experiment_folder = "experiment5_resnetX"
+experiment_folder = "experiment5_resnetX"
 
 root_models = os.path.join(root_models, experiment_folder)
 
@@ -332,8 +332,8 @@ models = [
     # "07_17_2020_13h_47m_10s_norm_perImage",             #normalization
     # "07_17_2020_13h_48m_02s_norm_perArray",             #normalization
     # "07_19_2020_13h_53m_16s_norm_adaptHistEq"           #normalization
-    "07_18_2020_15h_36m_29s_no_global_avg_pooling",       #global avg pooling
-    "07_18_2020_15h_36m_29s_yes_global_avg_pooling-Base", #global avg pooling
+    # "07_18_2020_15h_36m_29s_no_global_avg_pooling",       #global avg pooling
+    # "07_18_2020_15h_36m_29s_yes_global_avg_pooling-Base", #global avg pooling
     # "07_17_2020_13h_47m_10s_100PercChunks",             #chunk amount
     # "07_19_2020_13h_53m_35s_50Percent_chunks",          #chunk amount
     # "07_19_2020_13h_53m_35s_75Percent_chunks",          #chunk amount
@@ -342,8 +342,8 @@ models = [
     # "07_17_2020_14h_13m_09s_learning_rate_001",         #learning rate
     # "07_17_2020_13h_47m_10s_learning_rate_0001",        #learning rate
     # "07_19_2020_13h_54m_04s_learning_rate_00001",       #learning rate
-    # "07_17_2020_13h_47m_10s_resnet18",                  #resnetX
-    # "07_27_2020_13h_55m_24s_resnet50"                   #resnetx
+    "07_17_2020_13h_47m_10s_resnet18",                  #resnetX
+    "07_27_2020_13h_55m_24s_resnet50",                   #resnetx
     "resnet_single_newtr_last_last_weights_only"          #enrico baseline
 ]
 json_comp_key           = "model_name"              # is the label in generated plots
