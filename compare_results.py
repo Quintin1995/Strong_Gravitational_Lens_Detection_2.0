@@ -132,14 +132,14 @@ def average_prediction_results(network, data, avg_iter_counter=10, verbose=True)
 
 
 # Load validation chunk and calculate per model folder its model performance evaluated on f-beta score
-def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
+def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_count):
     for idx, model_folder in enumerate(models):
         # Step 0.0 - inits
-        f_beta_full_path = os.path.join(root_models, model_folder, "f_beta_results.csv")
-        full_path_fBeta_figure = os.path.join(root_models, model_folder, "f_beta_graph.png")
+        f_beta_full_path = os.path.join(model_folder, "f_beta_results.csv")
+        full_path_fBeta_figure = os.path.join(model_folder, "f_beta_graph.png")
 
         # Step 1.0 - Load settings of the model
-        yaml_path = glob.glob(os.path.join(root_models, model_folder) + "/*.yaml")[0]
+        yaml_path = glob.glob(os.path.join(model_folder) + "/*.yaml")[0]
         settings_yaml = load_settings_yaml(yaml_path)
         
         # Step 2.0 Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
@@ -216,6 +216,7 @@ def store_fbeta_results(models, jsons, json_comp_key, f_beta_avg_count):
 # Universal plot function that plots many plots
 def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
     print("------------------------------")
+    print("Plotting {}...".format(comparing_headerName_df))
     for idx in range(len(dfs)):         # loop over each model dataframe        
         data = dfs[idx][comparing_headerName_df]
         
@@ -328,12 +329,13 @@ def set_experiment_folder(root_folder):
         print("\t{} - {}".format(idx, exp_folder))
     exp_idx = int(input("Set number experiment folder (integer): "))
     print("Choose index: {}, {}".format(exp_idx, os.path.join(root_folder, local_folders[exp_idx])))
-    print("------------------------------")
+
     return os.path.join(root_folder, local_folders[exp_idx])
 
 
 # Prompt the user which models to compare against each other in the given experiment folder
 def set_models_folders(experiment_folder):
+    print("------------------------------")
     print("\n\nRoot folder this experiment: {}".format(experiment_folder))
 
     cwd = os.path.join(os.getcwd(), experiment_folder)
@@ -343,7 +345,7 @@ def set_models_folders(experiment_folder):
     print("\nSet model folders:")
     for idx, folder in enumerate(local_folders):
         print("\t{} - {}".format(idx, folder))
-    folder_idxs = input("Set indexes model folder(s)\n(integer)\nOr comma seperated ints: int,int,int: ")
+    folder_idxs = input("Set indexes model folder(s)\n(integer)\nOr comma seperated ints: ")
     
     str_indexes = folder_idxs.split(',')
     chosen_models = [local_folders[int(string_idx)] for string_idx in str_indexes]
@@ -352,8 +354,7 @@ def set_models_folders(experiment_folder):
     for chosen_model in chosen_models:
         print(chosen_model)
 
-    full_paths = [os.path.join(cwd, m) for m in chosen_models]    
-    print("------------------------------")
+    full_paths = [os.path.join(cwd, m) for m in chosen_models]
     return full_paths
 
 
@@ -444,7 +445,7 @@ def main():
 
         ## 7.0 - Calculate f-beta score per model - based on validation data
         if do_show_fbeta_plot:
-            store_fbeta_results(models_paths_list, jsons, json_comp_key, f_beta_avg_count)
+            store_fbeta_results(models_paths_list, paths_h5s, jsons, json_comp_key, f_beta_avg_count)
         ######################################################
 
 
