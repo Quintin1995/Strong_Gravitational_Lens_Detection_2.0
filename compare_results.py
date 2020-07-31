@@ -273,9 +273,9 @@ def plot_losses_avg(models, dfs,  window_size=10):
 
 
 # Plot the sliding window average error (in percentage) of the given models over time/chunks
-def plot_errors(models, dfs, jsons, json_comp_key, window_size=50, ylim_top = 1.0, ylim_bottom=0.0):
+def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
     print("------------------------------")
-    print("Plotting errors...")
+    print("Plotting errors rates...")
     for model_idx in range(len(models)):
         # Selecting columns of interest
         df_acc     = dfs[model_idx]["binary_accuracy"]
@@ -369,7 +369,7 @@ verbatim                = False
 
 ### 0 - Error Plot of given Models
 do_show_error_plot      = True
-error_window_size       = 150     # avg window size
+error_window_size       = 500     # avg window size
 ytop                    = 10.0    # Error plot y upper-limit in percentage
 ybottom                 = 4.00    # Error plot y bottom-limit in percentage
 
