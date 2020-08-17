@@ -11,18 +11,20 @@ import psutil
 import tensorflow as tf
 import sys
 import os
+import argparse
 
 
-def get_string(string_in):
-    return str(string_in)
+###### Step 1 - Define ArgumentParser
+parser = argparse.ArgumentParser()
+parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/run.yaml", required=False)
+args = parser.parse_args()
 
 
-###### Step 0.1 settings input file will now be given as an input argument to the program.
-assert len(sys.argv) == 2   #2 input arguments are supposed to be given. main.py run.yaml
-yaml_path = sys.argv[1]
+###### Step 2 - Settings input file will now be given as an input argument to the program.
+yaml_path = args.run
 
 
-###### Step 1.0 - Load all settings from .yaml file
+###### Step 3 - Load all settings from .yaml file
 settings_yaml = load_settings_yaml(yaml_path)
 params = Parameters(settings_yaml, yaml_path)
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
