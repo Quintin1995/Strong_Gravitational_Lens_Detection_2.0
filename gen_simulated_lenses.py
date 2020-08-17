@@ -151,23 +151,34 @@ def make_xy_coords(_n, _range=(0,1)):
     return np.meshgrid(x, y)
 
 
-
-def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0):
+#----------------------------------------------------------
+#   Create Noise Galaxy      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#----------------------------------------------------------
+def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
     xx = xx/n_pix*scale_im + half_pix
     yy = yy/n_pix*scale_im + half_pix
 
+    #--- Unpack input parameters
+    ps_min, ps_max = scale_r
+    pe_min, pe_max = ellip_r
+
     #--- Intermediate parameters
-    par_scale = np.random.uniform(0.01,0.05, size=n_sam)
-    par_ellip = np.random.uniform(0.2,0.75, size=n_sam)
-    par_angle = np.random.uniform(0,1, size=n_sam)
+    par_scale = np.random.uniform(ps_min, ps_max, size=n_sam)
+    par_ellip = np.random.uniform(pe_min, pe_max, size=n_sam)
+    par_angle = np.random.uniform(0, 1, size=n_sam)
 
     #--- Generate profiles for training
     ngs = np.zeros((n_sam, n_pix, n_pix, 1))            #ngs = Noise Galaxie(s)
     for i in range(n_sam):
         ngs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
+
+    #--- Add Gaussian noise
+    # y_true_noise = np.zeros((n_sam, n_pix, n_pix, 1))
+    for i in range(n_sam):
+        ngs[i,:,:,0] = ngs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
     return ngs
 
 
@@ -177,7 +188,7 @@ def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0):
 data_type = np.float32
 seed = 1234
 ########################################
-if True:
+if False:
     ### 1 - Load lenses.
     all_fits_paths = get_all_fits_paths()
     lenses         = load_lenses(all_fits_paths)
@@ -186,6 +197,6 @@ if True:
 
 if True:
     ### 3 - Create a Noise Galaxies
-    ngs = gen_noise_galaxies()
+    ngs = gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0.0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025)
     print_data_array_stats(ngs, name="Noise Galaxies")
     show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed)
