@@ -240,7 +240,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
 
 
 # Plot the losses of the trained model over training time. Plot the average loss based on a windows size given as parameter.
-def plot_losses_avg(models, dfs,  window_size=50, do_diff_loss=False):
+def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
     print("------------------------------")
     print("Plotting average losses...")
     for j in range(len(models)):
@@ -260,8 +260,8 @@ def plot_losses_avg(models, dfs,  window_size=50, do_diff_loss=False):
             for k in range(len(loss_avg)):
                 diff_loss.append(val_loss_avg[k] - loss_avg[k])
 
-        plt.plot(val_loss_avg[500:], label="val loss - avg window {}".format(window_size), color=colors[j], linewidth=3)
-        plt.plot(loss_avg[500:], label="train loss - avg window {}".format(window_size), color=colors[j], linewidth=1)
+        plt.plot(val_loss_avg[500:], label="val loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=3)
+        plt.plot(loss_avg[500:], label="train loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=1)
         if do_diff_loss:
             plt.plot(diff_loss[500:], label="diff loss")
         plt.title("Model losses - {}".format(models[j]))
@@ -449,7 +449,7 @@ def main():
 
         ## 5.0 - Show the losses nicely for each model
         if not is_enrico_model_chosen and loss_plot_dialog():
-            plot_losses_avg(models_paths_list, dfs, window_size=window_size)
+            plot_losses_avg(models_paths_list, dfs, jsons, window_size=window_size)
 
         ## 6.0 - Plot the data from the csvs - legend determined by json parameter dump file
         plots_to_show = which_plots_to_plot(dfs[0].columns)
