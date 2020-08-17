@@ -50,7 +50,7 @@ def normalize_img(numpy_img):
 # Loads all lenses into a data array, via multithreading
 def load_lenses(fits_files):
     with Pool(24) as pool:
-        print("\n\n\nLoading Training Data", flush=True)
+        print("Loading Training Data", flush=True)
         data_array = np.asarray(pool.map(load_img, enumerate(fits_files), chunksize=128), dtype=data_type)           # chunk_sizes = amount of data that will be given to one thread
     return data_array
 
@@ -68,8 +68,9 @@ def get_all_fits_paths():
     return all_fits_paths
 
 
-def print_data_array_stats(data_array):
+def print_data_array_stats(data_array, name):
     print("------------")
+    print("Name: {}".format(name), flush=True)
     print("Dimensions: {}".format(data_array.shape), flush=True)
     print("Max array  = {}".format(np.amax(data_array)), flush=True)
     print("Min array  = {}".format(np.amin(data_array)), flush=True)
@@ -80,21 +81,95 @@ def print_data_array_stats(data_array):
 
 
 # Shows a random sample of the given data array, to the user.
-def show_img_grid(data_array, columns=4, rows=4, seed=1245):
+def show_img_grid(data_array, iterations=1, columns=4, rows=4, seed=1245):
     random.seed(seed)
     img_count = int(columns * rows)
-    rand_idxs = [random.choice(list(range(data_array.shape[0]))) for x in range(img_count)]
 
-    fig=plt.figure(figsize=(8, 8))
-    for idx, i in enumerate(range(1, columns*rows +1)):
-        fig.add_subplot(rows, columns, i)
-        ax = (fig.axes)[idx]
-        ax.axis('off')
-        ax.set_title("img idx = {}".format(rand_idxs[idx]))
-        lens = np.squeeze(data_array[rand_idxs[idx]])
-        plt.imshow(lens, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+    for _ in range(iterations):
+        rand_idxs = [random.choice(list(range(data_array.shape[0]))) for x in range(img_count)]
 
-    plt.show()
+        fig=plt.figure(figsize=(8, 8))
+        for idx, i in enumerate(range(1, columns*rows +1)):
+            fig.add_subplot(rows, columns, i)
+            ax = (fig.axes)[idx]
+            ax.axis('off')
+            ax.set_title("img idx = {}".format(rand_idxs[idx]))
+            lens = np.squeeze(data_array[rand_idxs[idx]])
+            plt.imshow(lens, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+
+        plt.show()
+
+
+#----------------------------------------------------------
+#   Define an exponential profile in numpy.         Taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#----------------------------------------------------------
+def exponential_2d_np(xx,yy, center=[0.0,0.0], amplitude=1.0, scale=0.5, ellipticity=0.0, angle=0.0):
+
+    scl_a = scale
+    scl_b = scl_a * (1-ellipticity)
+    
+    angle = angle*180  # OJO
+    theta = angle*np.pi/180 
+    #--- Rotate coordinates
+    xt = np.cos(theta) * (xx - center[0]) - np.sin(theta)*(yy - center[1])
+    yt = np.sin(theta) * (xx - center[0]) + np.cos(theta)*(yy - center[1])
+    #--- Radius
+    rt = np.sqrt(np.square(xt/scl_a) + np.square(yt/scl_b))
+    #return np.power(amplitude * np.exp(-rt),0.75)
+    return amplitude * np.exp(-rt)
+
+
+#----------------------------------------------------------
+#   Really wasteful way of passing coordinates to the network 
+#     but for this simple case it is ok...        Taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#----------------------------------------------------------
+def make_coord_list(_n, _img_size, _range=(-1,1)):
+
+    xy = make_xy_coords(_img_size, _range=_range)
+    xx = xy[0]
+    yy = xy[1]
+    
+    list_xx = []
+    list_yy = []
+    for i in range(_n):
+        list_xx.append(xx)
+        list_yy.append(yy)
+
+    list_xx = np.asarray(list_xx)
+    list_yy = np.asarray(list_yy)
+    list_xx = np.expand_dims(list_xx, axis=-1)
+    list_yy = np.expand_dims(list_yy, axis=-1)
+    return list_xx,list_yy
+
+
+#----------------------------------------------------------
+#   Create x and y arrays with coordinates      Taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#----------------------------------------------------------
+def make_xy_coords(_n, _range=(0,1)):
+    x = np.linspace(_range[0],_range[1], _n)
+    y = np.linspace(_range[0],_range[1], _n)
+    return np.meshgrid(x, y)
+
+
+
+def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0):
+
+    #--- Coordinates image. We will pass this to the neural net
+    xx, yy = make_coord_list(n_sam, n_pix)
+    xx = xx/n_pix*scale_im + half_pix
+    yy = yy/n_pix*scale_im + half_pix
+
+    #--- Intermediate parameters
+    par_scale = np.random.uniform(0.01,0.05, size=n_sam)
+    par_ellip = np.random.uniform(0.2,0.75, size=n_sam)
+    par_angle = np.random.uniform(0,1, size=n_sam)
+
+    #--- Generate profiles for training
+    ngs = np.zeros((n_sam, n_pix, n_pix, 1))            #ngs = Noise Galaxie(s)
+    for i in range(n_sam):
+        ngs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
+    return ngs
+
 
 
 ########################################
@@ -102,14 +177,15 @@ def show_img_grid(data_array, columns=4, rows=4, seed=1245):
 data_type = np.float32
 seed = 1234
 ########################################
+if True:
+    ### 1 - Load lenses.
+    all_fits_paths = get_all_fits_paths()
+    lenses         = load_lenses(all_fits_paths)
+    print_data_array_stats(lenses, name="lenses")
+    show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=seed)
 
-# Load lenses.
-all_fits_paths = get_all_fits_paths()
-lenses         = load_lenses(all_fits_paths)
-print_data_array_stats(lenses)
-
-
-# View random sample of lenses.
-show_img_grid(lenses, columns=4, rows=4, seed=seed)
-
-
+if True:
+    ### 3 - Create a Noise Galaxies
+    ngs = gen_noise_galaxies()
+    print_data_array_stats(ngs, name="Noise Galaxies")
+    show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed)
