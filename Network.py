@@ -70,6 +70,7 @@ class Network:
         begin_train_session = time.time()       # Records beginning of training time
         try:
             for chunk_idx in range(self.params.num_chunks):
+                
                 print("chunk {}/{}".format(chunk_idx+1, self.params.num_chunks), flush=True)
 
                 # Load train chunk and targets

@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import *
+from utils import load_settings_yaml
 from Parameters import *
 from Parameters import Parameters
 from DataGenerator import *
@@ -149,17 +149,17 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
         if params.model_name == "Baseline_Enrico":
             params.img_dims = (101,101,3)
-        
-        # Step 3.0 - Construct a neural network with the same architecture as that it was trained with.
-        network = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
-        network.model.trainable = False
-        
-        # Step 4.0 - Load weights of the neural network
-        network.model.load_weights(paths_h5s[idx])
-
-        # Step 5.0 - Define a DataGenerator that can generate validation chunks based on validation data.
+      
+        # Step 3.0 - Define a DataGenerator that can generate validation chunks based on validation data.
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
         placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
+        
+        # Step 4.0 - Construct a neural network with the same architecture as that it was trained with.
+        network = Network(params, dg) # The network needs to know hyper-paramters from params, and needs to know how to generate data with a datagenerator object.
+        network.model.trainable = False
+        
+        # Step 5.0 - Load weights of the neural network
+        network.model.load_weights(paths_h5s[idx])
         
         # Step 6.0 - we want a nice plot with standard deviation.
         f_beta_vectors = []
@@ -241,7 +241,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
 
 
 # Plot the losses of the trained model over training time. Plot the average loss based on a windows size given as parameter.
-def plot_losses_avg(models, dfs,  window_size=10):
+def plot_losses_avg(models, dfs,  window_size=50, do_diff_loss=False):
     print("------------------------------")
     print("Plotting average losses...")
     for j in range(len(models)):
@@ -256,17 +256,20 @@ def plot_losses_avg(models, dfs,  window_size=10):
         for i in range(len(df_loss) - window_size):
             loss_avg.append(sum(list(df_loss[i:i+window_size])) / window_size) 
 
-        diff_loss = []
-        for k in range(len(loss_avg)):
-            diff_loss.append(val_loss_avg[k] - loss_avg[k])
+        if do_diff_loss:
+            diff_loss = []
+            for k in range(len(loss_avg)):
+                diff_loss.append(val_loss_avg[k] - loss_avg[k])
 
-        plt.plot(val_loss_avg, label="val loss - avg window {}".format(window_size), color=colors[j], linewidth=3)
-        plt.plot(loss_avg, label="train loss - avg window {}".format(window_size), color=colors[j], linewidth=1)
-        plt.plot(diff_loss, label="diff loss")
-
+        plt.plot(val_loss_avg[500:], label="val loss - avg window {}".format(window_size), color=colors[j], linewidth=3)
+        plt.plot(loss_avg[500:], label="train loss - avg window {}".format(window_size), color=colors[j], linewidth=1)
+        if do_diff_loss:
+            plt.plot(diff_loss[500:], label="diff loss")
         plt.title("Model losses - {}".format(models[j]))
         plt.ylabel("loss")
         plt.xlabel("Trained Chunks")
+        
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
     plt.savefig(os.path.join(models[j], "avg_loss_Window{}".format(window_size)))
     plt.show()
@@ -369,7 +372,7 @@ verbatim                = False
 
 ### 0 - Error Plot of given Models
 do_show_error_plot      = True
-error_window_size       = 500     # avg window size
+window_size             = 500     # avg window size
 ytop                    = 10.0    # Error plot y upper-limit in percentage
 ybottom                 = 4.00    # Error plot y bottom-limit in percentage
 
@@ -377,8 +380,6 @@ ybottom                 = 4.00    # Error plot y bottom-limit in percentage
 ### 1a - Overfit plot ###
 # Shows a plot where the loss is average over time. (also plots the difference between training- and validation loss.)
 do_show_overfit_plot    = True
-window_size             = 50      # Determines over how many datapoints the average is taken. (window size in the future. (x = avg(next 50 datapoints) if x=50))
-
 
 ### 2a - Barrage of plots ###
 # Show a barrage of plots to the user defined in plots_to_show list.
@@ -430,7 +431,7 @@ def main():
 
         ## 4.0 - Plot Error for all models given
         if not is_enrico_model_chosen:
-            plot_errors(models_paths_list, dfs, jsons, json_comp_key, window_size=error_window_size, ylim_top = ytop, ylim_bottom=ybottom)
+            plot_errors(models_paths_list, dfs, jsons, json_comp_key, window_size=window_size, ylim_top = ytop, ylim_bottom=ybottom)
 
         ## 5.0 - Show the losses nicely for each model
         if not is_enrico_model_chosen:
