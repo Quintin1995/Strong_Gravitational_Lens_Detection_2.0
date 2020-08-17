@@ -1,5 +1,7 @@
 from __future__ import division
 
+import csv
+import psutil
 import six
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Activation, Dense, Flatten, GaussianNoise, Conv2D, MaxPooling2D, AveragePooling2D, Add, ZeroPadding2D, BatchNormalization
@@ -7,31 +9,174 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.initializers import glorot_uniform
 from tensorflow.keras import optimizers, metrics
 from tensorflow.keras import backend as K
+import tensorflow as tf
+import time
+from utils import hms, plot_history
+
 
 
 class Network:
-    def __init__(self, model_name, learning_rate, model_metrics, input_shape, num_outputs, params):
-        print("Initializing model.", flush=True)
+
+    def __init__(self, params, datagenerator):
+
+        # Set parameters of the Network class
+        print("---\nInitializing network #{}...".format(params.net_name), flush=True)
+        self.dg                 = datagenerator         # The Network class needs an instance of a datagenerator class.
+        self.params             = params                # The Network class needs an instance of the parameter class.
+        
+        # Set optimizer, Loss function and performancing tracking metric
+        self.optimizer          = optimizers.Adam(lr=self.params.net_learning_rate)
+        self.loss               = "binary_crossentropy" # Binary crossentropy is one of the best loss functions when it comes to binary classification problems.
+        self.metrics            = [metrics.binary_accuracy] if self.params.net_model_metrics == "binary_accuracy" else None
+        
+        # Define network input/output dimensionality
+        self.input_shape        = self.params.img_dims
+        self.num_outputs        = self.params.net_num_outputs
+
+        # Define which axis corresponds to which integer, regarding numpy
         self.row_axis           = 1
         self.col_axis           = 2
         self.channel_axis       = 3
-        self.name               = model_name
-        self.learning_rate      = learning_rate
-        self.optimizer          = optimizers.Adam(lr=self.learning_rate)
-        self.loss               = "binary_crossentropy"
-        self.input_shape        = input_shape
-        self.num_outputs        = num_outputs
-        self.metrics            = [metrics.binary_accuracy] if model_metrics == "binary_accuracy" else None
-        self.use_avg_pooling_2D = params.use_avg_pooling_2D
-        self.model              = None
 
-        # Case of model type
-        if model_name == "resnet18":
+        # Case over possible model types
+        self.model              = None
+        if self.params.net_name == "resnet18":
             self.model          = self.build_resnet(self.input_shape, self.num_outputs, self.basic_block, [2, 2, 2, 2])
-        if model_name == "resnet50":
+        if self.params.net_name == "resnet50":
             self.model          = self.build_resnet50(input_shape = self.input_shape, num_outputs = self.num_outputs)
 
+        # Parameters used when training the model
+        self.loss     = []              # Store loss of the model
+        self.acc      = []              # Store binary accuracy of the model
+        self.val_loss = []              # Store validation loss of the model
+        self.val_acc  = []              # Store validation binary accuracy
+
+        # Check if a model is set.
         assert self.model != None
+
+        # A printout of the model to a txt file
+        self.save_model_to_file()
+
+
+    def train(self):
+
+        # Open a csv writer and write headers into it.
+        bufsize = 1
+        f = open(self.params.full_path_of_history, "w", bufsize)
+        writer = csv.writer(f)
+        writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time", "cpu_percentage", "ram_usage", "available_mem"])
+
+        # Train the model
+        begin_train_session = time.time()       # Records beginning of training time
+        try:
+            for chunk_idx in range(self.params.num_chunks):
+                print("chunk {}/{}".format(chunk_idx+1, self.params.num_chunks), flush=True)
+
+                # Load train chunk and targets
+                X_train_chunk, y_train_chunk = self.dg.load_chunk(self.params.chunksize, self.dg.Xlenses_train, self.dg.Xnegatives_train, self.dg.Xsources_train, self.params.data_type, self.params.mock_lens_alpha_scaling)
+                # Load validation chunk and targets
+                X_validation_chunk, y_validation_chunk = self.dg.load_chunk(self.params.validation_chunksize, self.dg.Xlenses_validation, self.dg.Xnegatives_validation, self.dg.Xsources_validation, self.params.data_type, self.params.mock_lens_alpha_scaling)
+
+                # Fit model on data with a keras image data generator
+                network_fit_time_start = time.time()
+
+                # Define a train generator flow based on the ImageDataGenerator
+                train_generator_flowed = self.dg.train_generator.flow(
+                    X_train_chunk,
+                    y_train_chunk,
+                    batch_size=self.params.net_batch_size)
+
+                # Define a validation generator flow based on the ImageDataGenerator
+                validation_generator_flowed = self.dg.validation_generator.flow(
+                    X_validation_chunk,
+                    y_validation_chunk,
+                    batch_size=self.params.net_batch_size)
+
+                # Fit both generators (train and validation) on the model.
+                history = self.model.fit_generator(
+                        train_generator_flowed,
+                        steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
+                        epochs=self.params.net_epochs,
+                        validation_data=validation_generator_flowed,
+                        validation_steps=len(X_validation_chunk) / self.params.net_batch_size)
+
+                print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
+
+                # Save Model self.params to .h5 file
+                if chunk_idx % self.params.chunk_save_interval == 0:
+                    self.model.save_weights(self.params.full_path_of_weights)
+                    print("Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
+
+                # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
+                if(psutil.virtual_memory().percent > 75.0):
+                    self.reset_keras_backend()
+
+                # Write results to csv file
+                writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
+
+                # Store loss and accuracy in list
+                self.update_loss_and_acc(history)
+                
+                # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
+                if chunk_idx % self.params.chunk_plot_interval == 0:
+                    plot_history(self.acc, self.val_acc, self.loss, self.val_loss, self.params)
+
+        except KeyboardInterrupt:
+            self.model.save_weights(self.params.full_path_of_weights)
+            print("Interrupted by KEYBOARD!", flush=True)
+            print("saved weights to: {}".format(self.params.full_path_of_weights), flush=True)
+            f.close()           # Close the file handle            
+
+        end_train_session = time.time()
+        f.close()               # Close the file handle
+
+        # Safe Model parameters to .h5 file after training.
+        self.model.save_weights(self.params.full_path_of_weights)
+        print("\nSaved weights to: {}".format(self.params.full_path_of_weights), flush=True)
+        print("\nSaved results to: {}".format(self.params.full_path_of_history), flush=True)
+        print("\nTotal time employed ", hms(end_train_session - begin_train_session), flush=True)
+
+
+    def format_info_for_csv(self, chunk_idx, history, begin_train_session):
+        return [str(chunk_idx),
+                str(history.history["loss"][0]),
+                str(history.history["binary_accuracy"][0]),
+                str(history.history["val_loss"][0]),
+                str(history.history["val_binary_accuracy"][0]),
+                str(hms(time.time()-begin_train_session)),
+                str(psutil.cpu_percent()),
+                str(psutil.virtual_memory().percent),
+                str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
+            
+
+
+    # Resets the backend of keras. Everything regarding the model is stored into a folder,
+    # and later loaded again. This function is needed, in order to resolve memory leaks.
+    # Keras 1.x does not show memory leaks, while keras 2.x does show memory leaks.
+    # Resetting the backend of keras solves this problem. However this can be time
+    # consuming when models get large.
+    def reset_keras_backend(self):
+        begin_time = time.time()
+        print("\n\n----Reseting tensorflow keras backend", flush=True)
+        self.model.save(self.params.full_path_model_storage)
+        tf.keras.backend.clear_session()
+        self.model = tf.keras.models.load_model(self.params.full_path_model_storage)
+        print("\n reset time: {}\n----".format(hms(time.time() - begin_time)), flush=True)
+
+
+    # Update network properties, based on the history of the trained network.
+    def update_loss_and_acc(self, history):
+        self.loss.append(history.history["loss"][0])
+        self.acc.append(history.history["binary_accuracy"][0])
+        self.val_loss.append(history.history["val_loss"][0])
+        self.val_acc.append(history.history["val_binary_accuracy"][0])
+
+    # Store Neural Network summary to file
+    def save_model_to_file(self):
+        with open(self.params.full_path_neural_net_printout,'w') as fh:
+            # Pass the file handle in as a lambda function to make it callable
+            self.model.summary(print_fn=lambda x: fh.write(x + '\n'))
+
 
 
     # Builds a Residual Neural Network with network depth 50
@@ -74,7 +219,7 @@ class Network:
         X = self.identity_mapping_block(X, 3, [512, 512, 2048], stage=5, block='c')
     
         # AVGPOOL
-        if self.use_avg_pooling_2D:
+        if self.params.use_avg_pooling_2D:
             X = AveragePooling2D(pool_size=(2,2), padding='same')(X)
     
         # Output layer
@@ -356,7 +501,7 @@ class Network:
 
         # Classifier block
         block_shape = K.int_shape(block)
-        if self.use_avg_pooling_2D:
+        if self.params.use_avg_pooling_2D:
             pool2 = AveragePooling2D(pool_size=(block_shape[self.row_axis], block_shape[self.col_axis]), strides=(1, 1))(block)
             flatten1 = Flatten()(pool2)
         else:
