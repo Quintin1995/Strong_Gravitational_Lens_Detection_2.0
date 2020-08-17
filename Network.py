@@ -17,7 +17,7 @@ from utils import hms, plot_history
 
 class Network:
 
-    def __init__(self, params, datagenerator):
+    def __init__(self, params, datagenerator, training):
 
         # Set parameters of the Network class
         print("---\nInitializing network #{}...".format(params.net_name), flush=True)
@@ -55,7 +55,8 @@ class Network:
         assert self.model != None
 
         # A printout of the model to a txt file
-        self.save_model_to_file()
+        if training:
+            self.save_model_to_file()
 
 
     def train(self):

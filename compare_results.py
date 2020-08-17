@@ -5,10 +5,9 @@ import os
 import pandas as pd
 import json
 from utils import load_settings_yaml
-from Parameters import *
 from Parameters import Parameters
-from DataGenerator import *
-from Network import *
+from DataGenerator import DataGenerator
+from Network import Network
 import csv
 import math
 
@@ -142,7 +141,7 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         yaml_path = glob.glob(os.path.join(model_folder) + "/*.yaml")[0]
         settings_yaml = load_settings_yaml(yaml_path)
         
-        # Step 2.0 Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
+        # Step 2.0 - Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")
         params.fraction_to_load_sources_vali = 0.15
 
@@ -155,7 +154,7 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
         
         # Step 4.0 - Construct a neural network with the same architecture as that it was trained with.
-        network = Network(params, dg) # The network needs to know hyper-paramters from params, and needs to know how to generate data with a datagenerator object.
+        network = Network(params, dg, training=False) # The network needs to know hyper-paramters from params, and needs to know how to generate data with a datagenerator object.
         network.model.trainable = False
         
         # Step 5.0 - Load weights of the neural network
