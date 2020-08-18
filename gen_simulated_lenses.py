@@ -319,11 +319,11 @@ def emp_median_std(lenses):
 # Parameters
 data_type         = np.float32
 seed              = 1234
-n_sam             = 100
+n_sam             = 10000
 n_pix             = 101
 do_normalize      = False
 do_simple_clip    = True
-do_add_gaus_noise = False
+do_add_gaus_noise = True
 ########################################
 
 
@@ -336,7 +336,7 @@ if False:
 
 
 ### 2 - Create the Centre Galaxies as realistically as possible - Centre Galaxy = cg
-cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0038), ellip_r=(0.2,0.4), g_noise_sigma=0.00)
+cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0038), ellip_r=(0.2,0.4))
 fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
 print_data_array_stats(cg, name="Centre Galaxies")
 if False:
