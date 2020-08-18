@@ -110,7 +110,7 @@ def show_img_grid(data_array, iterations=1, columns=4, rows=4, seed=None, titles
 #----------------------------------------------------------
 #   Define an exponential profile in numpy.         Taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def exponential_2d_np(xx,yy, center=[0.0,0.0], amplitude=1.0, scale=0.5, ellipticity=0.0, angle=0.0):
+def exponential_2d_np(xx,yy, center=[0.0,0.0], amplitude=1.0, scale=0.5, ellipticity=0.0, angle=0.0, do_centre=True):
 
     scl_a = scale
     scl_b = scl_a * (1-ellipticity)
@@ -122,8 +122,15 @@ def exponential_2d_np(xx,yy, center=[0.0,0.0], amplitude=1.0, scale=0.5, ellipti
     yt = np.sin(theta) * (xx - center[0]) + np.cos(theta)*(yy - center[1])
     #--- Radius
     rt = np.sqrt(np.square(xt/scl_a) + np.square(yt/scl_b))
-    #return np.power(amplitude * np.exp(-rt),0.75)
-    return amplitude * np.exp(-rt)
+    img = amplitude * np.exp(-rt)
+
+    if not do_centre:
+        x_shift = int(random.uniform(0, (xt.shape[0])))
+        y_shift = int(random.uniform(0, (xt.shape[0])))
+        img = np.roll(img, x_shift, axis=0)                 # Rolling the image ensures that all pixels in the image stay in the image. It won't introduce 0.0 pixels, which are unrealistic.
+        img = np.roll(img, y_shift, axis=1)
+        
+    return img
 
 
 #----------------------------------------------------------
@@ -161,7 +168,7 @@ def make_xy_coords(_n, _range=(0,1)):
 #----------------------------------------------------------
 #  Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025, do_centre=True):
+def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
@@ -178,25 +185,44 @@ def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0
     par_angle = np.random.uniform(0, 1, size=n_sam)
 
     #--- Generate centre profiles/galaxies
-    if do_centre:
-        gs = np.zeros((n_sam, n_pix, n_pix, 1))            #gs = Galaxie(s)
-        for i in range(n_sam):
-            gs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
-
-    #--- Generate Noise profiles/galaxies - Noise galaxies are typically not in the centre of the image.
-    if not do_centre:
-        gs = np.zeros((n_sam, n_pix, n_pix, 1))            #gs = in this case Noise Galaxie(s)
-        for i in range(n_sam):
-            cx = 10#random.uniform(0,1)#random.uniform(-(n_pix/2), (n_pix/2))
-            cy = 10#random.uniform(0,1)#random.uniform(-(n_pix/2), (n_pix/2))
-            gs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], center=[cx, cy], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
-
+    gs = np.zeros((n_sam, n_pix, n_pix, 1))            #gs = Galaxie(s)
+    for i in range(n_sam):
+        gs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
 
     #--- Add Gaussian noise
-    # y_true_noise = np.zeros((n_sam, n_pix, n_pix, 1))
     for i in range(n_sam):
         gs[i,:,:,0] = gs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
     return gs, par_scale, par_ellip, par_angle
+
+
+#----------------------------------------------------------
+#  Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#----------------------------------------------------------
+def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
+
+    #--- Coordinates image. We will pass this to the neural net
+    xx, yy = make_coord_list(n_sam, n_pix)
+    xx = xx/n_pix*scale_im + half_pix
+    yy = yy/n_pix*scale_im + half_pix
+
+    #--- Unpack input parameters
+    ps_min, ps_max = scale_r
+    pe_min, pe_max = ellip_r
+
+    #--- Intermediate parameters
+    par_scale = np.random.uniform(ps_min, ps_max, size=n_sam)
+    par_ellip = np.random.uniform(pe_min, pe_max, size=n_sam)
+    par_angle = np.random.uniform(0, 1, size=n_sam)
+
+    #--- Generate Noise profiles/galaxies
+    ngs = np.zeros((n_sam, n_pix, n_pix, 1))            #ngs = Noise Galaxie(s)
+    for i in range(n_sam):
+        ngs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i], do_centre=False)
+
+    #--- Add Gaussian noise
+    for i in range(n_sam):
+        ngs[i,:,:,0] = ngs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
+    return ngs, par_scale, par_ellip, par_angle
 
 
 # Create titles that can accompany the image grid view.
