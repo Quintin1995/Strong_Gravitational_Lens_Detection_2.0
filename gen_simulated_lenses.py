@@ -81,19 +81,25 @@ def print_data_array_stats(data_array, name):
 
 
 # Shows a random sample of the given data array, to the user.
-def show_img_grid(data_array, iterations=1, columns=4, rows=4, seed=1245):
-    random.seed(seed)
+def show_img_grid(data_array, iterations=1, columns=4, rows=4, seed=None, titles=None, fig_title=""):
+    if seed != None:
+        random.seed(seed)
     img_count = int(columns * rows)
 
     for _ in range(iterations):
         rand_idxs = [random.choice(list(range(data_array.shape[0]))) for x in range(img_count)]
 
         fig=plt.figure(figsize=(8, 8))
+        fig.suptitle(fig_title, fontsize=16)
+
         for idx, i in enumerate(range(1, columns*rows +1)):
             fig.add_subplot(rows, columns, i)
             ax = (fig.axes)[idx]
             ax.axis('off')
-            ax.set_title("img idx = {}".format(rand_idxs[idx]))
+            if titles==None:
+                ax.set_title("img idx = {}".format(rand_idxs[idx]))
+            else:
+                ax.set_title(titles[rand_idxs[idx]])
             lens = np.squeeze(data_array[rand_idxs[idx]])
             plt.imshow(lens, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
 
@@ -152,9 +158,9 @@ def make_xy_coords(_n, _range=(0,1)):
 
 
 #----------------------------------------------------------
-#   Create Noise Galaxy      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#   Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
+def gen_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
@@ -179,8 +185,15 @@ def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0
     # y_true_noise = np.zeros((n_sam, n_pix, n_pix, 1))
     for i in range(n_sam):
         ngs[i,:,:,0] = ngs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
-    return ngs
+    return ngs, par_scale, par_ellip, par_angle
 
+
+# Create titles that can accompany the image grid view.
+def create_exponential_profile_titles(par_scale, par_ellip, par_angle):
+    titles = []
+    for i in range(par_scale.shape[0]):
+        titles.append("A:{:.3f} e:{:.3f} t:{:.3f}".format(par_scale[i], par_ellip[i], par_angle[i]))
+    return titles
 
 
 ########################################
@@ -188,15 +201,16 @@ def gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0
 data_type = np.float32
 seed = 1234
 ########################################
-if False:
+if True:
     ### 1 - Load lenses.
     all_fits_paths = get_all_fits_paths()
     lenses         = load_lenses(all_fits_paths)
-    print_data_array_stats(lenses, name="lenses")
-    show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=seed)
+    print_data_array_stats(lenses, name="Lenses")
+    show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=None, titles=None, fig_title="Real Lenses")
 
 if True:
-    ### 3 - Create a Noise Galaxies
-    ngs = gen_noise_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0.0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025)
-    print_data_array_stats(ngs, name="Noise Galaxies")
-    show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed)
+    ### 3 - Create a Centre Galaxies
+    ngs, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), g_noise_sigma=0.025)
+    fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
+    print_data_array_stats(ngs, name="Centre Galaxies")
+    show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Centre Galaxies")
