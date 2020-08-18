@@ -5,6 +5,7 @@
 #  "Noise Galaxy" - NG: A galaxy in an image, that is not
 #       in the centre of the image. Therefore it is not considered 
 #       the object of interest, therefore it is considered a noise object.
+#  "Centre Galaxy" - CG: The galaxy in the middle of the image. a.k.a. the object of interest.
 
 import glob
 import time
@@ -158,9 +159,9 @@ def make_xy_coords(_n, _range=(0,1)):
 
 
 #----------------------------------------------------------
-#   Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
+#  Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def gen_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
+def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025, do_centre=True):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
@@ -176,16 +177,26 @@ def gen_galaxies(n_sam=100, n_pix=64, scale_im=4.0, half_pix=0, scale_r=(0.01,0.
     par_ellip = np.random.uniform(pe_min, pe_max, size=n_sam)
     par_angle = np.random.uniform(0, 1, size=n_sam)
 
-    #--- Generate profiles for training
-    ngs = np.zeros((n_sam, n_pix, n_pix, 1))            #ngs = Noise Galaxie(s)
-    for i in range(n_sam):
-        ngs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
+    #--- Generate centre profiles/galaxies
+    if do_centre:
+        gs = np.zeros((n_sam, n_pix, n_pix, 1))            #gs = Galaxie(s)
+        for i in range(n_sam):
+            gs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
+
+    #--- Generate Noise profiles/galaxies - Noise galaxies are typically not in the centre of the image.
+    if not do_centre:
+        gs = np.zeros((n_sam, n_pix, n_pix, 1))            #gs = in this case Noise Galaxie(s)
+        for i in range(n_sam):
+            cx = 10#random.uniform(0,1)#random.uniform(-(n_pix/2), (n_pix/2))
+            cy = 10#random.uniform(0,1)#random.uniform(-(n_pix/2), (n_pix/2))
+            gs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], center=[cx, cy], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
+
 
     #--- Add Gaussian noise
     # y_true_noise = np.zeros((n_sam, n_pix, n_pix, 1))
     for i in range(n_sam):
-        ngs[i,:,:,0] = ngs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
-    return ngs, par_scale, par_ellip, par_angle
+        gs[i,:,:,0] = gs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
+    return gs, par_scale, par_ellip, par_angle
 
 
 # Create titles that can accompany the image grid view.
@@ -201,16 +212,23 @@ def create_exponential_profile_titles(par_scale, par_ellip, par_angle):
 data_type = np.float32
 seed = 1234
 ########################################
-if True:
+if False:
     ### 1 - Load lenses.
     all_fits_paths = get_all_fits_paths()
     lenses         = load_lenses(all_fits_paths)
     print_data_array_stats(lenses, name="Lenses")
     show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=None, titles=None, fig_title="Real Lenses")
 
-if True:
-    ### 3 - Create a Centre Galaxies
-    ngs, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), g_noise_sigma=0.025)
+if False:
+    ### 2 - Create a Centre Galaxies as realistically as possible - Centre Galaxy = cg
+    cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), g_noise_sigma=0.025)
     fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
-    print_data_array_stats(ngs, name="Centre Galaxies")
-    show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Centre Galaxies")
+    print_data_array_stats(cg, name="Centre Galaxies")
+    show_img_grid(cg, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Centre Galaxies")
+
+if True:
+    ### 3 - Create Noise Galaxies - as realistically as possible
+    ngs, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), g_noise_sigma=0.025, do_centre=False)
+    fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
+    print_data_array_stats(ngs, name="Noise Galaxies")
+    show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Noise Galaxies")
