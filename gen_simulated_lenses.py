@@ -199,7 +199,7 @@ def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0
 #----------------------------------------------------------
 #  Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
+def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), bright=(0.2, 1.0)):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
@@ -209,6 +209,7 @@ def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(
     #--- Unpack input parameters
     ps_min, ps_max = scale_r
     pe_min, pe_max = ellip_r
+    pb_min, pb_max = bright
 
     #--- Generate Noise profiles/galaxies
     ngs = np.zeros((n_sam, n_pix, n_pix, 1))            #ngs = Noise Galaxie(s)
@@ -217,17 +218,21 @@ def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(
         num_noise_galaxies = abs(int(np.random.normal(mu, sigma, 1)))       #Sample from a normal distribution (but only positive values)
         ng = np.zeros((n_pix, n_pix))
         for j in range(num_noise_galaxies):
-            par_scale = np.random.uniform(ps_min, ps_max, size=1)
-            par_ellip = np.random.uniform(pe_min, pe_max, size=1)
-            par_angle = np.random.uniform(0, 1, size=1)
-            ng += exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[0], ellipticity=par_ellip[0], angle=par_angle[0], do_centre=False)
+            par_scale  = np.random.uniform(ps_min, ps_max, size=1)
+            par_ellip  = np.random.uniform(pe_min, pe_max, size=1)
+            par_angle  = np.random.uniform(0, 1, size=1)
+            par_bright = np.random.uniform(pb_min, pb_max, size=1)
+            ng += par_bright * exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[0], ellipticity=par_ellip[0], angle=par_angle[0], do_centre=False)
         
         ngs[i,:,:,0] = ng
-
-    #--- Add Gaussian noise
-    for i in range(n_sam):
-        ngs[i,:,:,0] = ngs[i,:,:,0] + np.random.randn(n_pix, n_pix)*g_noise_sigma
     return ngs
+
+
+#--- Add Gaussian noise to data array
+def add_gaussian_noise(data_array, g_noise_sigma=0.025):
+    for i in range(data_array.shape[0]):
+        data_array[i,:,:,0] = data_array[i,:,:,0] + np.random.randn(data_array.shape[1], data_array.shape[2])*g_noise_sigma
+    return data_array
 
 
 # Create titles that can accompany the image grid view.
@@ -246,7 +251,8 @@ def is_even(num):
         return True
 
 
-def show_comparing_img_grid(data_array1, data_array2, iterations=1, name1="", name2="", columns=4, rows=4, seed=None, titles=None, fig_title=""):
+# Show 2 sets of images to the user, coming from two data arrays.
+def show_comparing_img_grid(data_array1, data_array2, iterations=1, name1="ar1", name2="ar2", columns=4, rows=4, seed=None, titles=None, fig_title=""):
     if seed != None:
         random.seed(seed)
     img_count = int(columns * rows)
@@ -264,11 +270,9 @@ def show_comparing_img_grid(data_array1, data_array2, iterations=1, name1="", na
             ax.axis('off')
 
             if is_even(idx):
-                # rand_idxs  = rand_idxs1
                 name       = name1
                 data_array = data_array1
             else:
-                # rand_idxs  = rand_idxs2
                 name       = name2
                 data_array = data_array2
 
@@ -283,58 +287,110 @@ def show_comparing_img_grid(data_array1, data_array2, iterations=1, name1="", na
             img = np.squeeze(data_array[rand_idxs[idx]])
             plt.imshow(img, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
 
-        plt.show()    
+        plt.show()
+
+
+def deviation_from_median(data_array, median):
+    # Make array one dimensional
+    data_array = data_array.flatten()
+    # Number of observations
+    n = data_array.shape[0]
+    # Square deviations
+    deviations = [(x - median) ** 2 for x in data_array]
+    # Variance
+    variance = sum(deviations) / n
+    return np.sqrt(variance)
+
+
+##### Code that determined the emperical median and standard deviation of the lenses
+def emp_median_std(lenses):
+    median = np.median(lenses)
+    deviations_from_median = []
+    for i in range(lenses.shape[0]):
+        print(i)
+        deviations_from_median.append(deviation_from_median(np.clip(lenses[i], 0.0, 0.1), median=median))
+
+    count, bins, ignored = plt.hist(deviations_from_median, 30, density=True, alpha=0.5, label="observations")
+    plt.show()
+    print("median: {}".format(np.mean(np.asarray(deviations_from_median))))
+    print("std from median: {}".format(np.std(np.asarray(deviations_from_median))))
 
 ########################################
 # Parameters
-data_type   = np.float32
-seed        = 1234
-n_sam       = 100
-n_pix       = 101
+data_type         = np.float32
+seed              = 1234
+n_sam             = 100
+n_pix             = 101
+do_normalize      = False
+do_simple_clip    = True
+do_add_gaus_noise = False
 ########################################
-if True:
-    ### 1 - Load lenses.
-    all_fits_paths = get_all_fits_paths()
-    lenses         = load_lenses(all_fits_paths)
-    print_data_array_stats(lenses, name="Lenses")
-    if False:
-        show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=None, titles=None, fig_title="Real Lenses")
-
-if True:
-    ### 2 - Create a Centre Galaxies as realistically as possible - Centre Galaxy = cg
-    cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), g_noise_sigma=0.025)
-    fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
-    print_data_array_stats(cg, name="Centre Galaxies")
-    if False:
-        show_img_grid(cg, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Centre Galaxies")
-
-if True:
-    ### 3 - Create Noise Galaxies - as realistically as possible
-    ngs = gen_noise_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), g_noise_sigma=0.025)
-    print_data_array_stats(ngs, name="Noise Galaxies")
-    if False:
-        show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Noise Galaxies")
 
 
-if True:
-    ### 4 - Merge Centre Galaxy and Noise galaxies
-    sgs = np.zeros((n_sam, n_pix, n_pix, 1))            #sgs = Simulated Galaxie(s)
-    for i in range(cg.shape[0]):
-        sgs[i] = cg[i] + ngs[i]
-    print_data_array_stats(sgs, name="Simulated Galaxy")
-    if False:
-        show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy")
+### 1 - Load lenses.
+all_fits_paths = get_all_fits_paths()
+lenses         = load_lenses(all_fits_paths)
+print_data_array_stats(lenses, name="Lenses")
+if False:
+    show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=None, titles=None, fig_title="Real Lenses")
 
 
-if True:
-    ### 5 - Normalize the merged galaxies. per image
+### 2 - Create the Centre Galaxies as realistically as possible - Centre Galaxy = cg
+cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0038), ellip_r=(0.2,0.4), g_noise_sigma=0.00)
+fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
+print_data_array_stats(cg, name="Centre Galaxies")
+if False:
+    show_img_grid(cg, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Centre Galaxies")
+
+
+### 3 - Create Noise Galaxies - as realistically as possible
+ngs = gen_noise_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), bright=(0.2, 1.0))
+print_data_array_stats(ngs, name="Noise Galaxies - Median lenses not added")
+if False:
+    show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Noise Galaxies")
+
+
+### 4 - Merge Centre Galaxy and Noise galaxies
+sgs = np.zeros((n_sam, n_pix, n_pix, 1))            #sgs = Simulated Galaxie(s)
+for i in range(cg.shape[0]):
+    med   = 0.0232                                 # Median of lenses - emperically determined
+    sigma = 0.0096                                  # Standard Deviation from Median - emperically determined
+    empericaly_noise = np.random.normal(loc=med, scale=sigma, size=(n_pix, n_pix, 1))           # Each black pixel in the image isnt black but nearly black. We sample from a normal distribution to get this nearly black value.
+    sgs[i] = cg[i] + ngs[i] + empericaly_noise
+print_data_array_stats(sgs, name="Simulated Galaxy")
+if False:
+    show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy")
+
+
+### 5 - Apply some Gaussian Noise
+if do_add_gaus_noise:
+    sgs = add_gaussian_noise(sgs, g_noise_sigma=0.0125)
+
+### 6 - Normalize per image
+if do_normalize:
     for j in range(sgs.shape[0]):
         sgs[j] = normalize_img(sgs[j])
     print_data_array_stats(sgs, name="Simulated Galaxy - after normalization")
     if False:
-        show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - norm")
-    
+        show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - norm per image")
 
+### 7 - Clipping, the merged galaxies per image
+if do_simple_clip:
+    for j in range(sgs.shape[0]):
+        sgs[j] = np.clip(sgs[j], 0.0, 1.0)
+    print_data_array_stats(sgs, name="Simulated Galaxy - after normalization")
+    if False:
+        show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - clipping per image")    
+
+
+### 7 - Show Real lenses and simulated lenses next to each other to the user.
 if True:
-    ### 6 - Show Real lenses and simulated lenses next to each other to the user.
-    show_comparing_img_grid(lenses, sgs, iterations=1, name1="lenses", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
+    show_comparing_img_grid(lenses, sgs, iterations=10, name1="1", name2="2", columns=2, rows=4, seed=None, titles=None, fig_title="")
+
+
+
+#to do
+#3 add the standard deviation from the median of the lenses
+#1 slight chance to remove centre galaxy
+#2 slight change to saturate the image significantly more.
+
