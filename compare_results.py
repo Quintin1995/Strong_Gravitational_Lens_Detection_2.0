@@ -4,11 +4,10 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import *
-from Parameters import *
+from utils import load_settings_yaml
 from Parameters import Parameters
-from DataGenerator import *
-from Network import *
+from DataGenerator import DataGenerator
+from Network import Network
 import csv
 import math
 
@@ -142,24 +141,24 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         yaml_path = glob.glob(os.path.join(model_folder) + "/*.yaml")[0]
         settings_yaml = load_settings_yaml(yaml_path)
         
-        # Step 2.0 Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
+        # Step 2.0 - Set Parameters - and overload fraction to load sources - because not all are needed and it will just slow things down for now.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")
         params.fraction_to_load_sources_vali = 0.15
 
         params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # must be done here, due to the json, not accepting this kind of if statement in the parameter class.
         if params.model_name == "Baseline_Enrico":
             params.img_dims = (101,101,3)
-        
-        # Step 3.0 - Construct a neural network with the same architecture as that it was trained with.
-        network = Network(params.net_name, params.net_learning_rate, params.net_model_metrics, params.img_dims, params.net_num_outputs, params)
-        network.model.trainable = False
-        
-        # Step 4.0 - Load weights of the neural network
-        network.model.load_weights(paths_h5s[idx])
-
-        # Step 5.0 - Define a DataGenerator that can generate validation chunks based on validation data.
+      
+        # Step 3.0 - Define a DataGenerator that can generate validation chunks based on validation data.
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
         placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
+        
+        # Step 4.0 - Construct a neural network with the same architecture as that it was trained with.
+        network = Network(params, dg, training=False) # The network needs to know hyper-paramters from params, and needs to know how to generate data with a datagenerator object.
+        network.model.trainable = False
+        
+        # Step 5.0 - Load weights of the neural network
+        network.model.load_weights(paths_h5s[idx])
         
         # Step 6.0 - we want a nice plot with standard deviation.
         f_beta_vectors = []
@@ -183,7 +182,7 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
                     f_betas.append(F_beta)
                     writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
             f_beta_vectors.append(f_betas)
-        print("saved csv with f_beta scores to: ".format(f_beta_full_path), flush=True)
+        print("saved csv with f_beta scores to: {}".format(f_beta_full_path), flush=True)
         
         # step 7.0 - calculate std and mean - based on f_beta_vectors
         colls = list(zip(*f_beta_vectors))
@@ -241,7 +240,7 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
 
 
 # Plot the losses of the trained model over training time. Plot the average loss based on a windows size given as parameter.
-def plot_losses_avg(models, dfs,  window_size=10):
+def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
     print("------------------------------")
     print("Plotting average losses...")
     for j in range(len(models)):
@@ -256,17 +255,20 @@ def plot_losses_avg(models, dfs,  window_size=10):
         for i in range(len(df_loss) - window_size):
             loss_avg.append(sum(list(df_loss[i:i+window_size])) / window_size) 
 
-        diff_loss = []
-        for k in range(len(loss_avg)):
-            diff_loss.append(val_loss_avg[k] - loss_avg[k])
+        if do_diff_loss:
+            diff_loss = []
+            for k in range(len(loss_avg)):
+                diff_loss.append(val_loss_avg[k] - loss_avg[k])
 
-        plt.plot(val_loss_avg, label="val loss - avg window {}".format(window_size), color=colors[j], linewidth=3)
-        plt.plot(loss_avg, label="train loss - avg window {}".format(window_size), color=colors[j], linewidth=1)
-        plt.plot(diff_loss, label="diff loss")
-
+        plt.plot(val_loss_avg[500:], label="val loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=3)
+        plt.plot(loss_avg[500:], label="train loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=1)
+        if do_diff_loss:
+            plt.plot(diff_loss[500:], label="diff loss")
         plt.title("Model losses - {}".format(models[j]))
         plt.ylabel("loss")
         plt.xlabel("Trained Chunks")
+        
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
     plt.savefig(os.path.join(models[j], "avg_loss_Window{}".format(window_size)))
     plt.show()
@@ -358,6 +360,43 @@ def set_models_folders(experiment_folder):
     return full_paths
 
 
+def which_plots_to_plot(columns):
+    print("------------------------------")
+    print("Set plots that you want to view:")
+    for idx, folder in enumerate(columns):
+        print("\t{} - {}".format(idx, folder))
+    plot_idxs = input("Set indexes of plot(s)\n(integer)\nOr comma seperated ints: ")
+
+    str_indexes = plot_idxs.split(',')
+    chosen_plots = [columns[int(string_idx)] for string_idx in str_indexes]
+
+    print("\nUser Choices: ")
+    for chosen_plot in chosen_plots:
+        print(chosen_plot)
+
+    return chosen_plots
+
+
+# Ask the user whether he want to see and compute the error plot.
+def error_plot_dialog():
+    print("------------------------------")
+    show_error_plot = input("Show error plot? y/n: ")
+    show_error_plot = True if show_error_plot in ["y", "yes"] else False
+    return show_error_plot
+
+# Ask the user whether he want to see and compute the error plot.
+def loss_plot_dialog():
+    print("------------------------------")
+    show_loss_plot = input("Show loss plot? y/n: ")
+    show_loss_plot = True if show_loss_plot in ["y", "yes"] else False
+    return show_loss_plot
+
+# Ask the user whether he want to see and compute the error plot.
+def fBeta_plot_dialog():
+    print("------------------------------")
+    show_fBeta_plot = input("Show f_beta graphs? y/n: ")
+    show_fBeta_plot = True if show_fBeta_plot in ["y", "yes"] else False
+    return show_fBeta_plot
 
 
 
@@ -367,41 +406,17 @@ colors                  = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum'
 json_comp_key           = "model_name"              # is the label in generated plots
 verbatim                = False
 
-### 0 - Error Plot of given Models
-do_show_error_plot      = True
-error_window_size       = 500     # avg window size
+### Error Plot of given Models
+window_size             = 500     # avg window size
 ytop                    = 10.0    # Error plot y upper-limit in percentage
 ybottom                 = 4.00    # Error plot y bottom-limit in percentage
 
-
-### 1a - Overfit plot ###
-# Shows a plot where the loss is average over time. (also plots the difference between training- and validation loss.)
-do_show_overfit_plot    = True
-window_size             = 50      # Determines over how many datapoints the average is taken. (window size in the future. (x = avg(next 50 datapoints) if x=50))
-
-
-### 2a - Barrage of plots ###
-# Show a barrage of plots to the user defined in plots_to_show list.
-show_all_step4_plots    = True
-plots_to_show = {
-    # "loss",
-    # "binary_accuracy",
-    # "val_loss",
-    # "val_binary_accuracy",
-    "time",
-    # "cpu_percentage",
-    # "ram_usage",
-    # "available_mem",
-    # "chunk"
-}
-
-### 3a - f_beta graph and its paramters ###
+### f_beta graph and its paramters
 # Shows a f_beta plot of the given models (can be time consuming)
-do_show_fbeta_plot      = True
-f_beta_avg_count        = 10                            # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
-beta_squarred           = 0.03                          # For f-beta calculation
-stepsize                = 0.01                          # For f-beta calculation
-threshold_range = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
+f_beta_avg_count        = 10                                    # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
+beta_squarred           = 0.03                                  # For f-beta calculation
+stepsize                = 0.01                                  # For f-beta calculation
+threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
 ######################################################
 
 
@@ -420,23 +435,24 @@ def main():
 
         ## 1.0 - Get list dataframes
         if not is_enrico_model_chosen:
-            dfs, csv_paths = get_dataframes(models_paths_list)
+            dfs, _ = get_dataframes(models_paths_list)
 
         ## 2.0 - Get list of jsons
-        jsons, json_paths = get_jsons(models_paths_list)
+        jsons, _ = get_jsons(models_paths_list)
 
         ## 3.0 - get list of .h5 files
         paths_h5s = get_h5s_paths(models_paths_list)
 
         ## 4.0 - Plot Error for all models given
-        if not is_enrico_model_chosen:
-            plot_errors(models_paths_list, dfs, jsons, json_comp_key, window_size=error_window_size, ylim_top = ytop, ylim_bottom=ybottom)
+        if not is_enrico_model_chosen and error_plot_dialog():
+            plot_errors(models_paths_list, dfs, jsons, json_comp_key, window_size=window_size, ylim_top = ytop, ylim_bottom=ybottom)
 
         ## 5.0 - Show the losses nicely for each model
-        if not is_enrico_model_chosen:
-            plot_losses_avg(models_paths_list, dfs, window_size=window_size)
+        if not is_enrico_model_chosen and loss_plot_dialog():
+            plot_losses_avg(models_paths_list, dfs, jsons, window_size=window_size)
 
         ## 6.0 - Plot the data from the csvs - legend determined by json parameter dump file
+        plots_to_show = which_plots_to_plot(dfs[0].columns)
         if not is_enrico_model_chosen:
             for columnname in dfs[0].columns:
                 if columnname not in plots_to_show:
@@ -444,9 +460,8 @@ def main():
                 compare_plot_models(columnname, dfs, jsons, json_comp_key)
 
         ## 7.0 - Calculate f-beta score per model - based on validation data
-        if do_show_fbeta_plot:
+        if fBeta_plot_dialog:
             store_fbeta_results(models_paths_list, paths_h5s, jsons, json_comp_key, f_beta_avg_count)
         ######################################################
-
 
 main()
