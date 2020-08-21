@@ -14,7 +14,6 @@ import time
 from utils import hms, plot_history
 
 
-
 class Network:
 
     def __init__(self, params, datagenerator, training):
@@ -59,6 +58,8 @@ class Network:
             self.save_model_to_file()
 
 
+    # Training function, that will train according to paramters set by the Parameter class
+    # A csv writer is opened and being written into during training.
     def train(self):
 
         # Open a csv writer and write headers into it.
@@ -151,7 +152,6 @@ class Network:
                 str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
             
 
-
     # Resets the backend of keras. Everything regarding the model is stored into a folder,
     # and later loaded again. This function is needed, in order to resolve memory leaks.
     # Keras 1.x does not show memory leaks, while keras 2.x does show memory leaks.
@@ -173,12 +173,12 @@ class Network:
         self.val_loss.append(history.history["val_loss"][0])
         self.val_acc.append(history.history["val_binary_accuracy"][0])
 
+
     # Store Neural Network summary to file
     def save_model_to_file(self):
         with open(self.params.full_path_neural_net_printout,'w') as fh:
             # Pass the file handle in as a lambda function to make it callable
             self.model.summary(print_fn=lambda x: fh.write(x + '\n'))
-
 
 
     # Builds a Residual Neural Network with network depth 50
