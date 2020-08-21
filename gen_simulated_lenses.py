@@ -16,10 +16,11 @@ import functools
 from skimage import exposure
 import scipy
 from multiprocessing import Pool
-from utils import *
+from utils import bytes2gigabyes
 from astropy.io import fits
 import os
 import matplotlib.pyplot as plt
+import scipy.ndimage as ndimage
 
 # Returns a numpy array with lens images from disk
 def load_img(path, data_type = np.float32, normalize_dat = "per_image"):
@@ -126,8 +127,8 @@ def exponential_2d_np(xx,yy, center=[0.0,0.0], amplitude=1.0, scale=0.5, ellipti
     img = amplitude * np.exp(-rt)
 
     if not do_centre:
-        x_shift = int(random.uniform(0, (xt.shape[0])))
-        y_shift = int(random.uniform(0, (xt.shape[0])))
+        x_shift = int(random.uniform(0, (xt.shape[0]//2)))
+        y_shift = int(random.uniform(0, (xt.shape[0]//2)))
         img = np.roll(img, x_shift, axis=0)                 # Rolling the image ensures that all pixels in the image stay in the image. It won't introduce 0.0 pixels, which are unrealistic.
         img = np.roll(img, y_shift, axis=1)
         
@@ -169,7 +170,7 @@ def make_xy_coords(_n, _range=(0,1)):
 #----------------------------------------------------------
 #  Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025):
+def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), g_noise_sigma=0.025, bright_r=(0.0, 0.99)):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
@@ -179,16 +180,23 @@ def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0
     #--- Unpack input parameters
     ps_min, ps_max = scale_r
     pe_min, pe_max = ellip_r
+    pb_min, pb_max = bright_r
 
     #--- Intermediate parameters
     par_scale = np.random.uniform(ps_min, ps_max, size=n_sam)
     par_ellip = np.random.uniform(pe_min, pe_max, size=n_sam)
     par_angle = np.random.uniform(0, 1, size=n_sam)
 
+    brightness = np.random.uniform(pb_min, pb_max, size=n_sam)                          # The brightness of the centre galaxy is usually associated with pixel value of 1.0. However, based on a histogram, this value is 1 in 46 times not 1.0, but a unifrom value between 0.0 and 0.99.
+    emperical_threshold = 0.021739     # Determined emperically based on lens set.
+    for i in range(brightness.shape[0]):
+        if random.random() > emperical_threshold:
+            brightness[i] = 1.0
+
     #--- Generate centre profiles/galaxies
     gs = np.zeros((n_sam, n_pix, n_pix, 1))            #gs = Galaxie(s)
     for i in range(n_sam):
-        gs[i,:,:,0] = exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
+        gs[i,:,:,0] = brightness[i] * exponential_2d_np(xx[i,:,:,0],yy[i,:,:,0], scale=par_scale[i], ellipticity=par_ellip[i], angle=par_angle[i])
 
     #--- Add Gaussian noise
     for i in range(n_sam):
@@ -199,7 +207,7 @@ def gen_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0
 #----------------------------------------------------------
 #  Create Galaxie(s)      Partially taken from: https://github.com/miguel-aragon/Semantic-Autoencoder-Paper/blob/master/PAPER_Exponential_profile_3-parameters_Gaussian-noise.ipynb
 #----------------------------------------------------------
-def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), bright=(0.2, 1.0)):
+def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(0.01,0.05), ellip_r=(0.2,0.75), bright_r=(0.2, 1.0)):
 
     #--- Coordinates image. We will pass this to the neural net
     xx, yy = make_coord_list(n_sam, n_pix)
@@ -209,7 +217,7 @@ def gen_noise_galaxies(n_sam=100, n_pix=101, scale_im=4.0, half_pix=0, scale_r=(
     #--- Unpack input parameters
     ps_min, ps_max = scale_r
     pe_min, pe_max = ellip_r
-    pb_min, pb_max = bright
+    pb_min, pb_max = bright_r
 
     #--- Generate Noise profiles/galaxies
     ngs = np.zeros((n_sam, n_pix, n_pix, 1))            #ngs = Noise Galaxie(s)
@@ -315,15 +323,40 @@ def emp_median_std(lenses):
     print("median: {}".format(np.mean(np.asarray(deviations_from_median))))
     print("std from median: {}".format(np.std(np.asarray(deviations_from_median))))
 
+
+def crop_center(img, cropx, cropy):
+    y, x, _ = img.shape
+    startx = x // 2 - (cropx // 2)
+    starty = y // 2 - (cropy // 2)
+    return img[starty:starty + cropy, startx:startx + cropx, :]
+
+
+# Returns an array with centre cutouts.
+# Returns an array with images that have a centre intensity lower than the intensity threshold
+# Returns a list of peak intensities in the images.
+def get_centre_cutouts_emptyImgs_intensities(lenses, crop_dim=22, intensity_threshold=0.1):
+    cutouts = []
+    empty_imgs = []
+    max_intensities_centres = []
+    for i in range(lenses.shape[0]):
+        img    = lenses[i]
+        cutout = crop_center(img, crop_dim, crop_dim)
+        max_intensities_centres.append(np.amax(cutout))
+        if np.amax(cutout) < intensity_threshold:
+            empty_imgs.append(cutout)
+        cutouts.append( cutout )
+    return np.asarray(cutouts), np.asarray(empty_imgs), max_intensities_centres
+
+
 ########################################
 # Parameters
-data_type         = np.float32
-seed              = 1234
-n_sam             = 10000
-n_pix             = 101
-do_normalize      = False
-do_simple_clip    = True
-do_add_gaus_noise = True
+data_type             = np.float32
+seed                  = 1234
+n_sam                 = 100
+n_pix                 = 101
+do_normalize          = False
+do_simple_clip        = True
+do_add_gaus_noise     = False
 ########################################
 
 
@@ -336,7 +369,7 @@ if False:
 
 
 ### 2 - Create the Centre Galaxies as realistically as possible - Centre Galaxy = cg
-cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0038), ellip_r=(0.2,0.4))
+cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0045), ellip_r=(0.2,0.25), bright_r=(0.0, 0.99))
 fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
 print_data_array_stats(cg, name="Centre Galaxies")
 if False:
@@ -344,7 +377,7 @@ if False:
 
 
 ### 3 - Create Noise Galaxies - as realistically as possible
-ngs = gen_noise_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), bright=(0.2, 1.0))
+ngs = gen_noise_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), bright_r=(0.2, 1.0))
 print_data_array_stats(ngs, name="Noise Galaxies - Median lenses not added")
 if False:
     show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Noise Galaxies")
@@ -362,9 +395,10 @@ if False:
     show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy")
 
 
-### 5 - Apply some Gaussian Noise
+### 5.1 - Apply some Gaussian Noise
 if do_add_gaus_noise:
-    sgs = add_gaussian_noise(sgs, g_noise_sigma=0.0125)
+    sgs = add_gaussian_noise(sgs, g_noise_sigma=0.003125)        # Sigma found by means of visual inspection
+
 
 ### 6 - Normalize per image
 if do_normalize:
@@ -382,15 +416,28 @@ if do_simple_clip:
     if False:
         show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - clipping per image")    
 
-
 ### 7 - Show Real lenses and simulated lenses next to each other to the user.
 if True:
-    show_comparing_img_grid(lenses, sgs, iterations=10, name1="1", name2="2", columns=2, rows=4, seed=None, titles=None, fig_title="")
+    show_comparing_img_grid(lenses, sgs, iterations=50, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
 
+### 8 - How many centre galaxies are missing from the lenses set?
+## Centre Crops
+if False:
+    intensity_threshold = 0.1
+    cutouts, empty_imgs, max_intensities_centres = get_centre_cutouts_emptyImgs_intensities(lenses, intensity_threshold=intensity_threshold)
+    print_data_array_stats(cutouts, name="Centre Galaxy cutouts")
+    show_img_grid(cutouts, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Centre Galaxy cutouts")    
 
+    ## Missing Galaxies
+    print_data_array_stats(empty_imgs, name="Centre Galaxy missing?")
+    print("Missing galaxy count #{}, threshold #{}".format(empty_imgs.shape[0], intensity_threshold))
+    print("fraction of gone galaxies: {}".format(empty_imgs.shape[0]/lenses.shape[0]))
+    show_img_grid(empty_imgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Centre Galaxy missing?")    
 
-#to do
-#3 add the standard deviation from the median of the lenses
-#1 slight chance to remove centre galaxy
-#2 slight change to saturate the image significantly more.
+# Histogram of centre centre intensities - Observation: # The brightness of the centre galaxy is usually associated with pixel value of 1.0. However, based on a histogram, this value is 1 in 46 times not 1.0, but a unifrom value between 0.0 and 0.99.
+if False:
+    max_intensities_centres = [x for x in max_intensities_centres if x < 1.0]
+    count, bins, ignored = plt.hist(max_intensities_centres, 50, density=True, alpha=0.5, label="intensities centres")
+    plt.legend()
+    plt.show()
 
