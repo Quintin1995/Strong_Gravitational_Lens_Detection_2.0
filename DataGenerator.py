@@ -184,6 +184,9 @@ class DataGenerator:
         else:
             data_paths = glob.glob(path + "*_r_*.fits")
 
+        if len(data_paths) == 0:
+            data_paths = glob.glob(os.path.join(path, "*/*.fits"))
+
         # Shuffle the filenames
         if do_shuffle:
             random.shuffle(data_paths)
