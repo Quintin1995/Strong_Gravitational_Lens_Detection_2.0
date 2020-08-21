@@ -16,11 +16,12 @@ import functools
 from skimage import exposure
 import scipy
 from multiprocessing import Pool
-from utils import bytes2gigabyes
+from utils import bytes2gigabyes, create_dir_if_not_exists
 from astropy.io import fits
 import os
 import matplotlib.pyplot as plt
 import scipy.ndimage as ndimage
+import shutil
 
 # Returns a numpy array with lens images from disk
 def load_img(path, data_type = np.float32, normalize_dat = "per_image"):
@@ -348,11 +349,48 @@ def get_centre_cutouts_emptyImgs_intensities(lenses, crop_dim=22, intensity_thre
     return np.asarray(cutouts), np.asarray(empty_imgs), max_intensities_centres
 
 
+# Writes a given data array to a given directory
+# dir_batch_size = # how many images go into one sub-directory
+def write_fits_files(data_array, path, filename="sim_lens_r_", dir_batch_size=1000):
+
+    # number batches
+    n_batches = data_array.shape[0]//dir_batch_size
+
+    # loop over batches
+    for batch_idx in range(n_batches):
+        batch_path = os.path.join(path, "batch{}_{}#{}".format(batch_idx, int(batch_idx*dir_batch_size), int((batch_idx+1)*dir_batch_size-1)))
+        create_dir_if_not_exists(batch_path)
+
+        # loop within batch loop
+        for in_batch_idx in range(dir_batch_size):
+            img_idx = int(in_batch_idx + batch_idx*dir_batch_size)
+            img_path = os.path.join(batch_path, "{}{}.fits".format(filename, img_idx))
+            sim_img = sgs[img_idx]
+            hdu = fits.PrimaryHDU(sim_img)
+            hdul = fits.HDUList([hdu])
+            hdul.writeto(img_path)
+
+
+# Delete old data if it exists
+def remove_dirs(train_path, val_path, test_path):
+    try:
+        shutil.rmtree(train_path)
+        shutil.rmtree(val_path)
+        shutil.rmtree(test_path)
+        print("Directory " , train_path ,  " removed ", flush=True)
+        print("Directory " , val_path ,  " removed ", flush=True)
+        print("Directory " , test_path ,  " removed ", flush=True)
+    except e:
+        print("Directory " , train_path ,  " did not exists - {}".format(e), flush=True)
+        print("Directory " , val_path ,  " did not exists - {}".format(e), flush=True)
+        print("Directory " , test_path ,  " did not exists - {}".format(e), flush=True)
+    
+
 ########################################
 # Parameters
-data_type             = np.float32
+data_type             = np.float32      # data type of all generated data arrays
 seed                  = 1234
-n_sam                 = 100
+n_sam                 = 40000
 n_pix                 = 101
 do_normalize          = False
 do_simple_clip        = True
@@ -384,7 +422,7 @@ if False:
 
 
 ### 4 - Merge Centre Galaxy and Noise galaxies
-sgs = np.zeros((n_sam, n_pix, n_pix, 1))            #sgs = Simulated Galaxie(s)
+sgs = np.zeros((n_sam, n_pix, n_pix, 1), dtype=data_type)            #sgs = Simulated Galaxie(s)
 for i in range(cg.shape[0]):
     med   = 0.0232                                 # Median of lenses - emperically determined
     sigma = 0.0096                                  # Standard Deviation from Median - emperically determined
@@ -408,7 +446,8 @@ if do_normalize:
     if False:
         show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - norm per image")
 
-### 7 - Clipping, the merged galaxies per image
+
+### 7 - Clipping, the merged galaxies per image - Clipping seems to be more realistic than normalization.
 if do_simple_clip:
     for j in range(sgs.shape[0]):
         sgs[j] = np.clip(sgs[j], 0.0, 1.0)
@@ -416,12 +455,17 @@ if do_simple_clip:
     if False:
         show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - clipping per image")    
 
-### 7 - Show Real lenses and simulated lenses next to each other to the user.
-if True:
-    show_comparing_img_grid(lenses, sgs, iterations=50, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
 
+### 7 - Show Real lenses and simulated lenses next to each other to the user.
+if False:
+    show_comparing_img_grid(lenses, sgs, iterations=1, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
+
+
+# The following code has been used to emperically determine the intensities of the lenses data.
+# And how many lenses images have no centre galaxy. It might show up on the test data, therefore
+# the neural network needs to be able to see these examples to.
 ### 8 - How many centre galaxies are missing from the lenses set?
-## Centre Crops
+## Image Centre Crops
 if False:
     intensity_threshold = 0.1
     cutouts, empty_imgs, max_intensities_centres = get_centre_cutouts_emptyImgs_intensities(lenses, intensity_threshold=intensity_threshold)
@@ -434,10 +478,32 @@ if False:
     print("fraction of gone galaxies: {}".format(empty_imgs.shape[0]/lenses.shape[0]))
     show_img_grid(empty_imgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Centre Galaxy missing?")    
 
-# Histogram of centre centre intensities - Observation: # The brightness of the centre galaxy is usually associated with pixel value of 1.0. However, based on a histogram, this value is 1 in 46 times not 1.0, but a unifrom value between 0.0 and 0.99.
+### 9 - Histogram of centre centre intensities - Observation: # The brightness of the centre galaxy is usually associated with pixel value of 1.0. However, based on a histogram, this value is 1 in 46 times not 1.0, but a unifrom value between 0.0 and 0.99.
 if False:
     max_intensities_centres = [x for x in max_intensities_centres if x < 1.0]
     count, bins, ignored = plt.hist(max_intensities_centres, 50, density=True, alpha=0.5, label="intensities centres")
     plt.legend()
     plt.show()
 
+
+### 10 - Store the simulated lenses to disk.
+train_path = os.path.join("data", "train", "sim_lenses")
+val_path   = os.path.join("data", "validation", "sim_lenses")
+test_path  = os.path.join("data", "test", "sim_lenses")
+
+remove_dirs(train_path, val_path, test_path)
+
+create_dir_if_not_exists(train_path)
+create_dir_if_not_exists(val_path)
+create_dir_if_not_exists(test_path)
+
+train_frac, val_frac, test_frac = 0.8, 0.1, 0.1                # These fractions have been determined at the beginning of the project.
+
+# Split the simulated galaxies into train, validation and test data.
+train_data = sgs[0:int(train_frac*n_sam)]
+val_data   = sgs[int(train_frac*n_sam):int((train_frac+val_frac)*n_sam)]
+test_data  = sgs[int((train_frac+val_frac)*n_sam):int((train_frac+val_frac+test_frac)*n_sam)]
+
+write_fits_files(train_data, train_path)
+write_fits_files(val_data, val_path)
+write_fits_files(test_data, test_path)
