@@ -380,10 +380,10 @@ def remove_dirs(train_path, val_path, test_path):
         print("Directory " , train_path ,  " removed ", flush=True)
         print("Directory " , val_path ,  " removed ", flush=True)
         print("Directory " , test_path ,  " removed ", flush=True)
-    except e:
-        print("Directory " , train_path ,  " did not exists - {}".format(e), flush=True)
-        print("Directory " , val_path ,  " did not exists - {}".format(e), flush=True)
-        print("Directory " , test_path ,  " did not exists - {}".format(e), flush=True)
+    except IOError:
+        print("Directory " , train_path ,  " did not exists", flush=True)
+        print("Directory " , val_path ,  " did not exists", flush=True)
+        print("Directory " , test_path ,  " did not exists", flush=True)
     
 
 ########################################
