@@ -392,7 +392,7 @@ def remove_dirs(train_path, val_path, test_path):
 ##### Some parameters can be found as parameters in the code and not here yet.
 data_type               = np.float32     # Data type of all generated data arrays
 seed                    = 1234
-n_sam                   = 10000          # Number of images
+n_sam                   = 50000          # Number of images
 n_pix                   = 101            # Number of pixels
 
 show_comparing_plot     = False          # Whether you want to see the comparison between real lens and simulated lens
@@ -513,7 +513,7 @@ if False:
     count, bins, ignored = plt.hist(max_intensities_centres, 50, density=True, alpha=0.5, label="intensities centres")
     plt.legend()
     plt.show()
-    
+
 
 ### 10 - Store the simulated lenses to disk.
 if do_store_results_file:
