@@ -32,17 +32,16 @@ def normalize_img(numpy_img):
 
 # Simple case function to reduce line count in other function
 def normalize_function(img, norm_type, data_type):
-    a = img.shape
     if norm_type == "per_image":
         img = normalize_img(img)
     if norm_type == "adapt_hist_eq":
         img = normalize_img(img)
-        # img[np.where(img==0.0)] = 0.000001         #pixel values cannot be zero it seems
         img = exposure.equalize_adapthist(img).astype(data_type)
     return img
 
 
-
+# If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
+# There is also a check on whether the loaded data already has a color channel dimension, if not create it.
 def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_filename):
     idx, filename = idx_filename
     if idx % 1000 == 0:
@@ -56,7 +55,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
         if img.ndim == 3:                                                                      # Some images are stored with color channel
             return normalize_function(img, normalize_dat, data_type)
         elif img.ndim == 2:                                                                    # Some images are stored without color channel
-            return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)\
+            return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)
 
 
 class DataGenerator:
@@ -262,7 +261,7 @@ class DataGenerator:
             num_negative = X_negatives.shape[0]
         else:
             # Half a chunk positive and half negative
-            num_positive = int(chunksize / 2)       
+            num_positive = int(chunksize / 2)
             num_negative = int(chunksize / 2)
         
         # Get mock lenses data and labels
