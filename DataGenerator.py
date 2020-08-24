@@ -48,12 +48,15 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
     if idx % 1000 == 0:
         print("loaded {} images".format(idx), flush=True)
     if are_sources:
-        img = fits.getdata(filename).astype(data_type)                                         #read file
-        img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                           #convolve with psf_r and expand dims
-        return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)              #normalize
+        img = fits.getdata(filename).astype(data_type)
+        img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                                # Convolve with psf_r, has to do with camara point spread function.
+        return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)       # Expand color channel and normalize
     else:
-        img = fits.getdata(filename).astype(data_type)                                         #read file and expand dims
-        return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)                   #normalize
+        img = fits.getdata(filename).astype(data_type)
+        if img.ndim == 3:                                                                      # Some images are stored with color channel
+            return normalize_function(img, normalize_dat, data_type)
+        elif img.ndim == 2:                                                                    # Some images are stored without color channel
+            return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)\
 
 
 class DataGenerator:
@@ -184,6 +187,7 @@ class DataGenerator:
         else:
             data_paths = glob.glob(path + "*_r_*.fits")
 
+        # Temporary fix to be able to read folder structure of simulated lenses...
         if len(data_paths) == 0:
             data_paths = glob.glob(os.path.join(path, "*/*.fits"))
 
@@ -197,9 +201,6 @@ class DataGenerator:
         # How many does the user actually want?
         num_to_actually_load = int(fraction_to_load*len(data_paths))
         data_paths = data_paths[0:num_to_actually_load]
-
-        # Pre-allocate numpy array for the data
-        # data_array = np.zeros((len(data_paths),img_dims[0], img_dims[1], img_dims[2]),dtype=data_type)
 
         print("Loading...", flush=True)
 
