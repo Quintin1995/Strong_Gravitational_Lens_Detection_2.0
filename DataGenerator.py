@@ -61,31 +61,26 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 class DataGenerator:
     def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
         self.params = params
-
         self.PSF_r = self.compute_PSF_r()
-
         print_stats_program()
 
         with Pool(24) as p:
             if mode == "training":
                 # Load all training data
                 print("\n\n\nLoading Training Data", flush=True)
-                self.Xsources_train   = self.get_data_array(self.params.img_dims,
-                                                            path=self.params.sources_path_train,
+                self.Xsources_train   = self.get_data_array(path=self.params.sources_path_train,
                                                             fraction_to_load=self.params.fraction_to_load_sources_train,
                                                             are_sources=True,
                                                             normalize_dat=self.params.normalize,
                                                             do_shuffle=do_shuffle_data,
                                                             pool=p)
-                self.Xnegatives_train = self.get_data_array(self.params.img_dims,
-                                                            path=self.params.negatives_path_train,
+                self.Xnegatives_train = self.get_data_array(path=self.params.negatives_path_train,
                                                             fraction_to_load=self.params.fraction_to_load_negatives_train,
                                                             are_sources=False,
                                                             normalize_dat=self.params.normalize,
                                                             do_shuffle=do_shuffle_data,
                                                             pool=p)
-                self.Xlenses_train = self.get_data_array(self.params.img_dims,
-                                                            path=self.params.lenses_path_train,
+                self.Xlenses_train = self.get_data_array(path=self.params.lenses_path_train,
                                                             fraction_to_load=self.params.fraction_to_load_lenses_train,
                                                             are_sources=False,
                                                             normalize_dat=self.params.normalize,
@@ -94,22 +89,19 @@ class DataGenerator:
 
             # Load all validation data.
             print("\n\n\nLoading Validation Data", flush=True)
-            self.Xsources_validation = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.sources_path_validation,
+            self.Xsources_validation = self.get_data_array(path=self.params.sources_path_validation,
                                                         fraction_to_load=self.params.fraction_to_load_sources_vali,
                                                         are_sources=True,
                                                         normalize_dat=self.params.normalize,
                                                         do_shuffle=do_shuffle_data,
                                                         pool=p)
-            self.Xnegatives_validation = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.negatives_path_validation,
+            self.Xnegatives_validation = self.get_data_array(path=self.params.negatives_path_validation,
                                                         fraction_to_load=self.params.fraction_to_load_negatives_vali,
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
                                                         do_shuffle=do_shuffle_data,
                                                         pool=p)
-            self.Xlenses_validation    = self.get_data_array(self.params.img_dims,
-                                                        path=self.params.lenses_path_validation,
+            self.Xlenses_validation    = self.get_data_array(path=self.params.lenses_path_validation,
                                                         fraction_to_load=self.params.fraction_to_load_lenses_vali,
                                                         are_sources=False,
                                                         normalize_dat=self.params.normalize,
@@ -173,20 +165,17 @@ class DataGenerator:
 
 
     # Returns a numpy array with lens images from disk
-    def get_data_array(self, img_dims, path, pool, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image", do_shuffle=True):
+    def get_data_array(self, path, pool, fraction_to_load = 1.0, data_type = np.float32, are_sources=False, normalize_dat = "per_image", do_shuffle=True):
         
+        # Check if normalization is a valid entry among the acceptable possibilities.
         if normalize_dat not in ("per_image", "per_array", "adapt_hist_eq"):
             raise Exception('Normalization is not initialized, check if normalization is set correctly in run.yaml')
         start_time = time.time()
-        data_paths = []
 
-        # Get all file names
-        if are_sources:
-            data_paths = glob.glob(path + "*/*.fits")
-        else:
-            data_paths = glob.glob(path + "*_r_*.fits")
-
-        # Temporary fix to be able to read folder structure of simulated lenses...
+        # Try to glob files in the given path
+        data_paths = glob.glob(path + "*_r_*.fits")
+        
+        # if the previous glob fails, then the files are probably in a sub-directory. This sub-directory structure is preferred over bulk files in one folder.
         if len(data_paths) == 0:
             data_paths = glob.glob(os.path.join(path, "*/*.fits"))
 
@@ -203,14 +192,17 @@ class DataGenerator:
 
         print("Loading...", flush=True)
 
-        # Load all the data in into the numpy array:
+        # Define a partial function
         f = functools.partial(load_and_normalize_img, data_type, are_sources, normalize_dat, self.PSF_r)
 
-        data_array = np.asarray(pool.map(f, enumerate(data_paths), chunksize=128),dtype=data_type)           # amount of data that will be given to one thread
-        print("data array shape: {}".format(data_array.shape), flush=True)
+        # Load all the data in into the numpy array:
+        data_array = np.asarray(pool.map(f, enumerate(data_paths), chunksize=128),dtype=data_type)           # Chunksize = Amount of data that will be given to one thread.
+
+        # Normalize per data array.
         if normalize_dat == "per_array":                                                               #normalize
             return self.normalize_data_array(data_array)
 
+        print("data array shape: {}".format(data_array.shape), flush=True)
         print("Max array  = {}".format(np.amax(data_array)), flush=True)
         print("Min array  = {}".format(np.amin(data_array)), flush=True)
         print("Mean array = {}".format(np.mean(data_array)), flush=True)
