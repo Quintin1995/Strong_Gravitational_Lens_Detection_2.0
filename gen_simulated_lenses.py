@@ -395,6 +395,7 @@ n_pix                 = 101
 do_normalize          = False
 do_simple_clip        = True
 do_add_gaus_noise     = False
+do_store_results_file = False
 ########################################
 
 
@@ -486,24 +487,26 @@ if False:
     plt.show()
 
 
+
 ### 10 - Store the simulated lenses to disk.
-train_path = os.path.join("data", "train", "sim_lenses")
-val_path   = os.path.join("data", "validation", "sim_lenses")
-test_path  = os.path.join("data", "test", "sim_lenses")
+if do_store_results_file:
+    train_path = os.path.join("data", "train", "sim_lenses")
+    val_path   = os.path.join("data", "validation", "sim_lenses")
+    test_path  = os.path.join("data", "test", "sim_lenses")
 
-remove_dirs(train_path, val_path, test_path)
+    remove_dirs(train_path, val_path, test_path)
 
-create_dir_if_not_exists(train_path)
-create_dir_if_not_exists(val_path)
-create_dir_if_not_exists(test_path)
+    create_dir_if_not_exists(train_path)
+    create_dir_if_not_exists(val_path)
+    create_dir_if_not_exists(test_path)
 
-train_frac, val_frac, test_frac = 0.8, 0.1, 0.1                # These fractions have been determined at the beginning of the project.
+    train_frac, val_frac, test_frac = 0.8, 0.1, 0.1                # These fractions have been determined at the beginning of the project.
 
-# Split the simulated galaxies into train, validation and test data.
-train_data = sgs[0:int(train_frac*n_sam)]
-val_data   = sgs[int(train_frac*n_sam):int((train_frac+val_frac)*n_sam)]
-test_data  = sgs[int((train_frac+val_frac)*n_sam):int((train_frac+val_frac+test_frac)*n_sam)]
+    # Split the simulated galaxies into train, validation and test data.
+    train_data = sgs[0:int(train_frac*n_sam)]
+    val_data   = sgs[int(train_frac*n_sam):int((train_frac+val_frac)*n_sam)]
+    test_data  = sgs[int((train_frac+val_frac)*n_sam):int((train_frac+val_frac+test_frac)*n_sam)]
 
-write_fits_files(train_data, train_path)
-write_fits_files(val_data, val_path)
-write_fits_files(test_data, test_path)
+    write_fits_files(train_data, train_path)
+    write_fits_files(val_data, val_path)
+    write_fits_files(test_data, test_path)
