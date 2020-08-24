@@ -389,21 +389,22 @@ def remove_dirs(train_path, val_path, test_path):
 ########################################
 ###### Parameters ######################
 ########################################
-data_type               = np.float32      # data type of all generated data arrays
+##### Some parameters can be found as parameters in the code and not here yet.
+data_type               = np.float32     # Data type of all generated data arrays
 seed                    = 1234
-n_sam                   = 10000
-n_pix                   = 101
+n_sam                   = 10000          # Number of images
+n_pix                   = 101            # Number of pixels
 
-show_comparing_plot     = False
-show_comparing_plot_its = 1
+show_comparing_plot     = False          # Whether you want to see the comparison between real lens and simulated lens
+show_comparing_plot_its = 1              # If the comparing plot is shown to the user. How many times do you want to see the plot?
 
 # Normalization Parameters
 do_normalize            = False
 do_simple_clip          = True
 
 # Noise Parameters
-do_add_gaus_noise       = False
-do_add_emperical_noise  = True
+do_add_gaus_noise       = False          # Whether to add gaussian noise to the simulated lenses.
+do_add_emperical_noise  = True           # Whether to add emperical noise to the simulated lenses, obtained from the real lenses.
 
 # Dialation params
 do_dilation             = True
@@ -420,7 +421,7 @@ verbatim                = False
 all_fits_paths = get_all_fits_paths()
 lenses         = load_lenses(all_fits_paths)
 print_data_array_stats(lenses, name="Lenses")
-if False:
+if verbatim:
     show_img_grid(lenses, iterations=1, columns=4, rows=4, seed=None, titles=None, fig_title="Real Lenses")
 
 
@@ -428,14 +429,14 @@ if False:
 cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0045), ellip_r=(0.2,0.25), g_noise_sigma=0, bright_r=(0.0, 0.99))
 fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
 print_data_array_stats(cg, name="Centre Galaxies")
-if False:
+if verbatim:
     show_img_grid(cg, iterations=1, columns=4, rows=4, seed=seed, titles=fig_titles, fig_title="Centre Galaxies")
 
 
 ### 3 - Create Noise Galaxies - as realistically as possible
 ngs = gen_noise_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.004), ellip_r=(0.2,0.5), bright_r=(0.2, 1.0))
 print_data_array_stats(ngs, name="Noise Galaxies - Median lenses not added")
-if False:
+if verbatim:
     show_img_grid(ngs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Noise Galaxies")
 
 
@@ -450,7 +451,7 @@ for i in range(cg.shape[0]):
     else:
         sgs[i] = cg[i] + ngs[i]
 print_data_array_stats(sgs, name="Simulated Galaxy")
-if False:
+if verbatim:
     show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy")
 
 
@@ -464,7 +465,7 @@ if do_normalize:
     for j in range(sgs.shape[0]):
         sgs[j] = normalize_img(sgs[j])
     print_data_array_stats(sgs, name="Simulated Galaxy - after normalization")
-    if False:
+    if verbatim:
         show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - norm per image")
 
 
@@ -473,7 +474,7 @@ if do_simple_clip:
     for j in range(sgs.shape[0]):
         sgs[j] = np.clip(sgs[j], 0.0, 1.0)
     print_data_array_stats(sgs, name="Simulated Galaxy - after normalization")
-    if False:
+    if verbatim:
         show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - clipping per image")    
 
 
@@ -485,8 +486,8 @@ if do_dilation:
 
 
 ### 8 - Show Real lenses and simulated lenses next to each other to the user.
-if True:
-    show_comparing_img_grid(lenses, sgs, iterations=20, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
+if show_comparing_plot:
+    show_comparing_img_grid(lenses, sgs, iterations=show_comparing_plot_its, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
 
 
 # The following code has been used to emperically determine the intensities of the lenses data.
@@ -512,8 +513,7 @@ if False:
     count, bins, ignored = plt.hist(max_intensities_centres, 50, density=True, alpha=0.5, label="intensities centres")
     plt.legend()
     plt.show()
-
-
+    
 
 ### 10 - Store the simulated lenses to disk.
 if do_store_results_file:
