@@ -13,7 +13,7 @@ pip3 install -r requirements.txt
 
 ## How to run
 ~~~
-python3 main.py runs/experiment_folder/run.yaml
+python3 main.py --run=runs/experiment_folder/run.yaml
 ~~~
 
 Input parameters of a run can be set in the following file: runs/experiment_folder/run.yaml.
