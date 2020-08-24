@@ -387,15 +387,32 @@ def remove_dirs(train_path, val_path, test_path):
     
 
 ########################################
-# Parameters
-data_type             = np.float32      # data type of all generated data arrays
-seed                  = 1234
-n_sam                 = 40000
-n_pix                 = 101
-do_normalize          = False
-do_simple_clip        = True
-do_add_gaus_noise     = False
-do_store_results_file = False
+###### Parameters ######################
+########################################
+data_type               = np.float32      # data type of all generated data arrays
+seed                    = 1234
+n_sam                   = 10000
+n_pix                   = 101
+
+show_comparing_plot     = False
+show_comparing_plot_its = 1
+
+# Normalization Parameters
+do_normalize            = False
+do_simple_clip          = True
+
+# Noise Parameters
+do_add_gaus_noise       = False
+do_add_emperical_noise  = True
+
+# Dialation params
+do_dilation             = True
+dialation_threshold     = 0.5             # Probability of using a dialation kernel on the simulated galaxy
+dialation_kernel        = (2,2)
+
+# To Disk
+do_store_results_file   = True # Set to true of you want to overwrite all simulated lenses on your disk
+verbatim                = False
 ########################################
 
 
@@ -408,7 +425,7 @@ if False:
 
 
 ### 2 - Create the Centre Galaxies as realistically as possible - Centre Galaxy = cg
-cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0045), ellip_r=(0.2,0.25), bright_r=(0.0, 0.99))
+cg, par_scale, par_ellip, par_angle = gen_galaxies(n_sam=n_sam, n_pix=n_pix, scale_im=4.0, half_pix=0.0, scale_r=(0.001,0.0045), ellip_r=(0.2,0.25), g_noise_sigma=0, bright_r=(0.0, 0.99))
 fig_titles = create_exponential_profile_titles(par_scale, par_ellip, par_angle)
 print_data_array_stats(cg, name="Centre Galaxies")
 if False:
@@ -423,18 +440,21 @@ if False:
 
 
 ### 4 - Merge Centre Galaxy and Noise galaxies
-sgs = np.zeros((n_sam, n_pix, n_pix, 1), dtype=data_type)            #sgs = Simulated Galaxie(s)
+sgs = np.zeros((n_sam, n_pix, n_pix, 1), dtype=data_type)           #sgs = Simulated Galaxie(s)
+med   = 0.0232                                                      # Median of lenses - emperically determined
+sigma = 0.0096                                                      # Standard Deviation from Median - emperically determined
 for i in range(cg.shape[0]):
-    med   = 0.0232                                 # Median of lenses - emperically determined
-    sigma = 0.0096                                  # Standard Deviation from Median - emperically determined
-    empericaly_noise = np.random.normal(loc=med, scale=sigma, size=(n_pix, n_pix, 1))           # Each black pixel in the image isnt black but nearly black. We sample from a normal distribution to get this nearly black value.
-    sgs[i] = cg[i] + ngs[i] + empericaly_noise
+    if do_add_emperical_noise:
+        empericaly_noise = np.random.normal(loc=med, scale=sigma, size=(n_pix, n_pix, 1))           # Each black pixel in the image isnt black but nearly black. We sample from a normal distribution to get this nearly black value.
+        sgs[i] = cg[i] + ngs[i] + empericaly_noise
+    else:
+        sgs[i] = cg[i] + ngs[i]
 print_data_array_stats(sgs, name="Simulated Galaxy")
 if False:
     show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy")
 
 
-### 5.1 - Apply some Gaussian Noise
+### 5 - Apply some Gaussian Noise
 if do_add_gaus_noise:
     sgs = add_gaussian_noise(sgs, g_noise_sigma=0.003125)        # Sigma found by means of visual inspection
 
@@ -457,9 +477,16 @@ if do_simple_clip:
         show_img_grid(sgs, iterations=1, columns=4, rows=4, seed=seed, titles=None, fig_title="Simulated Galaxy - clipping per image")    
 
 
-### 7 - Show Real lenses and simulated lenses next to each other to the user.
-if False:
-    show_comparing_img_grid(lenses, sgs, iterations=1, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
+### 7.1 - Dilation - To make the centre of the image slightly more realistic
+if do_dilation:
+    for j in range(sgs.shape[0]):
+        if random.random() > dialation_threshold:
+            sgs[j] = np.expand_dims(ndimage.grey_dilation(np.squeeze(sgs[j]), footprint=np.ones(dialation_kernel)), axis=2)
+
+
+### 8 - Show Real lenses and simulated lenses next to each other to the user.
+if True:
+    show_comparing_img_grid(lenses, sgs, iterations=20, name1="lens", name2="sim", columns=2, rows=4, seed=None, titles=None, fig_title="")
 
 
 # The following code has been used to emperically determine the intensities of the lenses data.

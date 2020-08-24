@@ -328,8 +328,17 @@ class DataGenerator:
             mock_lens = self.merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
 
             import matplotlib.pyplot as plt
+            l = np.squeeze(lens)
+            s = np.squeeze(source)
             m = np.squeeze(mock_lens)
+            plt.imshow(l, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+            plt.title("lens")
+            plt.show()
+            plt.imshow(s, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+            plt.title("source")
+            plt.show()
             plt.imshow(m, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+            plt.title("mock lens")
             plt.show()
             X_train_positive[i] = mock_lens
 
