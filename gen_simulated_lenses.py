@@ -407,7 +407,7 @@ do_add_gaus_noise       = False          # Whether to add gaussian noise to the 
 do_add_emperical_noise  = True           # Whether to add emperical noise to the simulated lenses, obtained from the real lenses.
 
 # Dialation params
-do_dilation             = True
+do_dilation             = False
 dialation_threshold     = 0.5             # Probability of using a dialation kernel on the simulated galaxy
 dialation_kernel        = (2,2)
 

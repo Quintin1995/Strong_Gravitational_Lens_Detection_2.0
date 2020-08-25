@@ -408,8 +408,8 @@ verbatim                = False
 
 ### Error Plot of given Models
 window_size             = 500     # avg window size
-ytop                    = 10.0    # Error plot y upper-limit in percentage
-ybottom                 = 4.00    # Error plot y bottom-limit in percentage
+ytop                    = 100.0    # Error plot y upper-limit in percentage
+ybottom                 = 0.00    # Error plot y bottom-limit in percentage
 
 ### f_beta graph and its paramters
 # Shows a f_beta plot of the given models (can be time consuming)

@@ -44,7 +44,7 @@ lenses_path_train   : "data/train/sim_lenses/"
 negatives_path_train: "data/train/negatives/"
 sources_path_train  : "data/train/sources/"
 
-lenses_path_validation   : "data/validation/sim_lenses/"
+lenses_path_validation   : "data/validation/lenses/"
 negatives_path_validation: "data/validation/negatives/"
 sources_path_validation  : "data/validation/sources/"
 
