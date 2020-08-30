@@ -81,19 +81,6 @@ class Network:
                 # Load validation chunk and targets
                 X_validation_chunk, y_validation_chunk = self.dg.load_chunk(self.params.validation_chunksize, self.dg.Xlenses_validation, self.dg.Xnegatives_validation, self.dg.Xsources_validation, self.params.data_type, self.params.mock_lens_alpha_scaling)
 
-
-                # for i in range(10):
-                #     plt.imshow(np.squeeze(X_train_chunk[i*100]), origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
-                #     print("train label #{}, idx #{}".format(y_train_chunk[i*100], i*100))
-                #     plt.title("train")
-                #     plt.show()
-
-                #     plt.imshow(np.squeeze(X_validation_chunk[i*10]), origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
-                #     print("  val label #{}, idx#{}".format(y_validation_chunk[i*10], i*10))
-                #     plt.title("val")
-                #     plt.show()
-
-
                 # Fit model on data with a keras image data generator
                 network_fit_time_start = time.time()
 

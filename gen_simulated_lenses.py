@@ -392,11 +392,11 @@ def remove_dirs(train_path, val_path, test_path):
 ##### Some parameters can be found as parameters in the code and not here yet.
 data_type               = np.float32     # Data type of all generated data arrays
 seed                    = 1234
-n_sam                   = 100          # Number of images
+n_sam                   = 10000          # Number of images
 n_pix                   = 101            # Number of pixels
 
-show_comparing_plot     = True          # Whether you want to see the comparison between real lens and simulated lens
-show_comparing_plot_its = 10              # If the comparing plot is shown to the user. How many times do you want to see the plot?
+show_comparing_plot     = False          # Whether you want to see the comparison between real lens and simulated lens
+show_comparing_plot_its = 1              # If the comparing plot is shown to the user. How many times do you want to see the plot?
 
 # Normalization Parameters
 do_normalize            = False
@@ -412,7 +412,7 @@ dialation_threshold     = 0.5             # Probability of using a dialation ker
 dialation_kernel        = (2,2)
 
 # To Disk
-do_store_results_file   = False # Set to true of you want to overwrite all simulated lenses on your disk
+do_store_results_file   = True # Set to true of you want to overwrite all simulated lenses on your disk
 verbatim                = False
 ########################################
 
@@ -442,8 +442,8 @@ if verbatim:
 
 ### 4 - Merge Centre Galaxy and Noise galaxies
 sgs = np.zeros((n_sam, n_pix, n_pix, 1), dtype=data_type)           #sgs = Simulated Galaxie(s)
-med   = 0.0232                                                      # Median of lenses - emperically determined
-sigma = 0.0096                                                      # Standard Deviation from Median - emperically determined
+med   = 0.0232*10                                                      # Median of lenses - emperically determined
+sigma = 0.0096*2                                                      # Standard Deviation from Median - emperically determined
 for i in range(cg.shape[0]):
     if do_add_emperical_noise:
         empericaly_noise = np.random.normal(loc=med, scale=sigma, size=(n_pix, n_pix, 1))           # Each black pixel in the image isnt black but nearly black. We sample from a normal distribution to get this nearly black value.
