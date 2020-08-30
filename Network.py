@@ -9,6 +9,7 @@ from tensorflow.keras.layers import Input, Activation, Dense, Flatten, GaussianN
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.initializers import glorot_uniform
 from tensorflow.keras import optimizers, metrics
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras import backend as K
 import tensorflow as tf
 import time
@@ -97,19 +98,17 @@ class Network:
                     batch_size=self.params.net_batch_size)
 
                 # Fit both generators (train and validation) on the model.
+                es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=self.params.early_stoping_patience)
+                mcp_save = ModelCheckpoint(self.params.es_full_path_of_weights, save_best_only=True, monitor='val_loss', mode='min', verbose=0)
                 history = self.model.fit_generator(
                         train_generator_flowed,
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
                         validation_data=validation_generator_flowed,
-                        validation_steps=len(X_validation_chunk) / self.params.net_batch_size)
+                        validation_steps=len(X_validation_chunk) / self.params.net_batch_size,
+                        callbacks=[es, mcp_save])
 
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
-
-                # Save Model self.params to .h5 file
-                if chunk_idx % self.params.chunk_save_interval == 0:
-                    self.model.save_weights(self.params.full_path_of_weights)
-                    print("Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
                 # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
                 if(psutil.virtual_memory().percent > 75.0):

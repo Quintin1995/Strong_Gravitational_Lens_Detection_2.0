@@ -80,6 +80,11 @@ class Parameters(object):
         self.filename_weights       = self.model_name + "_weights_only" + self.weights_extension
         self.full_path_of_weights   = os.path.join(self.model_path, self.filename_weights)
 
+        # Early stopping weights file
+        self.early_stopping_ext     = ".hdf5"
+        self.filename_early_st_weights = self.model_name + "_ESweights" + self.early_stopping_ext
+        self.es_full_path_of_weights = os.path.join(self.model_path, self.filename_early_st_weights)
+
         # Csv logger file to store the callback of the .fit function. It stores the history of the training session.
         self.history_extension      = ".csv"                 #Extension for history callback
         self.filename_history       = self.model_name + "_history" + self.history_extension
@@ -112,6 +117,9 @@ class Parameters(object):
 
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
+
+        # Early stopping
+        self.early_stoping_patience = 500
 
         if mode == "training":
             #copy run.yaml to model folder
