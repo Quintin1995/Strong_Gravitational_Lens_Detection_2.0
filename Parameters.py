@@ -1,5 +1,5 @@
 import os
-from utils import *
+from utils import create_dir_if_not_exists, get_time_string
 import json
 from shutil import copyfile
 
@@ -31,9 +31,6 @@ class Parameters(object):
 
         # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
         self.normalize = settings["normalize"]        #options = {"None", "per_image", "per_array"}
-
-        # Determines the splitting point of the data. Splitting percentage between test and train data.
-        # self.test_fraction = settings["test_fraction"]            # 0.2 means that 20% of the data will be reserved for test data.
 
         # Alpha scaling, randomly drawn from this uniform distribution. Because the lensing features usually are of a lower luminosity than the LRG. Source scaling factor.
         self.mock_lens_alpha_scaling = (settings["mock_lens_alpha_scaling_min"],settings["mock_lens_alpha_scaling_max"])
@@ -70,9 +67,6 @@ class Parameters(object):
         # Chunk Parameters
         self.num_chunks = settings["num_chunks"]  # Number of chunks to be generated 
         self.chunksize  = settings["chunksize"]   # The number of images that will fit into one chunk
-
-        # Path to weights file for prediction (the referenced file should be a .h5 file that is trained)
-        # self.full_path_predict_weights = os.path.join(settings["path_trained_folder"], settings["filename_trained_weights"])
 
         # Path stuff
         self.root_dir_models        = settings["root_dir_models"]
@@ -112,7 +106,6 @@ class Parameters(object):
         # Plot parameters
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
         self.chunk_save_interval   = settings["chunk_save_interval"]
-        self.mem_leak_save_interval= settings["mem_leak_save_interval"]
 
         # Validation chunk size - Number of validation images that will be tested during training. (per chunk)
         self.validation_chunksize  = settings["validation_chunksize"]

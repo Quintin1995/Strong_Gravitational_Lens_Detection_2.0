@@ -4,8 +4,6 @@
 # Model Name
 model_name: "learning_rate_00001"    # String
 
-mem_leak_save_interval: 500               # int - after this amount of chunks the keras backend will be reset and the model loaded in order to adress the tensorflow memory leaks in ternsorflow version 2.x
-
 # Loading the input data
 fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
 fraction_to_load_negatives_train: 1.0     #float # range = [0,1]  train
