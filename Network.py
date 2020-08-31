@@ -17,6 +17,14 @@ from utils import hms, plot_history
 
 class Network:
 
+    
+
+    def __getattribute__(self, str):
+        attr = self.__getattribute__(str)
+        # return attr if attr else str
+        return super().__getattribute__(attr) if attr else str
+
+
     def __init__(self, params, datagenerator, training):
 
         # Set parameters of the Network class
@@ -26,8 +34,12 @@ class Network:
         
         # Set optimizer, Loss function and performancing tracking metric
         self.optimizer          = optimizers.Adam(lr=self.params.net_learning_rate)
-        self.loss               = "binary_crossentropy" # Binary crossentropy is one of the best loss functions when it comes to binary classification problems.
-        self.metrics            = [metrics.binary_accuracy] if self.params.net_model_metrics == "binary_accuracy" else None
+        
+        # Setting the loss function
+        self.loss_function = self.__getattribute__(self.params.net_loss_function)
+
+        # Neural Network Train Metric
+        self.metrics = self.__getattribute__(self.params.net_model_metrics)
         
         # Define network input/output dimensionality
         self.input_shape        = self.params.img_dims
@@ -42,7 +54,7 @@ class Network:
         self.model              = None
         if self.params.net_name == "resnet18":
             self.model          = self.build_resnet(self.input_shape, self.num_outputs, self.basic_block, [2, 2, 2, 2])
-        if self.params.net_name == "resnet50":
+        elif self.params.net_name == "resnet50":
             self.model          = self.build_resnet50(input_shape = self.input_shape, num_outputs = self.num_outputs)
 
         # Parameters used when training the model
@@ -182,6 +194,79 @@ class Network:
             self.model.summary(print_fn=lambda x: fh.write(x + '\n'))
 
 
+    # The following function/method I have taken from:
+    # https://towardsdatascience.com/the-unknown-benefits-of-using-a-soft-f1-loss-in-classification-systems-753902c0105d
+    # Written by: Ashref Maiza
+    def macro_soft_f1(self, y, y_hat):
+        """Compute the macro soft F1-score as a cost.
+        Average (1 - soft-F1) across all labels.
+        Use probability values instead of binary predictions.
+        Args:
+            y (int32 Tensor): targets array of shape (BATCH_SIZE, N_LABELS)
+            y_hat (float32 Tensor): probability matrix of shape (BATCH_SIZE, N_LABELS)
+        Returns:
+            cost (scalar Tensor): value of the cost function for the batch
+        """
+        y = tf.cast(y, tf.float32)
+        y_hat = tf.cast(y_hat, tf.float32)
+        tp = tf.reduce_sum(y_hat * y, axis=0)
+        fp = tf.reduce_sum(y_hat * (1 - y), axis=0)
+        fn = tf.reduce_sum((1 - y_hat) * y, axis=0)
+        soft_f1 = 2*tp / (2*tp + fn + fp + 1e-16)
+        cost = 1 - soft_f1 # reduce 1 - soft-f1 in order to increase soft-f1
+        macro_cost = tf.reduce_mean(cost) # average on all labels
+        return macro_cost
+
+
+    # The following function/method I have taken from:
+    # https://towardsdatascience.com/the-unknown-benefits-of-using-a-soft-f1-loss-in-classification-systems-753902c0105d
+    # Written by: Ashref Maiza
+    def macro_double_soft_f1(self, y, y_hat):
+        """Compute the macro soft F1-score as a cost (average 1 - soft-F1 across all labels).
+        Use probability values instead of binary predictions.
+        This version uses the computation of soft-F1 for both positive and negative class for each label.
+        Args:
+            y (int32 Tensor): targets array of shape (BATCH_SIZE, N_LABELS)
+            y_hat (float32 Tensor): probability matrix from forward propagation of shape (BATCH_SIZE, N_LABELS)
+        Returns:
+            cost (scalar Tensor): value of the cost function for the batch
+        """
+        y = tf.cast(self, y, tf.float32)
+        y_hat = tf.cast(y_hat, tf.float32)
+        tp = tf.reduce_sum(y_hat * y, axis=0)
+        fp = tf.reduce_sum(y_hat * (1 - y), axis=0)
+        fn = tf.reduce_sum((1 - y_hat) * y, axis=0)
+        tn = tf.reduce_sum((1 - y_hat) * (1 - y), axis=0)
+        soft_f1_class1 = 2*tp / (2*tp + fn + fp + 1e-16)
+        soft_f1_class0 = 2*tn / (2*tn + fn + fp + 1e-16)
+        cost_class1 = 1 - soft_f1_class1 # reduce 1 - soft-f1_class1 in order to increase soft-f1 on class 1
+        cost_class0 = 1 - soft_f1_class0 # reduce 1 - soft-f1_class0 in order to increase soft-f1 on class 0
+        cost = 0.5 * (cost_class1 + cost_class0) # take into account both class 1 and class 0
+        macro_cost = tf.reduce_mean(cost) # average on all labels
+        return macro_cost
+
+
+    # The following function/method I have taken from:
+    # https://towardsdatascience.com/the-unknown-benefits-of-using-a-soft-f1-loss-in-classification-systems-753902c0105d
+    # Written by: Ashref Maiza
+    def macro_f1(self, y, y_hat, thresh=0.5):
+        """Compute the macro F1-score on a batch of observations (average F1 across labels)
+        Args:
+            y (int32 Tensor): labels array of shape (BATCH_SIZE, N_LABELS)
+            y_hat (float32 Tensor): probability matrix from forward propagation of shape (BATCH_SIZE, N_LABELS)
+            thresh: probability value above which we predict positive
+        Returns:
+            macro_f1 (scalar Tensor): value of macro F1 for the batch
+        """
+        y_pred = tf.cast(tf.greater(y_hat, thresh), tf.float32)
+        tp = tf.cast(tf.math.count_nonzero(y_pred * y, axis=0), tf.float32)
+        fp = tf.cast(tf.math.count_nonzero(y_pred * (1 - y), axis=0), tf.float32)
+        fn = tf.cast(tf.math.count_nonzero((1 - y_pred) * y, axis=0), tf.float32)
+        f1 = 2*tp / (2*tp + fn + fp + 1e-16)
+        macro_f1 = tf.reduce_mean(f1)
+        return macro_f1
+
+
     # Builds a Residual Neural Network with network depth 50
     def build_resnet50(self, input_shape = (101, 101, 1), num_outputs = 1):
     
@@ -233,7 +318,7 @@ class Network:
         model = Model(inputs = X_input, outputs = X, name='resnet50')
 
         # Compile the Model before returning it.
-        model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
+        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
         print(model.summary(), flush=True)
         return model
         
@@ -516,7 +601,7 @@ class Network:
 
         model.compile(
                         optimizer=self.optimizer,
-                        loss=self.loss,
+                        loss=self.loss_function,
                         metrics=self.metrics,
                     )
 

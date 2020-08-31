@@ -51,6 +51,7 @@ class Parameters(object):
         self.net_name          = settings["net_name"]
         self.net_learning_rate = settings["net_learning_rate"]
         self.net_model_metrics = settings["net_model_metrics"]
+        self.net_loss_function = settings["net_loss_function"]
         self.net_num_outputs   = settings["net_num_outputs"]
         self.net_epochs        = settings["net_epochs"]
         self.net_batch_size    = settings["net_batch_size"]
