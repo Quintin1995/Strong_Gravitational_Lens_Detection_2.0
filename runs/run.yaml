@@ -40,7 +40,7 @@ net_epochs       : 1                        #int# How many epochs are done. Set 
 net_batch_size   : 32                       #int#
 
 ##### Paths to data
-lenses_path_train   : "data/train/sim_lenses/"
+lenses_path_train   : "data/train/lenses/"
 # lenses_path_train   : "data/train/lenses/"
 negatives_path_train: "data/train/negatives/"
 sources_path_train  : "data/train/sources/"

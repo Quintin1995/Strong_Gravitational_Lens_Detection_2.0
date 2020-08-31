@@ -17,14 +17,6 @@ from utils import hms, plot_history
 
 class Network:
 
-    
-
-    def __getattribute__(self, str):
-        attr = self.__getattribute__(str)
-        # return attr if attr else str
-        return super().__getattribute__(attr) if attr else str
-
-
     def __init__(self, params, datagenerator, training):
 
         # Set parameters of the Network class
@@ -36,10 +28,12 @@ class Network:
         self.optimizer          = optimizers.Adam(lr=self.params.net_learning_rate)
         
         # Setting the loss function
-        self.loss_function = self.__getattribute__(self.params.net_loss_function)
+        self.metrics = None
+        self.set_neural_network_metric()
 
         # Neural Network Train Metric
-        self.metrics = self.__getattribute__(self.params.net_model_metrics)
+        self.loss_function = None
+        self.set_loss_function()
         
         # Define network input/output dimensionality
         self.input_shape        = self.params.img_dims
@@ -79,7 +73,11 @@ class Network:
         bufsize = 1
         f = open(self.params.full_path_of_history, "w", bufsize)
         writer = csv.writer(f)
-        writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time", "cpu_percentage", "ram_usage", "available_mem"])
+
+        if self.metrics == "binary_accuracy":
+            writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time", "cpu_percentage", "ram_usage", "available_mem"])
+        else:
+            writer.writerow(["chunk", "loss", "macro_f1", "val_loss", "val_macro_f1", "time", "cpu_percentage", "ram_usage", "available_mem"])
 
         # Train the model
         begin_train_session = time.time()       # Records beginning of training time
@@ -154,15 +152,26 @@ class Network:
 
 
     def format_info_for_csv(self, chunk_idx, history, begin_train_session):
-        return [str(chunk_idx),
-                str(history.history["loss"][0]),
-                str(history.history["binary_accuracy"][0]),
-                str(history.history["val_loss"][0]),
-                str(history.history["val_binary_accuracy"][0]),
-                str(hms(time.time()-begin_train_session)),
-                str(psutil.cpu_percent()),
-                str(psutil.virtual_memory().percent),
-                str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
+        if self.metrics == "binary_accuracy":
+            return [str(chunk_idx),
+                    str(history.history["loss"][0]),
+                    str(history.history["binary_accuracy"][0]),
+                    str(history.history["val_loss"][0]),
+                    str(history.history["val_binary_accuracy"][0]),
+                    str(hms(time.time()-begin_train_session)),
+                    str(psutil.cpu_percent()),
+                    str(psutil.virtual_memory().percent),
+                    str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
+        elif self.metrics == self.macro_f1:
+            return [str(chunk_idx),
+                    str(history.history["loss"][0]),
+                    str(history.history["macro_f1"][0]),
+                    str(history.history["val_loss"][0]),
+                    str(history.history["val_macro_f1"][0]),
+                    str(hms(time.time()-begin_train_session)),
+                    str(psutil.cpu_percent()),
+                    str(psutil.virtual_memory().percent),
+                    str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
             
 
     # Resets the backend of keras. Everything regarding the model is stored into a folder,
@@ -181,10 +190,16 @@ class Network:
 
     # Update network properties, based on the history of the trained network.
     def update_loss_and_acc(self, history):
-        self.loss.append(history.history["loss"][0])
-        self.acc.append(history.history["binary_accuracy"][0])
-        self.val_loss.append(history.history["val_loss"][0])
-        self.val_acc.append(history.history["val_binary_accuracy"][0])
+        if self.metrics == "binary_accuracy":
+            self.loss.append(history.history["loss"][0])
+            self.acc.append(history.history["binary_accuracy"][0])
+            self.val_loss.append(history.history["val_loss"][0])
+            self.val_acc.append(history.history["val_binary_accuracy"][0])
+        else:
+            self.loss.append(history.history["loss"][0])
+            self.acc.append(history.history["macro_f1"][0])
+            self.val_loss.append(history.history["val_loss"][0])
+            self.val_acc.append(history.history["val_macro_f1"][0])
 
 
     # Store Neural Network summary to file
@@ -192,6 +207,29 @@ class Network:
         with open(self.params.full_path_neural_net_printout,'w') as fh:
             # Pass the file handle in as a lambda function to make it callable
             self.model.summary(print_fn=lambda x: fh.write(x + '\n'))
+
+
+    # Case over all possible loss functions
+    def set_loss_function(self):
+        if self.params.net_loss_function == "binary_crossentropy":
+            self.loss_function = "binary_crossentropy"
+        elif self.params.net_loss_function == "macro_soft_f1":
+            self.loss_function = self.macro_soft_f1
+        elif self.params.net_loss_function == "macro_double_soft_f1":
+            self.loss_function = self.macro_double_soft_f1
+        else:
+            print("No valid loss function has been selected.")
+            self.loss_function = None
+
+
+    # Case over all possible training metrics
+    def set_neural_network_metric(self):
+        if self.params.net_model_metrics == "binary_accuracy":
+            self.metrics = "binary_accuracy"
+        elif self.params.net_model_metrics == "macro_f1":
+            self.metrics = self.macro_f1
+        else:
+            self.metrics = None
 
 
     # The following function/method I have taken from:
@@ -225,13 +263,15 @@ class Network:
         """Compute the macro soft F1-score as a cost (average 1 - soft-F1 across all labels).
         Use probability values instead of binary predictions.
         This version uses the computation of soft-F1 for both positive and negative class for each label.
+        
         Args:
             y (int32 Tensor): targets array of shape (BATCH_SIZE, N_LABELS)
             y_hat (float32 Tensor): probability matrix from forward propagation of shape (BATCH_SIZE, N_LABELS)
+            
         Returns:
             cost (scalar Tensor): value of the cost function for the batch
         """
-        y = tf.cast(self, y, tf.float32)
+        y = tf.cast(y, tf.float32)
         y_hat = tf.cast(y_hat, tf.float32)
         tp = tf.reduce_sum(y_hat * y, axis=0)
         fp = tf.reduce_sum(y_hat * (1 - y), axis=0)
@@ -318,7 +358,7 @@ class Network:
         model = Model(inputs = X_input, outputs = X, name='resnet50')
 
         # Compile the Model before returning it.
-        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
+        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=[self.metrics])
         print(model.summary(), flush=True)
         return model
         
@@ -602,7 +642,7 @@ class Network:
         model.compile(
                         optimizer=self.optimizer,
                         loss=self.loss_function,
-                        metrics=self.metrics,
+                        metrics=[self.metrics],
                     )
 
         return model
