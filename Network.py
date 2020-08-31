@@ -184,7 +184,8 @@ class Network:
         print("\n\n----Reseting tensorflow keras backend", flush=True)
         self.model.save(self.params.full_path_model_storage)
         tf.keras.backend.clear_session()
-        self.model = tf.keras.models.load_model(self.params.full_path_model_storage)
+        self.model = tf.keras.models.load_model(self.params.full_path_model_storage, compile=False)
+        self.model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=[self.metrics])
         print("\n reset time: {}\n----".format(hms(time.time() - begin_time)), flush=True)
 
 
