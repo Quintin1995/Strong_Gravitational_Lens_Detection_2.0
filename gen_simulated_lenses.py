@@ -294,7 +294,8 @@ def show_comparing_img_grid(data_array1, data_array2, iterations=1, name1="ar1",
             else:
                 ax.set_title(titles[rand_idxs[idx]])
             img = np.squeeze(data_array[rand_idxs[idx]])
-            plt.imshow(img, origin='lower', interpolation='none', cmap='gray')
+            # plt.imshow(img, origin='lower', interpolation='none', cmap='gray')
+            plt.imshow(img, cmap=plt.cm.binary)
 
         plt.show()
 
@@ -392,10 +393,10 @@ def remove_dirs(train_path, val_path, test_path):
 ##### Some parameters can be found as parameters in the code and not here yet.
 data_type               = np.float32     # Data type of all generated data arrays
 seed                    = 1234
-n_sam                   = 10000          # Number of images
+n_sam                   = 100          # Number of images
 n_pix                   = 101            # Number of pixels
 
-show_comparing_plot     = False          # Whether you want to see the comparison between real lens and simulated lens
+show_comparing_plot     = True          # Whether you want to see the comparison between real lens and simulated lens
 show_comparing_plot_its = 1              # If the comparing plot is shown to the user. How many times do you want to see the plot?
 
 # Normalization Parameters
@@ -412,7 +413,7 @@ dialation_threshold     = 0.5             # Probability of using a dialation ker
 dialation_kernel        = (2,2)
 
 # To Disk
-do_store_results_file   = True # Set to true of you want to overwrite all simulated lenses on your disk
+do_store_results_file   = False # Set to true of you want to overwrite all simulated lenses on your disk
 verbatim                = False
 ########################################
 

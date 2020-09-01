@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import load_settings_yaml
+from utils import load_settings_yaml, smooth_curve
 from Parameters import Parameters
 from DataGenerator import DataGenerator
 from Network import Network
@@ -117,6 +117,7 @@ def dstack_data(data):
     return dstack_data
 
 
+# Average predictions of the neural network over a 'avg_iter_counter' amount of times
 def average_prediction_results(network, data, avg_iter_counter=10, verbose=True):
     avg_preds = np.zeros((data.shape[0],1), dtype=np.float32)
     for i in range(avg_iter_counter):
@@ -239,8 +240,8 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
     plt.show()
 
 
-# Plot the losses of the trained model over training time. Plot the average loss based on a windows size given as parameter.
-def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
+# Plot the losses of the trained model over training time. Plot the Exponential Moving Average
+def plot_losses_avg(models, dfs, jsons,  smooth_fac=0.9, do_diff_loss=False):
     print("------------------------------")
     print("Plotting average losses...")
     for j in range(len(models)):
@@ -248,29 +249,22 @@ def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
         df_loss     = dfs[j]["loss"]
 
         val_loss_avg = []
-        for i in range(len(df_val_loss) - window_size):
-            val_loss_avg.append(sum(list(df_val_loss[i:i+window_size])) / window_size)
+        for i in range(len(df_val_loss)):
+            val_loss_avg.append(df_val_loss[i])
             
         loss_avg = []
-        for i in range(len(df_loss) - window_size):
-            loss_avg.append(sum(list(df_loss[i:i+window_size])) / window_size) 
+        for i in range(len(df_loss)):
+            loss_avg.append(df_loss[i]) 
 
-        if do_diff_loss:
-            diff_loss = []
-            for k in range(len(loss_avg)):
-                diff_loss.append(val_loss_avg[k] - loss_avg[k])
-
-        plt.plot(val_loss_avg[500:], label="val loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=3)
-        plt.plot(loss_avg[500:], label="train loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=1)
-        if do_diff_loss:
-            plt.plot(diff_loss[500:], label="diff loss")
-        plt.title("Model losses - {}".format(models[j]))
+        plt.plot(smooth_curve(val_loss_avg, factor=smooth_fac), label="val loss  {}".format(jsons[j][json_comp_key]), color=colors[j], linewidth=3)
+        plt.plot(smooth_curve(loss_avg, factor=smooth_fac), label="train loss  {}".format(jsons[j][json_comp_key]), color=colors[j], linewidth=1)
+        plt.title("Model losses")
         plt.ylabel("loss")
         plt.xlabel("Trained Chunks")
         
     plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
-    plt.savefig(os.path.join(models[j], "avg_loss_Window{}".format(window_size)))
+    plt.savefig(os.path.join(models[j], "avg_loss"))
     plt.show()
 
 
@@ -320,8 +314,8 @@ def set_models_folders(experiment_folder):
 
 
 
-# Plot the sliding window average error (in percentage) of the given models over time/chunks
-def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
+# Plot the Exponential Moving Average error (in percentage) of the given models over time/chunks
+def plot_errors(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
     print("------------------------------")
     print("Plotting errors rates...")
     for model_idx in range(len(models)):
@@ -329,19 +323,16 @@ def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1
         df_acc     = dfs[model_idx]["binary_accuracy"]
         df_acc_val = dfs[model_idx]["val_binary_accuracy"]
 
-        # Sliding window average of train accuracy
         train_error_avg = []
-        for i in range(len(df_acc_val) - window_size):
-            train_error_avg.append(sum(list(100.0-100.0*df_acc[i:i+window_size])) / window_size)
+        for i in range(len(df_acc_val)):
+            train_error_avg.append(100.0-100.0*df_acc[i])
 
-        # Sliding window average of validation accuracy
         vali_error_avg = []
-        for idx in range(len(df_acc_val) - window_size):
-            vali_error_avg.append(sum(list(100.0-100.0*df_acc_val[idx:idx+window_size])) / window_size)
+        for i in range(len(df_acc_val)):
+            vali_error_avg.append(100.0-100.0*df_acc_val[i])
         
-        plt.plot(train_error_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
-        plt.plot(vali_error_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
-
+        plt.plot(smooth_curve(train_error_avg, factor=smooth_fac), label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(smooth_curve(vali_error_avg, factor=smooth_fac), label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
         plt.title("Error Plot")
         plt.ylabel("Error (%)")
         plt.xlabel("Trained Chunks")
@@ -363,7 +354,7 @@ def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1
 
 
 # plots the macro_f1-softloss (score) of given models. 
-def make_f1_plot(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
+def make_f1_plot(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
     print("------------------------------")
     print("Plotting f1-softloss scores...")
     for model_idx in range(len(models)):
@@ -371,18 +362,16 @@ def make_f1_plot(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 
         df_macro_f1     = dfs[model_idx]["macro_f1"]
         df_macro_f1_val = dfs[model_idx]["val_macro_f1"]
 
-        # Sliding window average of train accuracy
         train_f1_avg = []
-        for i in range(len(df_macro_f1) - window_size):
-            train_f1_avg.append(sum(list(df_macro_f1[i:i+window_size])) / window_size)
+        for i in range(len(df_macro_f1)):
+            train_f1_avg.append(df_macro_f1[i])
 
-        # Sliding window average of validation accuracy
         val_f1_avg = []
-        for idx in range(len(df_macro_f1_val) - window_size):
-            val_f1_avg.append(sum(list(df_macro_f1_val[idx:idx+window_size])) / window_size)
+        for idx in range(len(df_macro_f1_val)):
+            val_f1_avg.append(df_macro_f1_val[idx])
 
-        plt.plot(train_f1_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
-        plt.plot(val_f1_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
+        plt.plot(smooth_curve(train_f1_avg, factor=smooth_fac), label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(smooth_curve(val_f1_avg, factor=smooth_fac), label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
 
         plt.title('Training and validation Macro F1-score')
         plt.ylabel('Macro F1-Score')
@@ -460,8 +449,9 @@ colors                  = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum'
 json_comp_key           = "model_name"              # is the label in generated plots
 verbatim                = False
 
+smooth_fac = 0.999
+
 ### Error Plot of given Models
-window_size             = 500     # avg window size
 ytop                    = 100.0    # Error plot y upper-limit in percentage
 ybottom                 = 0.00    # Error plot y bottom-limit in percentage
 
@@ -499,15 +489,15 @@ def main():
 
         ## 4.0 - Plot Error for all models given
         if not is_enrico_model_chosen and error_plot_dialog():
-            plot_errors(models_paths_list, dfs, jsons, json_comp_key, window_size=window_size, ylim_top = ytop, ylim_bottom=ybottom)
+            plot_errors(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 16.0, ylim_bottom=ybottom)
 
         ## 5.0 - Show the losses nicely for each model
         if not is_enrico_model_chosen and loss_plot_dialog():
-            plot_losses_avg(models_paths_list, dfs, jsons, window_size=window_size)
+            plot_losses_avg(models_paths_list, dfs, jsons, smooth_fac=smooth_fac)
 
         ## 6.0 - Show the macro-f1 score plot for each model:
         if not is_enrico_model_chosen and f1_plot_dialog():
-            make_f1_plot(models_paths_list, dfs, jsons, json_comp_key, window_size=window_size, ylim_top = 1.0, ylim_bottom=0.0)
+            make_f1_plot(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 1.0, ylim_bottom=0.0)
 
         ## 6.0 - Plot the data from the csvs - legend determined by json parameter dump file
         plots_to_show = which_plots_to_plot(dfs[0].columns)
