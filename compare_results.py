@@ -334,8 +334,6 @@ def set_models_folders(experiment_folder):
     return full_paths
 
 
-
-
 # Plot the Exponential Moving Average error (in percentage) of the given models over time/chunks
 def plot_errors(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
     print("------------------------------")
