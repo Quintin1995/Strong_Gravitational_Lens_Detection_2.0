@@ -132,7 +132,7 @@ def average_prediction_results(network, data, avg_iter_counter=10, verbose=True)
 
 
 # Load validation chunk and calculate per model folder its model performance evaluated on f-beta score
-def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_count):
+def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_count, do_eval=True):
     for idx, model_folder in enumerate(models):
         # Step 0.0 - inits
         f_beta_full_path = os.path.join(model_folder, "f_beta_results.csv")
@@ -172,6 +172,12 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
 
             # Step 6.2 - Predict the labels of the validation chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
             preds = network.model.predict(X_validation_chunk)
+
+            # Step 6.3 - Also calculate an evaluation based on the models evaluation metric
+            if do_eval:
+                results = network.model.evaluate(X_validation_chunk, y_validation_chunk, verbose=0)
+                for met_idx in range(len(results)):
+                    print("{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
 
             # Step 6.3 - Begin f-beta calculation and store into csv file
             f_betas = []
@@ -416,21 +422,21 @@ def which_plots_to_plot(columns):
 def error_plot_dialog():
     print("------------------------------")
     show_error_plot = input("Show error plot? y/n: ")
-    show_error_plot = True if show_error_plot in ["y", "yes"] else False
+    show_error_plot = True if show_error_plot in ["y", "yes", "Y", "1"] else False
     return show_error_plot
 
 # Ask the user whether he want to see and compute the loss plot.
 def loss_plot_dialog():
     print("------------------------------")
     show_loss_plot = input("Show loss plot? y/n: ")
-    show_loss_plot = True if show_loss_plot in ["y", "yes"] else False
+    show_loss_plot = True if show_loss_plot in ["y", "yes", "Y", "1"] else False
     return show_loss_plot
 
 # Ask the user whether he want to see and compute the fbeta plot.
 def fBeta_plot_dialog():
     print("------------------------------")
     show_fBeta_plot = input("Show f_beta graphs? y/n: ")
-    show_fBeta_plot = True if show_fBeta_plot in ["y", "yes"] else False
+    show_fBeta_plot = True if show_fBeta_plot in ["y", "yes", "Y", "1"] else False
     return show_fBeta_plot
 
 
@@ -438,9 +444,15 @@ def fBeta_plot_dialog():
 def f1_plot_dialog():
     print("------------------------------")
     show_f1_plot = input("Show f1-macro score plots? y/n: ")
-    show_f1_plot = True if show_f1_plot in ["y", "yes"] else False
+    show_f1_plot = True if show_f1_plot in ["y", "yes", "Y", "1"] else False
     return show_f1_plot
 
+# Ask the user whether he want to see and compute the f1 plot.
+def many_plot_dialog():
+    print("------------------------------")
+    show_wide_array_plots = input("Show wide array of plots? y/n: ")
+    show_wide_array_plots = True if show_wide_array_plots in ["y", "yes", "Y", "1"] else False
+    return show_wide_array_plots
 
 
 ############## Parameters ##############
@@ -449,6 +461,7 @@ colors                  = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum'
 json_comp_key           = "model_name"              # is the label in generated plots
 verbatim                = False
 
+#Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing will occur.
 smooth_fac = 0.999
 
 ### Error Plot of given Models
@@ -457,7 +470,7 @@ ybottom                 = 0.00    # Error plot y bottom-limit in percentage
 
 ### f_beta graph and its paramters
 # Shows a f_beta plot of the given models (can be time consuming)
-f_beta_avg_count        = 10                                    # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
+f_beta_avg_count        = 3                                    # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
 beta_squarred           = 0.03                                  # For f-beta calculation
 stepsize                = 0.01                                  # For f-beta calculation
 threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
@@ -500,8 +513,8 @@ def main():
             make_f1_plot(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 1.0, ylim_bottom=0.0)
 
         ## 6.0 - Plot the data from the csvs - legend determined by json parameter dump file
-        plots_to_show = which_plots_to_plot(dfs[0].columns)
-        if not is_enrico_model_chosen:
+        if not is_enrico_model_chosen and many_plot_dialog():
+            plots_to_show = which_plots_to_plot(dfs[0].columns)
             for columnname in dfs[0].columns:
                 if columnname not in plots_to_show:
                     continue

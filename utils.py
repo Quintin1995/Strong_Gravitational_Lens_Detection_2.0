@@ -154,6 +154,18 @@ def print_stats_program():
     print("Available memory: {:.01f}%".format(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total))
 
 
+# Smooths a set of points according to an Exponential Moving Average
+def smooth_curve(points, factor=0.9):
+    smoothed_points = []
+    for point in points:
+        if smoothed_points:
+            previous = smoothed_points[-1]
+            smoothed_points.append(previous * factor + point * (1 - factor))
+        else:
+            smoothed_points.append(point)
+    return smoothed_points
+
+
 ###################################3
 # Piece of code that might be usefull for later:
 ###### Step 4.1 - Sanity check of the train and test chunk
@@ -171,14 +183,3 @@ def print_stats_program():
 #####################################3
 
 
-
-# Smooths a set of points according to an Exponential Moving Average
-def smooth_curve(points, factor=0.9):
-    smoothed_points = []
-    for point in points:
-        if smoothed_points:
-            previous = smoothed_points[-1]
-            smoothed_points.append(previous * factor + point * (1 - factor))
-        else:
-            smoothed_points.append(point)
-    return smoothed_points
