@@ -163,6 +163,8 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         
         # Step 6.0 - we want a nice plot with standard deviation.
         f_beta_vectors = []
+        precision_data_vectors = []
+        recall_data_vectors = []
         for i in range(f_beta_avg_count):
             X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
             
@@ -181,14 +183,20 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
 
             # Step 6.3 - Begin f-beta calculation and store into csv file
             f_betas = []
+            precision_data = []
+            recall_data = []
             with open(f_beta_full_path, 'w', newline='') as f_beta_file:
                 writer = csv.writer(f_beta_file)
                 writer.writerow(["p_threshold", "TP", "TN", "FP", "FN", "precision", "recall", "fp_rate", "accuracy", "f_beta"])
                 for p_threshold in threshold_range:
                     (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(preds, y_validation_chunk, p_threshold, beta_squarred)
                     f_betas.append(F_beta)
+                    precision_data.append(precision)
+                    recall_data.append(recall)
                     writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
             f_beta_vectors.append(f_betas)
+            precision_data_vectors.append(precision_data)
+            recall_data_vectors.append(recall_data)
         print("saved csv with f_beta scores to: {}".format(f_beta_full_path), flush=True)
         
         # step 7.0 - calculate std and mean - based on f_beta_vectors
@@ -200,7 +208,15 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         upline  = np.add(means, stds)
         lowline = np.subtract(means, stds)
 
+        # Step 7.1.1 - Calculate mean precision and recall rates
+        colls_pre = list(zip(*precision_data_vectors))
+        precision_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_pre)))))
+        colls_recall = list(zip(*recall_data_vectors))
+        recall_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_recall)))))
+
         # step 7.2 - Plotting all lines
+        plt.plot(list(threshold_range), precision_mu, ":", color=colors[idx], label="precision mean", alpha=0.9, linewidth=3)
+        plt.plot(list(threshold_range), recall_mu, "--", color=colors[idx], label="recall mean", alpha=0.9, linewidth=3)
         plt.plot(list(threshold_range), upline, colors[idx])
         plt.plot(list(threshold_range), means, colors[idx], label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
         plt.plot(list(threshold_range), lowline, colors[idx])
