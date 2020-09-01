@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import load_settings_yaml
+from utils import load_settings_yaml, smooth_curve
 from Parameters import Parameters
 from DataGenerator import DataGenerator
 from Network import Network
@@ -117,6 +117,7 @@ def dstack_data(data):
     return dstack_data
 
 
+# Average predictions of the neural network over a 'avg_iter_counter' amount of times
 def average_prediction_results(network, data, avg_iter_counter=10, verbose=True):
     avg_preds = np.zeros((data.shape[0],1), dtype=np.float32)
     for i in range(avg_iter_counter):
@@ -131,7 +132,7 @@ def average_prediction_results(network, data, avg_iter_counter=10, verbose=True)
 
 
 # Load validation chunk and calculate per model folder its model performance evaluated on f-beta score
-def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_count):
+def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_count, do_eval=True):
     for idx, model_folder in enumerate(models):
         # Step 0.0 - inits
         f_beta_full_path = os.path.join(model_folder, "f_beta_results.csv")
@@ -162,6 +163,8 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         
         # Step 6.0 - we want a nice plot with standard deviation.
         f_beta_vectors = []
+        precision_data_vectors = []
+        recall_data_vectors = []
         for i in range(f_beta_avg_count):
             X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
             
@@ -172,16 +175,28 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
             # Step 6.2 - Predict the labels of the validation chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
             preds = network.model.predict(X_validation_chunk)
 
+            # Step 6.3 - Also calculate an evaluation based on the models evaluation metric
+            if do_eval:
+                results = network.model.evaluate(X_validation_chunk, y_validation_chunk, verbose=0)
+                for met_idx in range(len(results)):
+                    print("{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
+
             # Step 6.3 - Begin f-beta calculation and store into csv file
             f_betas = []
+            precision_data = []
+            recall_data = []
             with open(f_beta_full_path, 'w', newline='') as f_beta_file:
                 writer = csv.writer(f_beta_file)
                 writer.writerow(["p_threshold", "TP", "TN", "FP", "FN", "precision", "recall", "fp_rate", "accuracy", "f_beta"])
                 for p_threshold in threshold_range:
                     (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(preds, y_validation_chunk, p_threshold, beta_squarred)
                     f_betas.append(F_beta)
+                    precision_data.append(precision)
+                    recall_data.append(recall)
                     writer.writerow([str(p_threshold), str(TP), str(TN), str(FP), str(FN), str(precision), str(recall), str(fp_rate), str(accuracy), str(F_beta)])
             f_beta_vectors.append(f_betas)
+            precision_data_vectors.append(precision_data)
+            recall_data_vectors.append(recall_data)
         print("saved csv with f_beta scores to: {}".format(f_beta_full_path), flush=True)
         
         # step 7.0 - calculate std and mean - based on f_beta_vectors
@@ -193,7 +208,15 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         upline  = np.add(means, stds)
         lowline = np.subtract(means, stds)
 
+        # Step 7.1.1 - Calculate mean precision and recall rates
+        colls_pre = list(zip(*precision_data_vectors))
+        precision_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_pre)))))
+        colls_recall = list(zip(*recall_data_vectors))
+        recall_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_recall)))))
+
         # step 7.2 - Plotting all lines
+        plt.plot(list(threshold_range), precision_mu, ":", color=colors[idx], label="precision mean", alpha=0.9, linewidth=3)
+        plt.plot(list(threshold_range), recall_mu, "--", color=colors[idx], label="recall mean", alpha=0.9, linewidth=3)
         plt.plot(list(threshold_range), upline, colors[idx])
         plt.plot(list(threshold_range), means, colors[idx], label = str(json_comp_key) + ": " + str(jsons[idx][json_comp_key]))
         plt.plot(list(threshold_range), lowline, colors[idx])
@@ -239,8 +262,8 @@ def compare_plot_models(comparing_headerName_df, dfs, jsons, json_comp_key):
     plt.show()
 
 
-# Plot the losses of the trained model over training time. Plot the average loss based on a windows size given as parameter.
-def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
+# Plot the losses of the trained model over training time. Plot the Exponential Moving Average
+def plot_losses_avg(models, dfs, jsons,  smooth_fac=0.9, do_diff_loss=False):
     print("------------------------------")
     print("Plotting average losses...")
     for j in range(len(models)):
@@ -248,72 +271,23 @@ def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
         df_loss     = dfs[j]["loss"]
 
         val_loss_avg = []
-        for i in range(len(df_val_loss) - window_size):
-            val_loss_avg.append(sum(list(df_val_loss[i:i+window_size])) / window_size)
+        for i in range(len(df_val_loss)):
+            val_loss_avg.append(df_val_loss[i])
             
         loss_avg = []
-        for i in range(len(df_loss) - window_size):
-            loss_avg.append(sum(list(df_loss[i:i+window_size])) / window_size) 
+        for i in range(len(df_loss)):
+            loss_avg.append(df_loss[i]) 
 
-        if do_diff_loss:
-            diff_loss = []
-            for k in range(len(loss_avg)):
-                diff_loss.append(val_loss_avg[k] - loss_avg[k])
-
-        plt.plot(val_loss_avg[500:], label="val loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=3)
-        plt.plot(loss_avg[500:], label="train loss| avg window {}| {}".format(window_size, jsons[j][json_comp_key]), color=colors[j], linewidth=1)
-        if do_diff_loss:
-            plt.plot(diff_loss[500:], label="diff loss")
-        plt.title("Model losses - {}".format(models[j]))
+        plt.plot(smooth_curve(val_loss_avg, factor=smooth_fac), label="val loss  {}".format(jsons[j][json_comp_key]), color=colors[j], linewidth=3)
+        plt.plot(smooth_curve(loss_avg, factor=smooth_fac), label="train loss  {}".format(jsons[j][json_comp_key]), color=colors[j], linewidth=1)
+        plt.title("Model losses")
         plt.ylabel("loss")
         plt.xlabel("Trained Chunks")
         
     plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
-    plt.savefig(os.path.join(models[j], "avg_loss_Window{}".format(window_size)))
+    plt.savefig(os.path.join(models[j], "avg_loss"))
     plt.show()
-
-
-# Plot the sliding window average error (in percentage) of the given models over time/chunks
-def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
-    print("------------------------------")
-    print("Plotting errors rates...")
-    for model_idx in range(len(models)):
-        # Selecting columns of interest
-        df_acc     = dfs[model_idx]["binary_accuracy"]
-        df_acc_val = dfs[model_idx]["val_binary_accuracy"]
-
-        # Sliding window average of train accuracy
-        train_error_avg = []
-        for i in range(len(df_acc_val) - window_size):
-            train_error_avg.append(sum(list(100.0-100.0*df_acc[i:i+window_size])) / window_size)
-
-        # Sliding window average of validation accuracy
-        vali_error_avg = []
-        for idx in range(len(df_acc_val) - window_size):
-            vali_error_avg.append(sum(list(100.0-100.0*df_acc_val[idx:idx+window_size])) / window_size)
-        
-        plt.plot(train_error_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
-        plt.plot(vali_error_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
-
-        plt.title("Error Plot")
-        plt.ylabel("Error (%)")
-        plt.xlabel("Trained Chunks")
-    
-    # Maximize current figure before saving
-    manager = plt.get_current_fig_manager()
-    manager.window.showMaximized()
-
-    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
-    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
-    plt.grid(color='grey', linestyle='dashed', linewidth=1)
-    plt.legend()
-    figure = plt.gcf() # get current figure
-    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
-    plt.savefig(os.path.join(models[model_idx], "error_train_vali"), dpi=100)
-    plt.show()
-    if verbatim:
-        print("done Plotting Errors")
 
 
 # Prompt the user to fill in which experiment folder to run.
@@ -360,6 +334,89 @@ def set_models_folders(experiment_folder):
     return full_paths
 
 
+
+
+# Plot the Exponential Moving Average error (in percentage) of the given models over time/chunks
+def plot_errors(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
+    print("------------------------------")
+    print("Plotting errors rates...")
+    for model_idx in range(len(models)):
+        # Selecting columns of interest
+        df_acc     = dfs[model_idx]["binary_accuracy"]
+        df_acc_val = dfs[model_idx]["val_binary_accuracy"]
+
+        train_error_avg = []
+        for i in range(len(df_acc_val)):
+            train_error_avg.append(100.0-100.0*df_acc[i])
+
+        vali_error_avg = []
+        for i in range(len(df_acc_val)):
+            vali_error_avg.append(100.0-100.0*df_acc_val[i])
+        
+        plt.plot(smooth_curve(train_error_avg, factor=smooth_fac), label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(smooth_curve(vali_error_avg, factor=smooth_fac), label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
+        plt.title("Error Plot")
+        plt.ylabel("Error (%)")
+        plt.xlabel("Trained Chunks")
+    
+    # Maximize current figure before saving
+    manager = plt.get_current_fig_manager()
+    manager.window.showMaximized()
+
+    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
+    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    figure = plt.gcf() # get current figure
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.savefig(os.path.join(models[model_idx], "error_train_vali"), dpi=100)
+    plt.show()
+    if verbatim:
+        print("done Plotting Errors")
+
+
+# plots the macro_f1-softloss (score) of given models. 
+def make_f1_plot(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
+    print("------------------------------")
+    print("Plotting f1-softloss scores...")
+    for model_idx in range(len(models)):
+        # Selecting columns of interest
+        df_macro_f1     = dfs[model_idx]["macro_f1"]
+        df_macro_f1_val = dfs[model_idx]["val_macro_f1"]
+
+        train_f1_avg = []
+        for i in range(len(df_macro_f1)):
+            train_f1_avg.append(df_macro_f1[i])
+
+        val_f1_avg = []
+        for idx in range(len(df_macro_f1_val)):
+            val_f1_avg.append(df_macro_f1_val[idx])
+
+        plt.plot(smooth_curve(train_f1_avg, factor=smooth_fac), label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(smooth_curve(val_f1_avg, factor=smooth_fac), label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
+
+        plt.title('Training and validation Macro F1-score')
+        plt.ylabel('Macro F1-Score')
+        plt.xlabel("Trained Chunks")
+    
+    # Maximize current figure before saving
+    manager = plt.get_current_fig_manager()
+    manager.window.showMaximized()
+
+    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
+    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    figure = plt.gcf() # get current figure
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.savefig(os.path.join(models[model_idx], "_f1-softloss_"), dpi=100)
+    plt.show()
+    if verbatim:
+        print("done Plotting f1-softlosses")
+
+
+# Loops over a set of columns and formats it for the user.
+# The user can choose which columns to plot.
 def which_plots_to_plot(columns):
     print("------------------------------")
     print("Set plots that you want to view:")
@@ -381,23 +438,37 @@ def which_plots_to_plot(columns):
 def error_plot_dialog():
     print("------------------------------")
     show_error_plot = input("Show error plot? y/n: ")
-    show_error_plot = True if show_error_plot in ["y", "yes"] else False
+    show_error_plot = True if show_error_plot in ["y", "yes", "Y", "1"] else False
     return show_error_plot
 
-# Ask the user whether he want to see and compute the error plot.
+# Ask the user whether he want to see and compute the loss plot.
 def loss_plot_dialog():
     print("------------------------------")
     show_loss_plot = input("Show loss plot? y/n: ")
-    show_loss_plot = True if show_loss_plot in ["y", "yes"] else False
+    show_loss_plot = True if show_loss_plot in ["y", "yes", "Y", "1"] else False
     return show_loss_plot
 
-# Ask the user whether he want to see and compute the error plot.
+# Ask the user whether he want to see and compute the fbeta plot.
 def fBeta_plot_dialog():
     print("------------------------------")
     show_fBeta_plot = input("Show f_beta graphs? y/n: ")
-    show_fBeta_plot = True if show_fBeta_plot in ["y", "yes"] else False
+    show_fBeta_plot = True if show_fBeta_plot in ["y", "yes", "Y", "1"] else False
     return show_fBeta_plot
 
+
+# Ask the user whether he want to see and compute the f1 plot.
+def f1_plot_dialog():
+    print("------------------------------")
+    show_f1_plot = input("Show f1-macro score plots? y/n: ")
+    show_f1_plot = True if show_f1_plot in ["y", "yes", "Y", "1"] else False
+    return show_f1_plot
+
+# Ask the user whether he want to see and compute the f1 plot.
+def many_plot_dialog():
+    print("------------------------------")
+    show_wide_array_plots = input("Show wide array of plots? y/n: ")
+    show_wide_array_plots = True if show_wide_array_plots in ["y", "yes", "Y", "1"] else False
+    return show_wide_array_plots
 
 
 ############## Parameters ##############
@@ -406,14 +477,16 @@ colors                  = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum'
 json_comp_key           = "model_name"              # is the label in generated plots
 verbatim                = False
 
+#Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing will occur.
+smooth_fac = 0.999
+
 ### Error Plot of given Models
-window_size             = 500     # avg window size
 ytop                    = 100.0    # Error plot y upper-limit in percentage
 ybottom                 = 0.00    # Error plot y bottom-limit in percentage
 
 ### f_beta graph and its paramters
 # Shows a f_beta plot of the given models (can be time consuming)
-f_beta_avg_count        = 10                                    # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
+f_beta_avg_count        = 3                                    # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
 beta_squarred           = 0.03                                  # For f-beta calculation
 stepsize                = 0.01                                  # For f-beta calculation
 threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
@@ -434,8 +507,8 @@ def main():
         is_enrico_model_chosen = True if len([x for x in models_paths_list if "resnet_single_newtr_last_last_weights_only" in x]) > 0 else False
 
         ## 1.0 - Get list dataframes
-        if not is_enrico_model_chosen:
-            dfs, _ = get_dataframes(models_paths_list)
+        copy_models_paths_lists = [ x for x in models_paths_list if "resnet_single_newtr_last_last_weights_only" not in x ] # we don't want enrico's model to be a dataframe, due to it not having logged statistics.
+        dfs, _ = get_dataframes(copy_models_paths_lists)
 
         ## 2.0 - Get list of jsons
         jsons, _ = get_jsons(models_paths_list)
@@ -445,22 +518,26 @@ def main():
 
         ## 4.0 - Plot Error for all models given
         if not is_enrico_model_chosen and error_plot_dialog():
-            plot_errors(models_paths_list, dfs, jsons, json_comp_key, window_size=window_size, ylim_top = ytop, ylim_bottom=ybottom)
+            plot_errors(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 16.0, ylim_bottom=ybottom)
 
         ## 5.0 - Show the losses nicely for each model
         if not is_enrico_model_chosen and loss_plot_dialog():
-            plot_losses_avg(models_paths_list, dfs, jsons, window_size=window_size)
+            plot_losses_avg(models_paths_list, dfs, jsons, smooth_fac=smooth_fac)
+
+        ## 6.0 - Show the macro-f1 score plot for each model:
+        if not is_enrico_model_chosen and f1_plot_dialog():
+            make_f1_plot(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 1.0, ylim_bottom=0.0)
 
         ## 6.0 - Plot the data from the csvs - legend determined by json parameter dump file
-        plots_to_show = which_plots_to_plot(dfs[0].columns)
-        if not is_enrico_model_chosen:
+        if not is_enrico_model_chosen and many_plot_dialog():
+            plots_to_show = which_plots_to_plot(dfs[0].columns)
             for columnname in dfs[0].columns:
                 if columnname not in plots_to_show:
                     continue
                 compare_plot_models(columnname, dfs, jsons, json_comp_key)
 
         ## 7.0 - Calculate f-beta score per model - based on validation data
-        if fBeta_plot_dialog:
+        if fBeta_plot_dialog():
             store_fbeta_results(models_paths_list, paths_h5s, jsons, json_comp_key, f_beta_avg_count)
         ######################################################
 

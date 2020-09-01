@@ -31,12 +31,13 @@ validation_chunksize: 128
 use_avg_pooling_2D: False            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Network Paramters
-net_name         : "resnet18"        #string# Determines which model will be loaded: options={"resnet18"}
-net_learning_rate: 0.0001            #float#
-net_model_metrics: "binary_accuracy" #string#
-net_num_outputs  : 1                 #int# How many output neurons does the network need?
-net_epochs       : 1                 #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
-net_batch_size   : 32                #int#
+net_name         : "resnet18"               #string# Determines which model will be loaded options={"resnet18", "resnet50"}
+net_learning_rate: 0.0001                   #float#
+net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy", "macro_f1"}
+net_loss_function: "binary_crossentropy"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1"}
+net_num_outputs  : 1                        #int# How many output neurons does the network need?
+net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
+net_batch_size   : 32                       #int#
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"
