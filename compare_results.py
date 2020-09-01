@@ -274,48 +274,6 @@ def plot_losses_avg(models, dfs, jsons,  window_size=50, do_diff_loss=False):
     plt.show()
 
 
-# Plot the sliding window average error (in percentage) of the given models over time/chunks
-def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
-    print("------------------------------")
-    print("Plotting errors rates...")
-    for model_idx in range(len(models)):
-        # Selecting columns of interest
-        df_acc     = dfs[model_idx]["binary_accuracy"]
-        df_acc_val = dfs[model_idx]["val_binary_accuracy"]
-
-        # Sliding window average of train accuracy
-        train_error_avg = []
-        for i in range(len(df_acc_val) - window_size):
-            train_error_avg.append(sum(list(100.0-100.0*df_acc[i:i+window_size])) / window_size)
-
-        # Sliding window average of validation accuracy
-        vali_error_avg = []
-        for idx in range(len(df_acc_val) - window_size):
-            vali_error_avg.append(sum(list(100.0-100.0*df_acc_val[idx:idx+window_size])) / window_size)
-        
-        plt.plot(train_error_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
-        plt.plot(vali_error_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
-
-        plt.title("Error Plot")
-        plt.ylabel("Error (%)")
-        plt.xlabel("Trained Chunks")
-    
-    # Maximize current figure before saving
-    manager = plt.get_current_fig_manager()
-    manager.window.showMaximized()
-
-    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
-    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
-    plt.grid(color='grey', linestyle='dashed', linewidth=1)
-    plt.legend()
-    figure = plt.gcf() # get current figure
-    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
-    plt.savefig(os.path.join(models[model_idx], "error_train_vali"), dpi=100)
-    plt.show()
-    if verbatim:
-        print("done Plotting Errors")
-
-
 # Prompt the user to fill in which experiment folder to run.
 def set_experiment_folder(root_folder):
     print("------------------------------")
@@ -360,6 +318,94 @@ def set_models_folders(experiment_folder):
     return full_paths
 
 
+
+
+# Plot the sliding window average error (in percentage) of the given models over time/chunks
+def plot_errors(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
+    print("------------------------------")
+    print("Plotting errors rates...")
+    for model_idx in range(len(models)):
+        # Selecting columns of interest
+        df_acc     = dfs[model_idx]["binary_accuracy"]
+        df_acc_val = dfs[model_idx]["val_binary_accuracy"]
+
+        # Sliding window average of train accuracy
+        train_error_avg = []
+        for i in range(len(df_acc_val) - window_size):
+            train_error_avg.append(sum(list(100.0-100.0*df_acc[i:i+window_size])) / window_size)
+
+        # Sliding window average of validation accuracy
+        vali_error_avg = []
+        for idx in range(len(df_acc_val) - window_size):
+            vali_error_avg.append(sum(list(100.0-100.0*df_acc_val[idx:idx+window_size])) / window_size)
+        
+        plt.plot(train_error_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(vali_error_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
+
+        plt.title("Error Plot")
+        plt.ylabel("Error (%)")
+        plt.xlabel("Trained Chunks")
+    
+    # Maximize current figure before saving
+    manager = plt.get_current_fig_manager()
+    manager.window.showMaximized()
+
+    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
+    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    figure = plt.gcf() # get current figure
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.savefig(os.path.join(models[model_idx], "error_train_vali"), dpi=100)
+    plt.show()
+    if verbatim:
+        print("done Plotting Errors")
+
+
+# plots the macro_f1-softloss (score) of given models. 
+def make_f1_plot(models, dfs, jsons, json_comp_key, window_size=500, ylim_top = 1.0, ylim_bottom=0.0):
+    print("------------------------------")
+    print("Plotting f1-softloss scores...")
+    for model_idx in range(len(models)):
+        # Selecting columns of interest
+        df_macro_f1     = dfs[model_idx]["macro_f1"]
+        df_macro_f1_val = dfs[model_idx]["val_macro_f1"]
+
+        # Sliding window average of train accuracy
+        train_f1_avg = []
+        for i in range(len(df_macro_f1) - window_size):
+            train_f1_avg.append(sum(list(df_macro_f1[i:i+window_size])) / window_size)
+
+        # Sliding window average of validation accuracy
+        val_f1_avg = []
+        for idx in range(len(df_macro_f1_val) - window_size):
+            val_f1_avg.append(sum(list(df_macro_f1_val[idx:idx+window_size])) / window_size)
+
+        plt.plot(train_f1_avg, label="Train: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=1)
+        plt.plot(val_f1_avg, label="Val: {}".format(jsons[model_idx][json_comp_key]), color=colors[model_idx], linewidth=3)
+
+        plt.title('Training and validation Macro F1-score')
+        plt.ylabel('Macro F1-Score')
+        plt.xlabel("Trained Chunks")
+    
+    # Maximize current figure before saving
+    manager = plt.get_current_fig_manager()
+    manager.window.showMaximized()
+
+    plt.ylim(top=ylim_top)  # adjust the top leaving bottom unchanged
+    plt.ylim(bottom=ylim_bottom)  # adjust the bottom leaving top unchanged
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    figure = plt.gcf() # get current figure
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.savefig(os.path.join(models[model_idx], "_f1-softloss_"), dpi=100)
+    plt.show()
+    if verbatim:
+        print("done Plotting f1-softlosses")
+
+
+# Loops over a set of columns and formats it for the user.
+# The user can choose which columns to plot.
 def which_plots_to_plot(columns):
     print("------------------------------")
     print("Set plots that you want to view:")
@@ -384,19 +430,27 @@ def error_plot_dialog():
     show_error_plot = True if show_error_plot in ["y", "yes"] else False
     return show_error_plot
 
-# Ask the user whether he want to see and compute the error plot.
+# Ask the user whether he want to see and compute the loss plot.
 def loss_plot_dialog():
     print("------------------------------")
     show_loss_plot = input("Show loss plot? y/n: ")
     show_loss_plot = True if show_loss_plot in ["y", "yes"] else False
     return show_loss_plot
 
-# Ask the user whether he want to see and compute the error plot.
+# Ask the user whether he want to see and compute the fbeta plot.
 def fBeta_plot_dialog():
     print("------------------------------")
     show_fBeta_plot = input("Show f_beta graphs? y/n: ")
     show_fBeta_plot = True if show_fBeta_plot in ["y", "yes"] else False
     return show_fBeta_plot
+
+
+# Ask the user whether he want to see and compute the f1 plot.
+def f1_plot_dialog():
+    print("------------------------------")
+    show_f1_plot = input("Show f1-macro score plots? y/n: ")
+    show_f1_plot = True if show_f1_plot in ["y", "yes"] else False
+    return show_f1_plot
 
 
 
@@ -434,8 +488,8 @@ def main():
         is_enrico_model_chosen = True if len([x for x in models_paths_list if "resnet_single_newtr_last_last_weights_only" in x]) > 0 else False
 
         ## 1.0 - Get list dataframes
-        if not is_enrico_model_chosen:
-            dfs, _ = get_dataframes(models_paths_list)
+        copy_models_paths_lists = [ x for x in models_paths_list if "resnet_single_newtr_last_last_weights_only" not in x ] # we don't want enrico's model to be a dataframe, due to it not having logged statistics.
+        dfs, _ = get_dataframes(copy_models_paths_lists)
 
         ## 2.0 - Get list of jsons
         jsons, _ = get_jsons(models_paths_list)
@@ -451,6 +505,10 @@ def main():
         if not is_enrico_model_chosen and loss_plot_dialog():
             plot_losses_avg(models_paths_list, dfs, jsons, window_size=window_size)
 
+        ## 6.0 - Show the macro-f1 score plot for each model:
+        if not is_enrico_model_chosen and f1_plot_dialog():
+            make_f1_plot(models_paths_list, dfs, jsons, json_comp_key, window_size=window_size, ylim_top = 1.0, ylim_bottom=0.0)
+
         ## 6.0 - Plot the data from the csvs - legend determined by json parameter dump file
         plots_to_show = which_plots_to_plot(dfs[0].columns)
         if not is_enrico_model_chosen:
@@ -460,7 +518,7 @@ def main():
                 compare_plot_models(columnname, dfs, jsons, json_comp_key)
 
         ## 7.0 - Calculate f-beta score per model - based on validation data
-        if fBeta_plot_dialog:
+        if fBeta_plot_dialog():
             store_fbeta_results(models_paths_list, paths_h5s, jsons, json_comp_key, f_beta_avg_count)
         ######################################################
 
