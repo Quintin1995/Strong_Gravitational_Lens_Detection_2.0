@@ -53,9 +53,13 @@ class Network:
 
         # Parameters used when training the model
         self.loss     = []              # Store loss of the model
-        self.acc      = []              # Store binary accuracy of the model
+        self.acc      = []              # Store binary accuracy of the model        or it holds other metric values such as f1-softloss (scores)
         self.val_loss = []              # Store validation loss of the model
-        self.val_acc  = []              # Store validation binary accuracy
+        self.val_acc  = []              # Store validation binary accuracy           or it holds other metric values such as f1-softloss (scores)
+
+        self.best_val_loss    = 9999.0                    # Used for Model Selection
+        self.es_patience      = self.params.es_patience   # Early Stopping
+        self.patience_counter = 0                         # Early Stopping
 
         # Check if a model is set.
         assert self.model != None
@@ -116,15 +120,6 @@ class Network:
 
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
-                # Save Model self.params to .h5 file
-                if chunk_idx % self.params.chunk_save_interval == 0:
-                    self.model.save_weights(self.params.full_path_of_weights)
-                    print("Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
-
-                # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
-                if(psutil.virtual_memory().percent > 75.0):
-                    self.reset_keras_backend()
-
                 # Write results to csv file
                 writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
 
@@ -134,6 +129,22 @@ class Network:
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
                 if chunk_idx % self.params.chunk_plot_interval == 0:
                     plot_history(self.acc, self.val_acc, self.loss, self.val_loss, self.params)
+
+                # MODEL SELECTION
+                # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
+                # Not storing the network before 4000 chunks have been trained on, seems like a reasonable efficiency heuristic.
+                if chunk_idx > 4000 and history.history["val_loss"][0] < self.best_val_loss:    
+                    self.model.save_weights(self.params.full_path_of_weights)
+                    self.best_val_loss = history.history["val_loss"][0]
+                    print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
+
+                # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
+                if(psutil.virtual_memory().percent > 75.0):
+                    self.reset_keras_backend()
+
+                # Early stopping
+                if self.do_early_stopping(history.history["val_loss"][0]):
+                    break
 
         except KeyboardInterrupt:
             self.model.save_weights(self.params.full_path_of_weights)
@@ -149,6 +160,19 @@ class Network:
         print("\nSaved weights to: {}".format(self.params.full_path_of_weights), flush=True)
         print("\nSaved results to: {}".format(self.params.full_path_of_history), flush=True)
         print("\nTotal time employed ", hms(end_train_session - begin_train_session), flush=True)
+
+
+    # Returns True if early stopping condition has been met.
+    def do_early_stopping(self, vall_loss):
+        if vall_loss < min(self.val_loss):
+            self.patience_counter = 0
+        else:                              # The model did not improve
+            self.patience_counter += 1          
+        if self.patience_counter == self.es_patience:
+            # Stop Training
+            print("Early Stopping!!!", flush=True)
+            return True
+        return False
 
 
     def format_info_for_csv(self, chunk_idx, history, begin_train_session):
