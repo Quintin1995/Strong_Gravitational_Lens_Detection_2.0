@@ -39,6 +39,7 @@ net_num_outputs  : 1                        #int# How many output neurons does t
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter: num_chunks.
 net_batch_size   : 32                       #int#
 es_patience      : 500                      #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
+net_val_freq     : 25                       #int# After this amount of training chunks validation data will be tested.
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"

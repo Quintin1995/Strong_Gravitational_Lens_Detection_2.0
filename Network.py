@@ -57,9 +57,15 @@ class Network:
         self.val_loss = []              # Store validation loss of the model
         self.val_acc  = []              # Store validation binary accuracy           or it holds other metric values such as f1-softloss (scores)
 
-        self.best_val_loss    = 9999.0                    # Used for Model Selection
-        self.es_patience      = self.params.es_patience   # Early Stopping
-        self.patience_counter = 0                         # Early Stopping
+        # Model Selection
+        self.best_val_loss    = 9999.0
+
+        # Early Stopping
+        self.es_patience      = self.params.es_patience
+        self.patience_counter = 0
+
+        # Validaton -  After this amount of epochs/train-chunks validation will be performed
+        self.net_val_freq     = self.params.net_val_freq      
 
         # Check if a model is set.
         assert self.model != None
@@ -116,7 +122,8 @@ class Network:
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
                         validation_data=validation_generator_flowed,
-                        validation_steps=len(X_validation_chunk) / self.params.net_batch_size)
+                        validation_steps=len(X_validation_chunk) / self.params.net_batch_size,
+                        validation_freq=self.net_val_freq)
 
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
