@@ -123,19 +123,11 @@ class Network:
                 # Write results to csv file
                 writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
 
-                # Store loss and accuracy in list
-                self.update_loss_and_acc(history)
-                
-                # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
-                if chunk_idx % self.params.chunk_plot_interval == 0:
-                    plot_history(self.acc, self.val_acc, self.loss, self.val_loss, self.params)
-
                 # MODEL SELECTION
                 # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
                 # Not storing the network before 4000 chunks have been trained on, seems like a reasonable efficiency heuristic.
                 if chunk_idx > 4000 and history.history["val_loss"][0] < self.best_val_loss:    
                     self.model.save_weights(self.params.full_path_of_weights)
-                    self.best_val_loss = history.history["val_loss"][0]
                     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
                 # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
@@ -145,6 +137,14 @@ class Network:
                 # Early stopping
                 if self.do_early_stopping(history.history["val_loss"][0]):
                     break
+
+                # Store loss and accuracy in list - Must be done after early stopping call
+                self.update_loss_and_acc(history)
+                
+                # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
+                if chunk_idx % self.params.chunk_plot_interval == 0:
+                    plot_history(self.acc, self.val_acc, self.loss, self.val_loss, self.params)
+
 
         except KeyboardInterrupt:
             self.model.save_weights(self.params.full_path_of_weights)
@@ -164,10 +164,13 @@ class Network:
 
     # Returns True if early stopping condition has been met.
     def do_early_stopping(self, vall_loss):
-        if vall_loss < min(self.val_loss):
+        # Update the best validation score and reset patience counter if the metric is better.
+        if vall_loss < self.best_val_loss:
+            self.best_val_loss = vall_loss
             self.patience_counter = 0
-        else:                              # The model did not improve
-            self.patience_counter += 1          
+        else:
+            self.patience_counter += 1
+
         if self.patience_counter == self.es_patience:
             # Stop Training
             print("Early Stopping!!!", flush=True)
