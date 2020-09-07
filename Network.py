@@ -9,6 +9,7 @@ from tensorflow.keras.layers import Input, Activation, Dense, Flatten, GaussianN
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.initializers import glorot_uniform
 from tensorflow.keras import optimizers, metrics
+from tensorflow.keras import models
 from tensorflow.keras import backend as K
 import tensorflow as tf
 import time
@@ -50,16 +51,29 @@ class Network:
             self.model          = self.build_resnet(self.input_shape, self.num_outputs, self.basic_block, [2, 2, 2, 2])
         elif self.params.net_name == "resnet50":
             self.model          = self.build_resnet50(input_shape = self.input_shape, num_outputs = self.num_outputs)
+        elif self.params.net_name == "simple_test_net":
+            self.model          = self.build_simple_test_net(input_shape = self.input_shape, num_outputs = self.num_outputs)
 
         # Parameters used when training the model
         self.loss     = []              # Store loss of the model
         self.acc      = []              # Store binary accuracy of the model        or it holds other metric values such as f1-softloss (scores)
         self.val_loss = []              # Store validation loss of the model
-        self.val_acc  = []              # Store validation binary accuracy           or it holds other metric values such as f1-softloss (scores)
+        self.val_metric  = []           # Store validation binary accuracy           or it holds other metric values such as f1-softloss (scores)
 
-        self.best_val_loss    = 9999.0                    # Used for Model Selection
-        self.es_patience      = self.params.es_patience   # Early Stopping
-        self.patience_counter = 0                         # Early Stopping
+        # Not every iteration/epoch has a validation value. In order to store a value for each epoch we need an initial value (this is just a guess and should not affect performance in any way.)
+        self.val_loss.append(3.0)       # initial validation loss value
+        self.val_metric.append(0.05)     # initial validation metric value
+
+
+        # Model Selection
+        self.best_val_loss    = 9999.0
+
+        # Early Stopping
+        self.es_patience      = self.params.es_patience
+        self.patience_counter = 0
+
+        # Validaton -  After this amount of epochs/train-chunks validation will be performed
+        self.net_val_freq     = self.params.net_val_freq      
 
         # Check if a model is set.
         assert self.model != None
@@ -87,16 +101,13 @@ class Network:
         begin_train_session = time.time()       # Records beginning of training time
         try:
             for chunk_idx in range(self.params.num_chunks):
-                
                 print("chunk {}/{}".format(chunk_idx+1, self.params.num_chunks), flush=True)
 
                 # Load train chunk and targets
                 X_train_chunk, y_train_chunk = self.dg.load_chunk(self.params.chunksize, self.dg.Xlenses_train, self.dg.Xnegatives_train, self.dg.Xsources_train, self.params.data_type, self.params.mock_lens_alpha_scaling)
                 # Load validation chunk and targets
-                X_validation_chunk, y_validation_chunk = self.dg.load_chunk(self.params.validation_chunksize, self.dg.Xlenses_validation, self.dg.Xnegatives_validation, self.dg.Xsources_validation, self.params.data_type, self.params.mock_lens_alpha_scaling)
-
-                # Fit model on data with a keras image data generator
-                network_fit_time_start = time.time()
+                if chunk_idx % self.net_val_freq == 0:      # not each train chunk needs to be followed up with validation
+                    X_validation_chunk, y_validation_chunk = self.dg.load_chunk_val(data_type=np.float32, mock_lens_alpha_scaling=self.params.mock_lens_alpha_scaling)
 
                 # Define a train generator flow based on the ImageDataGenerator
                 train_generator_flowed = self.dg.train_generator.flow(
@@ -104,29 +115,22 @@ class Network:
                     y_train_chunk,
                     batch_size=self.params.net_batch_size)
 
-                # Define a validation generator flow based on the ImageDataGenerator
-                validation_generator_flowed = self.dg.validation_generator.flow(
-                    X_validation_chunk,
-                    y_validation_chunk,
-                    batch_size=self.params.net_batch_size)
-
+                network_fit_time_start = time.time()
                 # Fit both generators (train and validation) on the model.
                 history = self.model.fit_generator(
                         train_generator_flowed,
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
-                        validation_data=validation_generator_flowed,
-                        validation_steps=len(X_validation_chunk) / self.params.net_batch_size)
-
+                        validation_data=(X_validation_chunk, y_validation_chunk))
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
                 # Write results to csv file
                 writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
-
+                
                 # MODEL SELECTION
                 # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
-                # Not storing the network before 4000 chunks have been trained on, seems like a reasonable efficiency heuristic.
-                if chunk_idx > 4000 and history.history["val_loss"][0] < self.best_val_loss:    
+                # Not storing the network before 15 chunks have been trained on, seems like a reasonable efficiency heuristic. (under the assumption that each training chunk has dimensions: (65536,101,101,1))
+                if chunk_idx > 15 and history.history["val_loss"][0] < self.best_val_loss:    
                     self.model.save_weights(self.params.full_path_of_weights)
                     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
@@ -135,7 +139,7 @@ class Network:
                     self.reset_keras_backend()
 
                 # Early stopping
-                if self.do_early_stopping(history.history["val_loss"][0]):
+                if self.do_early_stopping(self.val_loss[-1]):
                     break
 
                 # Store loss and accuracy in list - Must be done after early stopping call
@@ -222,12 +226,12 @@ class Network:
             self.loss.append(history.history["loss"][0])
             self.acc.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
-            self.val_acc.append(history.history["val_binary_accuracy"][0])
+            self.val_metric.append(history.history["val_binary_accuracy"][0])
         else:
             self.loss.append(history.history["loss"][0])
             self.acc.append(history.history["macro_f1"][0])
             self.val_loss.append(history.history["val_loss"][0])
-            self.val_acc.append(history.history["val_macro_f1"][0])
+            self.val_metric.append(history.history["val_macro_f1"][0])
 
 
     # Store Neural Network summary to file
@@ -333,6 +337,27 @@ class Network:
         f1 = 2*tp / (2*tp + fn + fp + 1e-16)
         macro_f1 = tf.reduce_mean(f1)
         return macro_f1
+
+
+    def build_simple_test_net(self, input_shape = (101,101,1), num_outputs=1):
+        
+        # super simple test network to be able to run on cpu aswell.
+        model = models.Sequential()
+        model.add(Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
+        model.add(MaxPooling2D((2, 2)))
+        model.add(Conv2D(64, (3, 3), activation='relu'))
+        model.add(MaxPooling2D((2, 2)))
+        model.add(Conv2D(64, (3,3), activation='relu'))
+        model.add(Flatten())
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(1, activation='sigmoid'))
+
+        # Compile the Model before returning it.
+        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=[self.metrics])
+        print(model.summary(), flush=True)
+
+        return model
+
 
 
     # Builds a Residual Neural Network with network depth 50
