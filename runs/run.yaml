@@ -7,7 +7,7 @@ model_name: "sim_lenses_exp1"    # String
 # Loading the input data
 fraction_to_load_sources_train  : 0.02     #float # range = [0,1]  train
 fraction_to_load_negatives_train: 0.2     #float # range = [0,1]  train
-fraction_to_load_lenses_train   : 0.1     #float # range = [0,1]  train
+fraction_to_load_lenses_train   : 1.0     #float # range = [0,1]  train
 
 fraction_to_load_sources_vali  : 0.1     #float # range = [0,1]   validation
 fraction_to_load_negatives_vali: 1.0     #float # range = [0,1]   validation
