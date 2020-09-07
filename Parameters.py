@@ -56,7 +56,6 @@ class Parameters(object):
         self.net_epochs        = settings["net_epochs"]
         self.net_batch_size    = settings["net_batch_size"]
         self.es_patience       = settings["es_patience"]
-        self.net_val_freq      = settings["net_val_freq"]
 
         # Loading the input data - What fraction of the data should be loaded into ram?
         self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]

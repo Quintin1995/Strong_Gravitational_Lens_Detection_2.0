@@ -64,16 +64,12 @@ class Network:
         self.val_loss.append(3.0)       # initial validation loss value
         self.val_metric.append(0.05)     # initial validation metric value
 
-
         # Model Selection
         self.best_val_loss    = 9999.0
 
         # Early Stopping
         self.es_patience      = self.params.es_patience
         self.patience_counter = 0
-
-        # Validaton -  After this amount of epochs/train-chunks validation will be performed
-        self.net_val_freq     = self.params.net_val_freq      
 
         # Check if a model is set.
         assert self.model != None
@@ -106,8 +102,7 @@ class Network:
                 # Load train chunk and targets
                 X_train_chunk, y_train_chunk = self.dg.load_chunk(self.params.chunksize, self.dg.Xlenses_train, self.dg.Xnegatives_train, self.dg.Xsources_train, self.params.data_type, self.params.mock_lens_alpha_scaling)
                 # Load validation chunk and targets
-                if chunk_idx % self.net_val_freq == 0:      # not each train chunk needs to be followed up with validation
-                    X_validation_chunk, y_validation_chunk = self.dg.load_chunk_val(data_type=np.float32, mock_lens_alpha_scaling=self.params.mock_lens_alpha_scaling)
+                X_validation_chunk, y_validation_chunk = self.dg.load_chunk_val(data_type=np.float32, mock_lens_alpha_scaling=self.params.mock_lens_alpha_scaling)
 
                 # Define a train generator flow based on the ImageDataGenerator
                 train_generator_flowed = self.dg.train_generator.flow(
@@ -130,7 +125,7 @@ class Network:
                 # MODEL SELECTION
                 # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
                 # Not storing the network before 15 chunks have been trained on, seems like a reasonable efficiency heuristic. (under the assumption that each training chunk has dimensions: (65536,101,101,1))
-                if chunk_idx > 15 and history.history["val_loss"][0] < self.best_val_loss:    
+                if chunk_idx > 10 and history.history["val_loss"][0] < self.best_val_loss:    
                     self.model.save_weights(self.params.full_path_of_weights)
                     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
@@ -147,7 +142,7 @@ class Network:
                 
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
                 if chunk_idx % self.params.chunk_plot_interval == 0:
-                    plot_history(self.acc, self.val_acc, self.loss, self.val_loss, self.params)
+                    plot_history(self.acc, self.val_metric, self.loss, self.val_loss, self.params)
 
 
         except KeyboardInterrupt:
@@ -339,6 +334,7 @@ class Network:
         return macro_f1
 
 
+    # Mostly used for debugging the whole pipeline.
     def build_simple_test_net(self, input_shape = (101,101,1), num_outputs=1):
         
         # super simple test network to be able to run on cpu aswell.
@@ -357,7 +353,6 @@ class Network:
         print(model.summary(), flush=True)
 
         return model
-
 
 
     # Builds a Residual Neural Network with network depth 50
