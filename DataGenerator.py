@@ -62,7 +62,9 @@ class DataGenerator:
     def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
         self.params = params
         self.PSF_r = self.compute_PSF_r()
-        print_stats_program()
+
+        # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
+        self.negative_sample_contaminant_prob = 0.8
 
         with Pool(24) as p:
             if mode == "training":
@@ -109,13 +111,6 @@ class DataGenerator:
                                                         pool=p)
         p.join()
 
-        # This code is calculated in load_chunk instead
-        if False:
-            self.ylenses_train          = np.zeros(self.Xlenses_train.shape[0])
-            self.ynegatives_train       = np.zeros(self.Xnegatives_train.shape[0])
-            self.ylenses_validation     = np.zeros(self.Xlenses_validation.shape[0])
-            self.ynegatives_validation  = np.zeros(self.Xnegatives_validation.shape[0])
-
         ###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
         self.train_generator = ImageDataGenerator(
                 rotation_range=params.aug_rotation_range,
@@ -137,8 +132,6 @@ class DataGenerator:
             show_random_img_plt_and_stats(Xnegatives_train, num_imgs=1, title="negatives")
             show_random_img_plt_and_stats(Xlenses_train,   num_imgs=1, title="sources")
         
-        print_stats_program()
-
 
     def compute_PSF_r(self):
         ## This piece of code is needed for some reason that i will try to find out later.
@@ -245,19 +238,15 @@ class DataGenerator:
     
 
     # Loading a chunk into memory
-    def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling, do_deterministic=False):
+    def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
 
-        if do_deterministic:            #do_deterministic is called when you always want the same chunk based on the same X_lenses, X_negatives and X_sources
-            num_positive = X_lenses.shape[0]       
-            num_negative = X_negatives.shape[0]
-        else:
-            # Half a chunk positive and half negative
-            num_positive = int(chunksize / 2)
-            num_negative = int(chunksize / 2)
+        # Half a chunk positive and half negative
+        num_positive = int(chunksize / 2)
+        num_negative = int(chunksize / 2)
         
         # Get mock lenses data and labels
-        X_pos, y_pos = self.merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=do_deterministic)
+        X_pos, y_pos = self.merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=False)
             
         # Store Negative data in numpy array and create label vector
         X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)
@@ -275,11 +264,33 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
-        if do_deterministic:
-            print("Creating deterministic chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
-        else:
-            print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
+        print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
+        return X_chunk, y_chunk
 
+
+    # Loading a valiation chunk into memory
+    def load_chunk_val(self, data_type, mock_lens_alpha_scaling):
+        start_time = time.time()
+        num_positive = self.Xlenses_validation.shape[0]
+        num_negative = self.Xnegatives_validation.shape[0] + self.Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
+        
+        # Get mock lenses data and labels
+        X_pos, y_pos = self.merge_lenses_and_sources(self.Xlenses_validation, self.Xsources_validation, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=True)
+            
+        # Store Negative data in numpy array and create label vector
+        X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)    
+        y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
+
+        # Negatives consist of the negatives set and the unmerged lenses set. A lens unmerged with a source is basically a negative.
+        X_neg[0:num_positive] = self.Xlenses_validation
+        X_neg[num_positive:num_negative] = self.Xnegatives_validation
+        X_neg = np.sqrt(X_neg)
+
+        # Concatenate the positive and negative examples into one chunk (also the labels)
+        X_chunk = np.concatenate((X_pos, X_neg))
+        y_chunk = np.concatenate((y_pos, y_neg))
+
+        print("Creating validation chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
         return X_chunk, y_chunk
     
 
@@ -317,7 +328,7 @@ class DataGenerator:
         # Which indexes to load from sources and lenses (these will be merged together)
         if do_deterministic:
             idxs_lenses = list(range(num_lenses))       # if deterministic we always want the same set
-            idxs_sources = idxs_lenses
+            idxs_sources = random.choices(list(range(num_sources)), k=num_mock_lenses)
         else:
             idxs_lenses = random.choices(list(range(num_lenses)), k=num_mock_lenses)
             idxs_sources = random.choices(list(range(num_sources)), k=num_mock_lenses)

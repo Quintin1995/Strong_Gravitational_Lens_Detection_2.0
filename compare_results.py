@@ -152,7 +152,6 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
       
         # Step 3.0 - Define a DataGenerator that can generate validation chunks based on validation data.
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False)     #do not shuffle the data in the data generator
-        placeholder = 1000   #this num doesn't matter - its chunksize. But for this validation chunk it is being overriden in the load_chunk function, by the do_deterministic boolean
         
         # Step 4.0 - Construct a neural network with the same architecture as that it was trained with.
         network = Network(params, dg, training=False) # The network needs to know hyper-paramters from params, and needs to know how to generate data with a datagenerator object.
@@ -166,7 +165,7 @@ def store_fbeta_results(models, paths_h5s, jsons, json_comp_key, f_beta_avg_coun
         precision_data_vectors = []
         recall_data_vectors = []
         for i in range(f_beta_avg_count):
-            X_validation_chunk, y_validation_chunk = dg.load_chunk(placeholder, dg.Xlenses_validation, dg.Xnegatives_validation, dg.Xsources_validation, params.data_type, params.mock_lens_alpha_scaling, do_deterministic=True)
+            X_validation_chunk, y_validation_chunk = dg.load_chunk_val(params.data_type, params.mock_lens_alpha_scaling)
             
             # Step 6.1 - dstack images for enrico neural network
             if params.model_name == "Baseline_Enrico":
@@ -334,8 +333,6 @@ def set_models_folders(experiment_folder):
     return full_paths
 
 
-
-
 # Plot the Exponential Moving Average error (in percentage) of the given models over time/chunks
 def plot_errors(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
     print("------------------------------")
@@ -477,8 +474,7 @@ colors                  = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum'
 json_comp_key           = "model_name"              # is the label in generated plots
 verbatim                = False
 
-#Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing will occur.
-smooth_fac = 0.999
+#Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing wilload
 
 ### Error Plot of given Models
 ytop                    = 100.0    # Error plot y upper-limit in percentage
