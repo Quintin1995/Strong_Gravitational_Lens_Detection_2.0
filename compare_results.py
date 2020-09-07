@@ -476,7 +476,7 @@ json_comp_key           = "model_name"              # is the label in generated 
 verbatim                = False
 
 #Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing will occur.
-smooth_fac = 0.99
+smooth_fac = 0.9
 
 ### Error Plot of given Models
 ytop                    = 100.0    # Error plot y upper-limit in percentage
