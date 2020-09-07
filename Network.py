@@ -121,16 +121,14 @@ class Network:
                         train_generator_flowed,
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
-                        validation_data=(X_validation_chunk, y_validation_chunk),
-                        # validation_steps=len(X_validation_chunk) / self.params.net_batch_size,
-                        validation_freq=self.net_val_freq)
+                        validation_data=(X_validation_chunk, y_validation_chunk))
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
                 # Write results to csv file
                 writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
 
                 # Store loss and metric in list
-                self.update_loss_and_acc(chunk_idx, history)
+                self.update_loss_and_acc(history)
                 
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
                 if chunk_idx % self.params.chunk_plot_interval == 0:
@@ -138,8 +136,8 @@ class Network:
 
                 # MODEL SELECTION
                 # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
-                # Not storing the network before 4000 chunks have been trained on, seems like a reasonable efficiency heuristic.
-                if chunk_idx > 4000 and history.history["val_loss"][0] < self.best_val_loss:    
+                # Not storing the network before 15 chunks have been trained on, seems like a reasonable efficiency heuristic. (under the assumption that each training chunk has dimensions: (65536,101,101,1))
+                if chunk_idx > 15 and history.history["val_loss"][0] < self.best_val_loss:    
                     self.model.save_weights(self.params.full_path_of_weights)
                     self.best_val_loss = history.history["val_loss"][0]
                     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
@@ -182,44 +180,26 @@ class Network:
 
 
     def format_info_for_csv(self, chunk_idx, history, begin_train_session):
-        # Validation does not occur each training iteration/epoch,
-        # therefore the validation loss and validation metric won't
-        # be available each time. Therefore, we take these values to
-        # be the values of the previous iteration/epoch
-
-        if (chunk_idx+1) % self.net_val_freq == 0 and chunk_idx != 0:
-            if self.metrics == "binary_accuracy":
-                validation_loss = history.history["val_loss"][0]
-                validation_metric = history.history["val_binary_accuracy"][0]
-            elif self.metrics == self.macro_f1:
-                validation_loss = history.history["val_loss"][0]
-                validation_metric = history.history["val_macro_f1"][0]
-        else:
-            validation_loss = self.val_loss[-1]
-            validation_metric = self.val_metric[-1]
-
         if self.metrics == "binary_accuracy":
-            info = [str(chunk_idx),
+            return [str(chunk_idx),
                     str(history.history["loss"][0]),
                     str(history.history["binary_accuracy"][0]),
-                    str(validation_loss),
-                    str(validation_metric),
+                    str(history.history["val_loss"][0]),
+                    str(history.history["val_binary_accuracy"][0]),
                     str(hms(time.time()-begin_train_session)),
                     str(psutil.cpu_percent()),
                     str(psutil.virtual_memory().percent),
                     str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
-            return info
         elif self.metrics == self.macro_f1:
-            info = [str(chunk_idx),
+            return [str(chunk_idx),
                     str(history.history["loss"][0]),
                     str(history.history["macro_f1"][0]),
-                    str(validation_loss),
-                    str(validation_metric),
+                    str(history.history["val_loss"][0]),
+                    str(history.history["val_macro_f1"][0]),
                     str(hms(time.time()-begin_train_session)),
                     str(psutil.cpu_percent()),
                     str(psutil.virtual_memory().percent),
                     str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
-            return info
             
 
     # Resets the backend of keras. Everything regarding the model is stored into a folder,
@@ -238,29 +218,17 @@ class Network:
 
 
     # Update network properties, based on the history of the trained network.
-    def update_loss_and_acc(self, chunk_idx, history):
-        if (chunk_idx+1) % self.net_val_freq == 0 and chunk_idx != 0:
-            if self.metrics == "binary_accuracy":
-                self.loss.append(history.history["loss"][0])
-                self.acc.append(history.history["binary_accuracy"][0])
-                self.val_loss.append(history.history["val_loss"][0])
-                self.val_metric.append(history.history["val_binary_accuracy"][0])
-            else:
-                self.loss.append(history.history["loss"][0])
-                self.acc.append(history.history["macro_f1"][0])
-                self.val_loss.append(history.history["val_loss"][0])
-                self.val_metric.append(history.history["val_macro_f1"][0])
+    def update_loss_and_acc(self, history):
+        if self.metrics == "binary_accuracy":
+            self.loss.append(history.history["loss"][0])
+            self.acc.append(history.history["binary_accuracy"][0])
+            self.val_loss.append(history.history["val_loss"][0])
+            self.val_metric.append(history.history["val_binary_accuracy"][0])
         else:
-            if self.metrics == "binary_accuracy":
-                self.loss.append(history.history["loss"][0])
-                self.acc.append(history.history["binary_accuracy"][0])
-                self.val_loss.append(self.val_loss[-1])
-                self.val_metric.append(self.val_metric[-1])
-            else:
-                self.loss.append(history.history["loss"][0])
-                self.acc.append(history.history["macro_f1"][0])
-                self.val_loss.append(self.val_loss[-1])
-                self.val_metric.append(self.val_metric[-1])
+            self.loss.append(history.history["loss"][0])
+            self.acc.append(history.history["macro_f1"][0])
+            self.val_loss.append(history.history["val_loss"][0])
+            self.val_metric.append(history.history["val_macro_f1"][0])
 
 
     # Store Neural Network summary to file
