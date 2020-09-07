@@ -17,7 +17,7 @@ fraction_to_load_lenses_vali   : 1.0     #float # range = [0,1]   validation
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
-num_chunks: 6000                      #int # Number of chunks to be generated 
+num_chunks: 100                      #int # Number of chunks to be generated 
 chunksize : 1024                      #int # The number of images that will fit into one chunk
 
 # Storing results parameters.

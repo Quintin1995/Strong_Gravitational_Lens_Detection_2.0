@@ -238,19 +238,15 @@ class DataGenerator:
     
 
     # Loading a chunk into memory
-    def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling, do_deterministic=False):
+    def load_chunk(self, chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
 
-        if do_deterministic:            #do_deterministic is called when you always want the same chunk based on the same X_lenses, X_negatives and X_sources
-            num_positive = X_lenses.shape[0]       
-            num_negative = X_negatives.shape[0]
-        else:
-            # Half a chunk positive and half negative
-            num_positive = int(chunksize / 2)
-            num_negative = int(chunksize / 2)
+        # Half a chunk positive and half negative
+        num_positive = int(chunksize / 2)
+        num_negative = int(chunksize / 2)
         
         # Get mock lenses data and labels
-        X_pos, y_pos = self.merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=do_deterministic)
+        X_pos, y_pos = self.merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=False)
             
         # Store Negative data in numpy array and create label vector
         X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)
@@ -268,11 +264,7 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
-        if do_deterministic:
-            print("Creating deterministic chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
-        else:
-            print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
-
+        print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
         return X_chunk, y_chunk
 
 
