@@ -9,12 +9,13 @@ from tensorflow.keras.layers import Input, Activation, Dense, Flatten, GaussianN
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.initializers import glorot_uniform
 from tensorflow.keras import optimizers, metrics
+from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 import tensorflow as tf
 import time
 from utils import hms, plot_history
-
+from f_beta_metric import FBetaMetric
 
 class Network:
 
@@ -30,7 +31,9 @@ class Network:
         
         # Setting the loss function
         self.metrics = None
+        self.f_beta_metric = None           # only used when validation loss is defined as f_beta.
         self.set_neural_network_metric()
+
 
         # Neural Network Train Metric
         self.loss_function = None
@@ -83,15 +86,28 @@ class Network:
     # A csv writer is opened and being written into during training.
     def train(self):
 
+        # Make checkpoints based on the loss
+        loss_checkpoint = ModelCheckpoint(
+            "best_loss.h5", monitor='val_loss', verbose=0, save_best_only=True,
+            save_weights_only=False, mode='min'
+        )
+        # Make checkpoints based on the F-Beta score
+        f_beta_checkpoint = ModelCheckpoint(
+            "best_f_beta.h5", monitor='val_f_beta', verbose=0, save_best_only=True,
+            save_weights_only=False, mode='max'
+        )
+
         # Open a csv writer and write headers into it.
         bufsize = 1
         f = open(self.params.full_path_of_history, "w", bufsize)
         writer = csv.writer(f)
 
-        if self.metrics == "binary_accuracy":
+        if self.metrics[0] == "binary_accuracy":
             writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time", "cpu_percentage", "ram_usage", "available_mem"])
-        else:
+        elif self.params.net_model_metrics == "macro_f1":
             writer.writerow(["chunk", "loss", "macro_f1", "val_loss", "val_macro_f1", "time", "cpu_percentage", "ram_usage", "available_mem"])
+        elif self.params.net_model_metrics == "f_beta":
+            writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_f_beta", "time", "cpu_percentage", "ram_usage", "available_mem"])
 
         # Train the model
         begin_train_session = time.time()       # Records beginning of training time
@@ -116,7 +132,8 @@ class Network:
                         train_generator_flowed,
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
-                        validation_data=(X_validation_chunk, y_validation_chunk))
+                        validation_data=(X_validation_chunk, y_validation_chunk),
+                        callbacks=[f_beta_checkpoint, loss_checkpoint])
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
                 # Write results to csv file
@@ -143,7 +160,6 @@ class Network:
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
                 if chunk_idx % self.params.chunk_plot_interval == 0:
                     plot_history(self.acc, self.val_metric, self.loss, self.val_loss, self.params)
-
 
         except KeyboardInterrupt:
             self.model.save_weights(self.params.full_path_of_weights)
@@ -198,6 +214,16 @@ class Network:
                     str(psutil.cpu_percent()),
                     str(psutil.virtual_memory().percent),
                     str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
+        elif self.params.net_model_metrics == "f_beta":
+             return [str(chunk_idx),
+                    str(history.history["loss"][0]),
+                    str(history.history["binary_accuracy"][0]),
+                    str(history.history["val_loss"][0]),
+                    str(history.history["val_f_beta"][0]),
+                    str(hms(time.time()-begin_train_session)),
+                    str(psutil.cpu_percent()),
+                    str(psutil.virtual_memory().percent),
+                    str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
             
 
     # Resets the backend of keras. Everything regarding the model is stored into a folder,
@@ -211,7 +237,7 @@ class Network:
         self.model.save(self.params.full_path_model_storage)
         tf.keras.backend.clear_session()
         self.model = tf.keras.models.load_model(self.params.full_path_model_storage, compile=False)
-        self.model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=[self.metrics])
+        self.model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
         print("\n reset time: {}\n----".format(hms(time.time() - begin_time)), flush=True)
 
 
@@ -222,11 +248,17 @@ class Network:
             self.acc.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_binary_accuracy"][0])
-        else:
+        elif self.params.net_model_metrics == "macro_f1":
             self.loss.append(history.history["loss"][0])
             self.acc.append(history.history["macro_f1"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_macro_f1"][0])
+        elif self.params.net_model_metrics == "macro_f1":
+            self.loss.append(history.history["loss"][0])
+            self.acc.append(history.history["binary_accuracy"][0])
+            self.val_loss.append(history.history["val_loss"][0])
+            self.val_metric.append(history.history["val_f_beta"][0])
+
 
 
     # Store Neural Network summary to file
@@ -252,9 +284,12 @@ class Network:
     # Case over all possible training metrics
     def set_neural_network_metric(self):
         if self.params.net_model_metrics == "binary_accuracy":
-            self.metrics = "binary_accuracy"
+            self.metrics = ["binary_accuracy"]
         elif self.params.net_model_metrics == "macro_f1":
-            self.metrics = self.macro_f1
+            self.metrics = [self.macro_f1]
+        elif self.params.net_model_metrics == "f_beta":
+            self.f_beta_metric = FBetaMetric(beta = 0.17, steps = 50)
+            self.metrics = ["binary_accuracy", self.f_beta_metric.f_beta]
         else:
             self.metrics = None
 
@@ -349,7 +384,7 @@ class Network:
         model.add(Dense(1, activation='sigmoid'))
 
         # Compile the Model before returning it.
-        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=[self.metrics])
+        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
         print(model.summary(), flush=True)
 
         return model
@@ -406,7 +441,7 @@ class Network:
         model = Model(inputs = X_input, outputs = X, name='resnet50')
 
         # Compile the Model before returning it.
-        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=[self.metrics])
+        model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
         print(model.summary(), flush=True)
         return model
         
@@ -690,7 +725,7 @@ class Network:
         model.compile(
                         optimizer=self.optimizer,
                         loss=self.loss_function,
-                        metrics=[self.metrics],
+                        metrics=self.metrics,
                     )
 
         return model
