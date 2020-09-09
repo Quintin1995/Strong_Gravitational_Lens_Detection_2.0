@@ -82,6 +82,14 @@ class Parameters(object):
         self.filename_weights       = self.model_name + "_weights_only" + self.weights_extension
         self.full_path_of_weights   = os.path.join(self.model_path, self.filename_weights)
 
+        # Best loss Weights .h5 file
+        self.filename_weights_loss       = self.model_name + "_best_loss" + self.weights_extension
+        self.full_path_of_weights_loss   = os.path.join(self.model_path, self.filename_weights)
+
+        # Best f_beta Weights .h5 file
+        self.filename_weights_fbeta       = self.model_name + "_best_fbeta" + self.weights_extension
+        self.full_path_of_weights_fbeta   = os.path.join(self.model_path, self.filename_weights)
+
         # Csv logger file to store the callback of the .fit function. It stores the history of the training session.
         self.history_extension      = ".csv"                 #Extension for history callback
         self.filename_history       = self.model_name + "_history" + self.history_extension

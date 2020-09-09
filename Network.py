@@ -88,12 +88,12 @@ class Network:
 
         # Make checkpoints based on the loss
         loss_checkpoint = ModelCheckpoint(
-            "best_loss.h5", monitor='val_loss', verbose=0, save_best_only=True,
+            self.params.full_path_of_weights_loss, monitor='val_loss', verbose=0, save_best_only=True,
             save_weights_only=False, mode='min'
         )
         # Make checkpoints based on the F-Beta score
         f_beta_checkpoint = ModelCheckpoint(
-            "best_f_beta.h5", monitor='val_f_beta', verbose=0, save_best_only=True,
+            self.params.full_path_of_weights_fbeta, monitor='val_f_beta', verbose=0, save_best_only=True,
             save_weights_only=False, mode='max'
         )
 
@@ -142,7 +142,7 @@ class Network:
                 # MODEL SELECTION
                 # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
                 # Not storing the network before 15 chunks have been trained on, seems like a reasonable efficiency heuristic. (under the assumption that each training chunk has dimensions: (65536,101,101,1))
-                if chunk_idx > 10 and history.history["val_loss"][0] < self.best_val_loss:    
+                if history.history["val_loss"][0] < self.best_val_loss:    
                     self.model.save_weights(self.params.full_path_of_weights)
                     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
@@ -253,7 +253,7 @@ class Network:
             self.acc.append(history.history["macro_f1"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_macro_f1"][0])
-        elif self.params.net_model_metrics == "macro_f1":
+        elif self.params.net_model_metrics == "f_beta":
             self.loss.append(history.history["loss"][0])
             self.acc.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
