@@ -149,13 +149,6 @@ class Network:
 
                 # Write results to csv file
                 writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
-                
-                # MODEL SELECTION
-                # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
-                # Not storing the network before 15 chunks have been trained on, seems like a reasonable efficiency heuristic. (under the assumption that each training chunk has dimensions: (65536,101,101,1))
-                # if history.history["val_loss"][0] < self.best_val_loss:    
-                #     self.model.save_weights(self.params.full_path_of_weights)
-                #     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
                 # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
                 if(psutil.virtual_memory().percent > 75.0):
