@@ -94,13 +94,12 @@ class ModelCheckpointYaml(ModelCheckpoint):
             self._maybe_remove_file()
 
 
+    # Store epoch and score/score in a yaml file if the score/score is better
     def _update_yaml(self):
         if self.best == float('inf'):
             return 
         self.mc_dict["epoch"] = self.epoch
         self.mc_dict[self.monitor] = float(self.best)
-        print(self.best)
-        print(type(self.best))
 
         f = open(self.mc_dict_filename, "w")
         yaml.dump(self.mc_dict, f)

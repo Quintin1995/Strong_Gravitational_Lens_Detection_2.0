@@ -16,6 +16,8 @@ import tensorflow as tf
 import time
 from utils import hms, plot_history
 from f_beta_metric import FBetaMetric
+import os
+from ModelCheckpointYaml import *
 
 class Network:
 
@@ -77,6 +79,21 @@ class Network:
         # Check if a model is set.
         assert self.model != None
 
+        # Model Checkpoints 
+        self.mc_loss = ModelCheckpointYaml(
+            self.params.full_path_of_weights_loss, monitor='val_loss',
+            verbose=1, save_best_only=True, mode='min',
+            save_weights_only=False,
+            mc_dict_filename=self.params.full_path_of_yaml_loss
+        )
+        self.mc_metric = ModelCheckpointYaml(
+            self.params.full_path_of_weights_metric, monitor='val_f_beta',
+            verbose=1, save_best_only=True, mode='max',
+            save_weights_only=False,
+            mc_dict_filename=self.params.full_path_of_yaml_metric
+        )
+
+
         # A printout of the model to a txt file
         if training:
             self.save_model_to_file()
@@ -86,20 +103,8 @@ class Network:
     # A csv writer is opened and being written into during training.
     def train(self):
 
-        # Make checkpoints based on the loss
-        loss_checkpoint = ModelCheckpoint(
-            self.params.full_path_of_weights_loss, monitor='val_loss', verbose=0, save_best_only=True,
-            save_weights_only=False, mode='min'
-        )
-        # Make checkpoints based on the F-Beta score
-        f_beta_checkpoint = ModelCheckpoint(
-            self.params.full_path_of_weights_fbeta, monitor='val_f_beta', verbose=0, save_best_only=True,
-            save_weights_only=False, mode='max'
-        )
-
         # Open a csv writer and write headers into it.
-        bufsize = 1
-        f = open(self.params.full_path_of_history, "w", bufsize)
+        f = open(self.params.full_path_of_history, "w", 1)
         writer = csv.writer(f)
 
         if self.metrics[0] == "binary_accuracy":
@@ -127,13 +132,14 @@ class Network:
                     batch_size=self.params.net_batch_size)
 
                 network_fit_time_start = time.time()
-                # Fit both generators (train and validation) on the model.
+                # Fit train generator on the model. And validate based on a validation chunk 
                 history = self.model.fit_generator(
                         train_generator_flowed,
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
                         validation_data=(X_validation_chunk, y_validation_chunk),
-                        callbacks=[f_beta_checkpoint, loss_checkpoint])
+                        callbacks=[self.mc_loss, self.mc_metric],
+                        verbose=0)
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
 
                 # Write results to csv file
