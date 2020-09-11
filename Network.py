@@ -79,16 +79,21 @@ class Network:
         # Check if a model is set.
         assert self.model != None
 
-        # Model Checkpoints 
+        # Model Checkpoints on validation loss and validation metric of interest.
         self.mc_loss = ModelCheckpointYaml(
-            self.params.full_path_of_weights_loss, monitor='val_loss',
-            verbose=1, save_best_only=True, mode='min',
+            self.params.full_path_of_weights_loss, 
+            monitor="val_loss",
+            verbose=1, save_best_only=True,
+            mode='min',
             save_weights_only=False,
             mc_dict_filename=self.params.full_path_of_yaml_loss
         )
         self.mc_metric = ModelCheckpointYaml(
-            self.params.full_path_of_weights_metric, monitor='val_f_beta',
-            verbose=1, save_best_only=True, mode='max',
+            self.params.full_path_of_weights_metric,
+            monitor = "val_" + self.params.net_model_metrics,
+            verbose=1, 
+            save_best_only=True, 
+            mode='max',
             save_weights_only=False,
             mc_dict_filename=self.params.full_path_of_yaml_metric
         )
@@ -118,7 +123,7 @@ class Network:
         begin_train_session = time.time()       # Records beginning of training time
         try:
             for chunk_idx in range(self.params.num_chunks):
-                print("chunk {}/{}".format(chunk_idx+1, self.params.num_chunks), flush=True)
+                print("========================================================\nchunk {}/{}".format(chunk_idx+1, self.params.num_chunks), flush=True)
 
                 # Load train chunk and targets
                 X_train_chunk, y_train_chunk = self.dg.load_chunk(self.params.chunksize, self.dg.Xlenses_train, self.dg.Xnegatives_train, self.dg.Xsources_train, self.params.data_type, self.params.mock_lens_alpha_scaling)
@@ -148,9 +153,9 @@ class Network:
                 # MODEL SELECTION
                 # It seems reasonalbe to assume that we don't want to store all the early models, due to having a lower validation score.
                 # Not storing the network before 15 chunks have been trained on, seems like a reasonable efficiency heuristic. (under the assumption that each training chunk has dimensions: (65536,101,101,1))
-                if history.history["val_loss"][0] < self.best_val_loss:    
-                    self.model.save_weights(self.params.full_path_of_weights)
-                    print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
+                # if history.history["val_loss"][0] < self.best_val_loss:    
+                #     self.model.save_weights(self.params.full_path_of_weights)
+                #     print("better validation: Saved model weights to: {}".format(self.params.full_path_of_weights), flush=True)
 
                 # Reset backend of tensorflow so that memory does not leak - Clear keras backend when at 75% usage.
                 if(psutil.virtual_memory().percent > 75.0):
@@ -164,8 +169,9 @@ class Network:
                 self.update_loss_and_acc(history)
                 
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
-                if chunk_idx % self.params.chunk_plot_interval == 0:
-                    plot_history(self.acc, self.val_metric, self.loss, self.val_loss, self.params)
+                if False:
+                    if chunk_idx % self.params.chunk_plot_interval == 0:
+                        plot_history(self.acc, self.val_metric, self.loss, self.val_loss, self.params)
 
         except KeyboardInterrupt:
             self.model.save_weights(self.params.full_path_of_weights)
@@ -200,7 +206,7 @@ class Network:
 
 
     def format_info_for_csv(self, chunk_idx, history, begin_train_session):
-        if self.metrics == "binary_accuracy":
+        if self.params.net_model_metrics == "binary_accuracy":
             return [str(chunk_idx),
                     str(history.history["loss"][0]),
                     str(history.history["binary_accuracy"][0]),
@@ -210,7 +216,7 @@ class Network:
                     str(psutil.cpu_percent()),
                     str(psutil.virtual_memory().percent),
                     str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
-        elif self.metrics == self.macro_f1:
+        elif self.params.net_model_metrics == "macro_f1":
             return [str(chunk_idx),
                     str(history.history["loss"][0]),
                     str(history.history["macro_f1"][0]),
