@@ -1,6 +1,5 @@
 import argparse
 from DataGenerator import DataGenerator
-import matplotlib.pyplot as plt
 from Network import Network
 import numpy as np
 from Parameters import Parameters
