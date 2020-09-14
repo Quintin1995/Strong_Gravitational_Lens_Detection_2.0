@@ -25,7 +25,7 @@ class FBetaMetric():
         """
         
         # Find all the actual positives for which the activation was higher than the specified cutoff
-        true_positives = tf.cast(tf.count_nonzero(K.greater_equal(K.clip(y_true * y_pred, 0, 1), cutoff)), tf.float32)
+        true_positives = tf.cast(tf.math.count_nonzero(K.greater_equal(K.clip(y_true * y_pred, 0, 1), cutoff)), tf.float32)
 
         # Get all actual positives
         possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
@@ -46,10 +46,10 @@ class FBetaMetric():
         """
 
         # Find all the actual positives for which the activation was higher than the specified cutoff
-        true_positives = tf.cast(tf.count_nonzero(K.greater_equal(K.clip(y_true * y_pred, 0, 1), cutoff)), tf.float32)
+        true_positives = tf.cast(tf.math.count_nonzero(K.greater_equal(K.clip(y_true * y_pred, 0, 1), cutoff)), tf.float32)
 
         # Get all predicted positives
-        predicted_positives = tf.cast(tf.count_nonzero(K.greater_equal(K.clip(y_pred, 0, 1), cutoff)), tf.float32)
+        predicted_positives = tf.cast(tf.math.count_nonzero(K.greater_equal(K.clip(y_pred, 0, 1), cutoff)), tf.float32)
 
         # Calculate the precision
         precision = true_positives / (predicted_positives + K.epsilon())

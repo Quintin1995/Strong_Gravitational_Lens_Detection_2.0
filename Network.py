@@ -162,7 +162,7 @@ class Network:
                 self.update_loss_and_acc(history)
                 
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
-                if False:
+                if self.params.verbatim:
                     if chunk_idx % self.params.chunk_plot_interval == 0:
                         plot_history(self.acc, self.val_metric, self.loss, self.val_loss, self.params)
 
