@@ -19,9 +19,13 @@ from f_beta_metric import FBetaMetric
 import os
 from ModelCheckpointYaml import *
 
+
+
 class Network:
 
     def __init__(self, params, datagenerator, training):
+
+        tf.compat.v1.disable_eager_execution()
 
         # Set parameters of the Network class
         print("---\nInitializing network #{}...".format(params.net_name), flush=True)

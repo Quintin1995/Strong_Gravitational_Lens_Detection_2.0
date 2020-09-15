@@ -10,6 +10,9 @@ class FBetaMetric():
         steps: Approximation quality, higher number is higher number of bins
     """
     def __init__(self, beta: float = 1, steps: int = 100):
+        
+        tf.compat.v1.disable_eager_execution()
+
         self.beta       = beta
         self.steps      = steps
 

@@ -6,6 +6,8 @@ from Parameters import Parameters
 import tensorflow as tf
 from utils import load_settings_yaml
 
+tf.compat.v1.disable_eager_execution()
+
 # Define ArgumentParser
 parser = argparse.ArgumentParser()
 parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/run.yaml", required=False)
