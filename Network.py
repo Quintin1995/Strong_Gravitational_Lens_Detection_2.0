@@ -179,9 +179,6 @@ class Network:
         end_train_session = time.time()
         f.close()               # Close the file handle
 
-        # Safe Model parameters to .h5 file after training.
-        self.model.save_weights(self.params.full_path_of_weights)
-        print("\nSaved weights to: {}".format(self.params.full_path_of_weights), flush=True)
         print("\nSaved results to: {}".format(self.params.full_path_of_history), flush=True)
         print("\nTotal time employed ", hms(end_train_session - begin_train_session), flush=True)
 
