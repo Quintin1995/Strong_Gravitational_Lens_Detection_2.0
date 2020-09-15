@@ -15,8 +15,24 @@ pip3 install -r requirements.txt
 ~~~
 python3 main.py --run=runs/experiment_folder/run.yaml
 ~~~
-
 Input parameters of a run can be set in the following file: runs/experiment_folder/run.yaml.
+
+
+## How to view Results
+If a run has completed, then a folder with a name such as: "/Strong_Gravitational_Lens_Detection_2.0/models/**09_14_2020_09h_48m_56s_name_of_run**/" has been created. If you want to compare models against each other than I recommend creating the following directory structure:
+~~~~
+models
+  experiment4_learning_rate
+    07_17_2020_13h_47m_10s_learning_rate_0001
+    07_17_2020_14h_13m_09s_learning_rate_001
+    07_19_2020_13h_54m_04s_learning_rate_00001
+~~~~
+These three models will be compared against each other by running the following:
+~~~~
+python3 compare_results.py
+~~~~
+This will take you through a dialog that will guide you in plotting results.
+
 
 ## Data
 Data can be requested.
