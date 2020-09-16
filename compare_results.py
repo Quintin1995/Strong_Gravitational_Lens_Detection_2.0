@@ -518,7 +518,7 @@ def main():
 
         ## 4.0 - Plot Error for all models given
         if not is_enrico_model_chosen and error_plot_dialog():
-            plot_errors(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 30.0, ylim_bottom=0.0)
+            plot_errors(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 100.0, ylim_bottom=0.0)
 
         ## 5.0 - Show the losses nicely for each model
         if not is_enrico_model_chosen and loss_plot_dialog():

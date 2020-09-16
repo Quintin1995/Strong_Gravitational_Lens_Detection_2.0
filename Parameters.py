@@ -77,7 +77,7 @@ class Parameters(object):
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
         if mode == "training":
             self.make_model_dir()       #create directory for all data concerning this model.
-        create_dir_if_not_exists(os.path.join(self.model_path, "checkpoints"))
+            create_dir_if_not_exists(os.path.join(self.model_path, "checkpoints"))
         
         # Weights .h5 file
         self.weights_extension      = ".h5"                 #Extension for saving weights
