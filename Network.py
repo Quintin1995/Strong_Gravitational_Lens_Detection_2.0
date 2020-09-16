@@ -102,7 +102,6 @@ class Network:
             mc_dict_filename=self.params.full_path_of_yaml_metric
         )
 
-
         # A printout of the model to a txt file
         if training:
             self.save_model_to_file()
@@ -147,9 +146,12 @@ class Network:
                         steps_per_epoch=len(X_train_chunk) / self.params.net_batch_size,
                         epochs=self.params.net_epochs,
                         validation_data=(X_validation_chunk, y_validation_chunk),
-                        callbacks=[self.mc_loss, self.mc_metric],
+                        callbacks=[self.mc_metric, self.mc_loss],
                         verbose=0)
                 print("Training on chunk took: {}".format(hms(time.time() - network_fit_time_start)), flush=True)
+
+                for pair in history.history.items():
+                    print(pair)                
 
                 # Write results to csv file
                 writer.writerow(self.format_info_for_csv(chunk_idx, history, begin_train_session))
