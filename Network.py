@@ -15,9 +15,10 @@ from tensorflow.keras import backend as K
 import tensorflow as tf
 import time
 from utils import hms, plot_history
-from f_beta_metric import FBetaMetric
 import os
 from ModelCheckpointYaml import *
+from f_beta_metric import FBetaMetric
+from f_beta_soft_metric import SoftFBeta
 
 
 
@@ -39,7 +40,6 @@ class Network:
         self.metrics = None
         self.f_beta_metric = None           # only used when validation loss is defined as f_beta.
         self.set_neural_network_metric()
-
 
         # Neural Network Train Metric
         self.loss_function = None
@@ -120,7 +120,9 @@ class Network:
         elif self.params.net_model_metrics == "macro_f1":
             writer.writerow(["chunk", "loss", "macro_f1", "val_loss", "val_macro_f1", "time", "cpu_percentage", "ram_usage", "available_mem"])
         elif self.params.net_model_metrics == "f_beta":
-            writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_f_beta", "time", "cpu_percentage", "ram_usage", "available_mem"])
+            writer.writerow(["chunk", "loss", "f_beta", "val_loss", "val_f_beta", "time", "cpu_percentage", "ram_usage", "available_mem"])
+        elif self.params.net_model_metrics == "f_beta_soft":
+            writer.writerow(["chunk", "loss", "f_beta_soft", "val_loss", "val_f_beta_soft", "time", "cpu_percentage", "ram_usage", "available_mem"])
 
         # Train the model
         begin_train_session = time.time()       # Records beginning of training time
@@ -232,6 +234,16 @@ class Network:
                     str(psutil.cpu_percent()),
                     str(psutil.virtual_memory().percent),
                     str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
+        elif self.params.net_model_metrics == "f_beta_soft":
+             return [str(chunk_idx),
+                    str(history.history["loss"][0]),
+                    str(history.history["binary_accuracy"][0]),
+                    str(history.history["val_loss"][0]),
+                    str(history.history["val_f_beta_soft"][0]),
+                    str(hms(time.time()-begin_train_session)),
+                    str(psutil.cpu_percent()),
+                    str(psutil.virtual_memory().percent),
+                    str(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)]
             
 
     # Resets the backend of keras. Everything regarding the model is stored into a folder,
@@ -266,7 +278,11 @@ class Network:
             self.acc.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_f_beta"][0])
-
+        elif self.params.net_model_metrics == "f_beta_soft":
+            self.loss.append(history.history["loss"][0])
+            self.acc.append(history.history["binary_accuracy"][0])
+            self.val_loss.append(history.history["val_loss"][0])
+            self.val_metric.append(history.history["val_f_beta_soft"][0])
 
 
     # Store Neural Network summary to file
@@ -298,6 +314,9 @@ class Network:
         elif self.params.net_model_metrics == "f_beta":
             self.f_beta_metric = FBetaMetric(beta = 0.17, steps = 50)
             self.metrics = ["binary_accuracy", self.f_beta_metric.f_beta]
+        elif self.params.net_model_metrics == "f_beta_soft":
+            self.f_beta_metric = SoftFBeta(beta = 0.17)
+            self.metrics = ["binary_accuracy", self.f_beta_metric.f_beta_soft]
         else:
             self.metrics = None
 
