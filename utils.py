@@ -10,7 +10,7 @@ import psutil
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
 def show_random_img_plt_and_stats(data_array, num_imgs, title):
     for _ in range(num_imgs):
-        random_idx = random.randint(0, data_array.shape[0])
+        random_idx = random.randint(0, data_array.shape[0]-1)
         img = np.squeeze(data_array[random_idx])                    #remove the color channel from the image for matplotlib
         print("\n")
         print(title + " image data type: {}".format(img.dtype.name), flush=True)
@@ -18,7 +18,7 @@ def show_random_img_plt_and_stats(data_array, num_imgs, title):
         print(title + " image min: {}".format(np.amin(img)), flush=True)
         print(title + " image max: {}".format(np.amax(img)), flush=True)
         plt.title(title)
-        plt.imshow(img, norm=None)
+        plt.imshow(img, origin='lower', interpolation='none', cmap=plt.cm.binary)
         plt.show()
 
 
