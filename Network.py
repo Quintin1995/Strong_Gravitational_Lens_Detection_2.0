@@ -92,15 +92,27 @@ class Network:
             save_weights_only=False,
             mc_dict_filename=self.params.full_path_of_yaml_loss
         )
-        self.mc_metric = ModelCheckpointYaml(
-            self.params.full_path_of_weights_metric,
-            monitor = "val_" + self.params.net_model_metrics,
-            verbose=1, 
-            save_best_only=True, 
-            mode='max',
-            save_weights_only=False,
-            mc_dict_filename=self.params.full_path_of_yaml_metric
-        )
+        if self.params.net_model_metrics == "f_beta_soft":
+            self.mc_metric = ModelCheckpointYaml(
+                self.params.full_path_of_weights_metric,
+                monitor = "val_" + self.params.net_model_metrics,
+                verbose=1, 
+                save_best_only=True, 
+                mode='min',
+                save_weights_only=False,
+                mc_dict_filename=self.params.full_path_of_yaml_metric
+            )
+        else:
+            self.mc_metric = ModelCheckpointYaml(
+                self.params.full_path_of_weights_metric,
+                monitor = "val_" + self.params.net_model_metrics,
+                verbose=1, 
+                save_best_only=True, 
+                mode='max',
+                save_weights_only=False,
+                mc_dict_filename=self.params.full_path_of_yaml_metric
+            )
+
 
         # A printout of the model to a txt file
         if training:
