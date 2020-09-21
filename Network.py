@@ -43,6 +43,7 @@ class Network:
 
         # Neural Network Train Metric
         self.loss_function = None
+        self.f_beta_soft_metric = None          # only used when f_beta_soft loss is used.
         self.set_loss_function()
         
         # Define network input/output dimensionality
@@ -134,7 +135,7 @@ class Network:
         elif self.params.net_model_metrics == "f_beta":
             writer.writerow(["chunk", "loss", "f_beta", "val_loss", "val_f_beta", "time", "cpu_percentage", "ram_usage", "available_mem"])
         elif self.params.net_model_metrics == "f_beta_soft":
-            writer.writerow(["chunk", "loss", "f_beta_soft", "val_loss", "val_f_beta_soft", "time", "cpu_percentage", "ram_usage", "available_mem"])
+            writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy", "time", "cpu_percentage", "ram_usage", "available_mem"])
 
         # Train the model
         begin_train_session = time.time()       # Records beginning of training time
@@ -251,7 +252,7 @@ class Network:
                     str(history.history["loss"][0]),
                     str(history.history["binary_accuracy"][0]),
                     str(history.history["val_loss"][0]),
-                    str(history.history["val_f_beta_soft"][0]),
+                    str(history.history["val_binary_accuracy"][0]),
                     str(hms(time.time()-begin_train_session)),
                     str(psutil.cpu_percent()),
                     str(psutil.virtual_memory().percent),
@@ -294,7 +295,7 @@ class Network:
             self.loss.append(history.history["loss"][0])
             self.acc.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
-            self.val_metric.append(history.history["val_f_beta_soft"][0])
+            self.val_metric.append(history.history["val_binary_accuracy"][0])
 
 
     # Store Neural Network summary to file
@@ -312,6 +313,9 @@ class Network:
             self.loss_function = self.macro_soft_f1
         elif self.params.net_loss_function == "macro_double_soft_f1":
             self.loss_function = self.macro_double_soft_f1
+        elif self.params.net_loss_function == "f_beta_soft_loss":
+            self.f_beta_soft_metric = SoftFBeta(beta = 0.17)
+            self.loss_function = self.f_beta_soft_metric.f_beta_soft
         else:
             print("No valid loss function has been selected.")
             self.loss_function = None
@@ -328,7 +332,7 @@ class Network:
             self.metrics = ["binary_accuracy", self.f_beta_metric.f_beta]
         elif self.params.net_model_metrics == "f_beta_soft":
             self.f_beta_metric = SoftFBeta(beta = 0.17)
-            self.metrics = ["binary_accuracy", self.f_beta_metric.f_beta_soft]
+            self.metrics = ["binary_accuracy"]
         else:
             self.metrics = None
 
