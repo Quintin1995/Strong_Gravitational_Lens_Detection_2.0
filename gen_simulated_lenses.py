@@ -93,7 +93,7 @@ def show_img_grid(data_array, iterations=1, columns=4, rows=4, seed=None, titles
     for _ in range(iterations):
         rand_idxs = [random.choice(list(range(data_array.shape[0]))) for x in range(img_count)]
 
-        fig=plt.figure(figsize=(8, 8))
+        fig=plt.figure()
         fig.suptitle(fig_title, fontsize=16)
 
         for idx, i in enumerate(range(1, columns*rows +1)):
@@ -294,8 +294,8 @@ def show_comparing_img_grid(data_array1, data_array2, iterations=1, name1="ar1",
             else:
                 ax.set_title(titles[rand_idxs[idx]])
             img = np.squeeze(data_array[rand_idxs[idx]])
-            # plt.imshow(img, origin='lower', interpolation='none', cmap='gray')
-            plt.imshow(img, cmap=plt.cm.binary)
+            plt.imshow(img, origin='lower', interpolation='none', cmap='gray')
+            # plt.imshow(img, cmap=plt.cm.binary)
 
         plt.show()
 
@@ -393,11 +393,11 @@ def remove_dirs(train_path, val_path, test_path):
 ##### Some parameters can be found as parameters in the code and not here yet.
 data_type               = np.float32     # Data type of all generated data arrays
 seed                    = 1234
-n_sam                   = 100          # Number of images
+n_sam                   = 250          # Number of images
 n_pix                   = 101            # Number of pixels
 
 show_comparing_plot     = True          # Whether you want to see the comparison between real lens and simulated lens
-show_comparing_plot_its = 1              # If the comparing plot is shown to the user. How many times do you want to see the plot?
+show_comparing_plot_its = 5              # If the comparing plot is shown to the user. How many times do you want to see the plot?
 
 # Normalization Parameters
 do_normalize            = False
@@ -443,8 +443,8 @@ if verbatim:
 
 ### 4 - Merge Centre Galaxy and Noise galaxies
 sgs = np.zeros((n_sam, n_pix, n_pix, 1), dtype=data_type)           #sgs = Simulated Galaxie(s)
-med   = 0.0232*10                                                      # Median of lenses - emperically determined
-sigma = 0.0096*2                                                      # Standard Deviation from Median - emperically determined
+med   = 0.0232                                                      # Median of lenses - emperically determined
+sigma = 0.0096                                                      # Standard Deviation from Median - emperically determined
 for i in range(cg.shape[0]):
     if do_add_emperical_noise:
         empericaly_noise = np.random.normal(loc=med, scale=sigma, size=(n_pix, n_pix, 1))           # Each black pixel in the image isnt black but nearly black. We sample from a normal distribution to get this nearly black value.

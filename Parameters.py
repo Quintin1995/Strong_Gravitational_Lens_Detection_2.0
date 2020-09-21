@@ -13,6 +13,7 @@ class Parameters(object):
         create_dir_if_not_exists("models")
         create_dir_if_not_exists("runs")
         create_dir_if_not_exists("slurms")
+        
 
         ##### Paths to data
         self.lenses_path_train     = settings["lenses_path_train"]
@@ -76,11 +77,14 @@ class Parameters(object):
         self.model_path             = os.path.join(self.root_dir_models, self.model_folder)     #path of model
         if mode == "training":
             self.make_model_dir()       #create directory for all data concerning this model.
+            create_dir_if_not_exists(os.path.join(self.model_path, "checkpoints"))
         
         # Weights .h5 file
         self.weights_extension      = ".h5"                 #Extension for saving weights
         self.filename_weights       = self.model_name + "_weights_only" + self.weights_extension
         self.full_path_of_weights   = os.path.join(self.model_path, self.filename_weights)
+
+        self.set_checkpoint_properties()
 
         # Csv logger file to store the callback of the .fit function. It stores the history of the training session.
         self.history_extension      = ".csv"                 #Extension for history callback
@@ -105,8 +109,10 @@ class Parameters(object):
         self.neural_net_txt_printout = "neural_net_printout.txt"
         self.full_path_neural_net_printout = os.path.join(self.model_path, self.neural_net_txt_printout)
 
-        # Plot parameters
+        # Plot parameter
         self.chunk_plot_interval   = settings["chunk_plot_interval"]
+        
+        # Save interval
         self.chunk_save_interval   = settings["chunk_save_interval"]
 
         # Validation chunk size - Number of validation images that will be tested during training. (per chunk)
@@ -121,6 +127,25 @@ class Parameters(object):
 
             #store all parameters of this object into a json file
             self.write_parameters_to_file()
+
+
+    # Model Storage with checkpoints and a reference with a .yaml file, from which epoch the model is.
+    def set_checkpoint_properties(self):
+        # Best validation loss Weights .h5 file
+        self.filename_weights_loss         = self.model_name + "_best_val_loss" + self.weights_extension
+        self.full_path_of_weights_loss     = os.path.join(self.model_path, "checkpoints", self.filename_weights_loss)
+
+        # Best validation metric Weights .h5 file (metric can be binary accuracy or f1 score or the fbeta score.)
+        self.filename_weights_metric       = self.model_name + "_best_val_metric" + self.weights_extension
+        self.full_path_of_weights_metric   = os.path.join(self.model_path, "checkpoints", self.filename_weights_metric)
+        
+        # Best validation loss .yaml file, stores loss and epoch number
+        self.filename_yaml_loss            = self.model_name + "_best_val_loss.yaml"
+        self.full_path_of_yaml_loss        = os.path.join(self.model_path, "checkpoints", self.filename_yaml_loss)
+
+        # Best validation metric .yaml, stores score and epoch number
+        self.filename_yaml_metric          = self.model_name + "_best_val_metric.yaml"
+        self.full_path_of_yaml_metric      = os.path.join(self.model_path, "checkpoints", self.filename_yaml_metric)
 
 
     # Create a folder where all model input/ouput is stored.

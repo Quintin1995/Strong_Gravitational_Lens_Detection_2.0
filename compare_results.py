@@ -103,7 +103,10 @@ def get_h5s_paths(models):
     for idx, model in enumerate(models):
         if verbatim:
             print("Model: {} - h5 file".format(idx))
-        h5_path = glob.glob(model + "/*.h5")[0]
+        try:
+            h5_path = glob.glob(model + "/*/*_val_metric.h5")[0]
+        except:
+            h5_path = glob.glob(model + "/*.h5")[0]
         paths_h5s.append(h5_path)
     return paths_h5s
 
@@ -475,6 +478,7 @@ json_comp_key           = "model_name"              # is the label in generated 
 verbatim                = False
 
 #Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing wilload
+smooth_fac = 0.5
 
 ### Error Plot of given Models
 ytop                    = 100.0    # Error plot y upper-limit in percentage
@@ -514,7 +518,7 @@ def main():
 
         ## 4.0 - Plot Error for all models given
         if not is_enrico_model_chosen and error_plot_dialog():
-            plot_errors(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 16.0, ylim_bottom=ybottom)
+            plot_errors(models_paths_list, dfs, jsons, json_comp_key, smooth_fac=smooth_fac, ylim_top = 100.0, ylim_bottom=0.0)
 
         ## 5.0 - Show the losses nicely for each model
         if not is_enrico_model_chosen and loss_plot_dialog():

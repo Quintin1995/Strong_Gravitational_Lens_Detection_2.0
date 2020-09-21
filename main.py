@@ -1,11 +1,12 @@
 import argparse
 from DataGenerator import DataGenerator
-import matplotlib.pyplot as plt
 from Network import Network
 import numpy as np
 from Parameters import Parameters
 import tensorflow as tf
 from utils import load_settings_yaml
+
+tf.compat.v1.disable_eager_execution()
 
 # Define ArgumentParser
 parser = argparse.ArgumentParser()
