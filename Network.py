@@ -96,7 +96,7 @@ class Network:
         if self.params.net_model_metrics == "f_beta_soft":
             self.mc_metric = ModelCheckpointYaml(
                 self.params.full_path_of_weights_metric,
-                monitor = "val_" + self.params.net_model_metrics,
+                monitor = "val_binary_accuracy",
                 verbose=1, 
                 save_best_only=True, 
                 mode='min',
