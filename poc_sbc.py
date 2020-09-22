@@ -45,7 +45,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 
 # 4.0 - Create Custom Data Generator
-mul = 4
+mul = 7
 random.seed(325*mul)
 np.random.seed(789*mul)
 dg = DataGenerator(params)
@@ -62,47 +62,53 @@ if False:
     plt.show()
 
 
-# 6.0 - Create max Tree from image
-# 6.1 - Convert img format and plot
-img = np.clip(np.squeeze(x[3,:]) * 255, 0, 255)
-img = img.astype('uint16')
-plt.figure()
-plt.imshow(img, cmap='Greys_r')
 
-# 6.2 - Do smt here that i don't understand yet.
-Bc = np.ones((15,15), dtype=bool)
-    #structuring element, connectivity -8
-t = time.time()
-mxt = siamxt.MaxTreeAlpha(img, Bc)
-t = time.time() -t
+filter_kernels = [(3,3),(5,5),(7,7),(9,9),(11,11),(13,13),(15,15),(17,17) ]
 
-# Size and shape threshold
-Wmin,Wmax = 3,60
-Hmin,Hmax = 3,60
-rr = 0.45
+for i in range(x.shape[0]):
+    # 6.1 - Convert img format and plot
+    img = np.clip(np.squeeze(x[i,:]) * 255, 0, 255)
+    img = img.astype('uint16')
 
-# Computing bouding-box lengths from the
-# attributes stored in NA
-dx = mxt.node_array[7,:] - mxt.node_array[6,:]
-dy = mxt.node_array[10,:] - mxt.node_array[9,:]
-area = mxt.node_array[3,:]
-RR = 1.0 * area / (dx*dy)
+    for j in range(len(filter_kernels)):
+        # 6.2 - Do smt here that i don't understand yet.
+        print("kernel = " + str(filter_kernels[j]))
+        Bc = np.ones(filter_kernels[j], dtype=bool)
+            #structuring element, connectivity -8
+        t = time.time()
+        mxt = siamxt.MaxTreeAlpha(img, Bc)
+        t = time.time() - t
 
-# Selecting nodes that fit the criteria
-nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & (RR>rr)
+        # Size and shape threshold
+        Wmin,Wmax = 3,60
+        Hmin,Hmax = 3,60
+        rr = 0.45
 
-# Filtering
-mxt.contractDR(nodes)
-print("Max-tree build time: %fs" %t)
-print("Number of max-tree nodes: %d" %mxt.node_array.shape[1])
-print("Number of max-tree leaves: %d" %(mxt.node_array[1,:] == 0).sum())
-img_filtered = mxt.getImage()
-plt.figure()
-plt.imshow(img_filtered, cmap='Greys_r')
-plt.show()
+        # Computing bouding-box lengths from the
+        # attributes stored in NA
+        dx = mxt.node_array[7,:] - mxt.node_array[6,:]
+        dy = mxt.node_array[10,:] - mxt.node_array[9,:]
+        area = mxt.node_array[3,:]
+        RR = 1.0 * area / (dx*dy)
 
+        # Selecting nodes that fit the criteria
+        nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & (RR>rr)
 
-print("shape mxt = ", str(mxt.node_array.shape))
+        # Filtering
+        mxt.contractDR(nodes)
+        print("Max-tree build time: %fs" %t)
+        print("Number of max-tree nodes: %d" %mxt.node_array.shape[1])
+        print("Number of max-tree leaves: %d" %(mxt.node_array[1,:] == 0).sum())
+        img_filtered = mxt.getImage()
 
+        imgs = [img, img_filtered]
 
-x = 2
+        print("shape mxt = ", str(mxt.node_array.shape))
+        fig=plt.figure(figsize=(8,8))
+        columns = 2
+        rows = 1
+        for i in range(1, columns*rows +1):
+            fig.add_subplot(rows, columns, i)
+            plt.imshow(imgs[i-1], cmap='Greys_r')
+            plt.title("kernel = {}".format(filter_kernels[j]))
+        plt.show()
