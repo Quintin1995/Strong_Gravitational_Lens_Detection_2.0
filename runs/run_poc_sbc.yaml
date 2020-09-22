@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "f_beta"    # String
+model_name: "test"    # String
 
 # Loading the input data
 fraction_to_load_sources_train  : 0.01     #float # range = [0,1]  train
