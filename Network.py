@@ -99,7 +99,7 @@ class Network:
                 monitor = "val_binary_accuracy",
                 verbose=1, 
                 save_best_only=True, 
-                mode='min',
+                mode='max',
                 save_weights_only=False,
                 mc_dict_filename=self.params.full_path_of_yaml_metric
             )
