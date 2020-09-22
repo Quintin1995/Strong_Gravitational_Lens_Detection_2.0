@@ -31,12 +31,11 @@ def show2Imgs(img1_numpy, img2_numpy, img1_title, img2_title):
 
     plt.figure()
     plt.subplot(1, 2, 1)
-    plt.imshow(img1_numpy, norm=None)
+    plt.imshow(img1_numpy,cmap='Greys_r')
     plt.title(img1_title)
     plt.subplot(1, 2, 2)
-    plt.imshow(img2_numpy, norm=None)
+    plt.imshow(img2_numpy, cmap='Greys_r')
     plt.title(img2_title)
-    plt.show()
 
 
 # One imshow, Un-Normalized.

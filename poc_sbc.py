@@ -45,7 +45,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 
 # 4.0 - Create Custom Data Generator
-mul = 7
+mul = 93
 random.seed(325*mul)
 np.random.seed(789*mul)
 dg = DataGenerator(params)
@@ -53,7 +53,7 @@ dg = DataGenerator(params)
 
 # 5.0 - Create Data
 x, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg.Xsources_train, params.data_type, params.mock_lens_alpha_scaling)
-
+print(y)
 
 # 5.1 - Visualize some data
 if False:
@@ -61,9 +61,12 @@ if False:
     plt.imshow(np.squeeze(x[0]), origin='lower', interpolation='none', cmap=plt.cm.binary)
     plt.show()
 
-
-
-filter_kernels = [(3,3),(5,5),(7,7),(9,9),(11,11),(13,13),(15,15),(17,17) ]
+# Possibilities for filter kernels:
+# Observations: 
+# (3,3) is to small, to many artifacts, due to noise
+# (13,13) is to big, some lensing features might disappear
+filter_kernels = [(5,5),(7,7),(9,9),(11,11)]
+# filter_kernels = [(4,4),(6,6),(8,8),(10,10),(12,12),(14,14),(16,16),(18,18),(20,20)]
 
 for i in range(x.shape[0]):
     # 6.1 - Convert img format and plot
@@ -103,7 +106,7 @@ for i in range(x.shape[0]):
 
         imgs = [img, img_filtered]
 
-        print("shape mxt = ", str(mxt.node_array.shape))
+        print("shape mxt = ", str(mxt.node_array))
         fig=plt.figure(figsize=(8,8))
         columns = 2
         rows = 1

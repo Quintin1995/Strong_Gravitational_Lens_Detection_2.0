@@ -307,9 +307,9 @@ class DataGenerator:
         # mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
         mock_lens = mock_lens.clip(min=0.0, max=1.0)
 
-        # if show_imgs:
+        # if True:
         #     show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
-        #     show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
+            # show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
 
         return mock_lens
 
