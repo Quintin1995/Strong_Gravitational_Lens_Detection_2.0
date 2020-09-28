@@ -81,30 +81,28 @@ for i in range(x.shape[0]):
     # Size and shape threshold
     Wmin,Wmax = 3,60
     Hmin,Hmax = 3,60
-    # rr = 0.45
+    rr = 0.45
+
+    #area filter
+    area = 35
+    mxt.areaOpen(area)
+
 
     # Computing bouding-box lengths from the
     # attributes stored in NA
     dx = mxt.node_array[7,:] - mxt.node_array[6,:]
     dy = mxt.node_array[10,:] - mxt.node_array[9,:]
-    area = mxt.node_array[3,:]
-    # RR = 1.0 * area / (dx*dy)
+    RR = 1.0 * area / (dx*dy)
 
+    # extinction filter
     # Computes the area extinction values
-    area_ext = mxt.computeExtinctionValues(area,"area")
-
-    # Applies the  area extinction filter
-    n=10
-    mxt.extinctionFilter(area_ext, n)
-    
-    # Filter based on area
-    # areas = [10, 15, 20, 25, 30, 35, 40, 45, 50]
-    # for area in areas:
-    # area = 25
-    # mxt.areaOpen(area)
+    n = 1
+    area = mxt.node_array[3,:]
+    area_ext = mxt.computeExtinctionValues(area, "area")
+    mxt.extinctionFilter(area_ext,n)
 
     # Selecting nodes that fit the criteria
-    nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax)# & (RR>rr)
+    nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & ((RR>1.1) | (RR<0.9))
 
     # # Filtering
     mxt.contractDR(nodes)
@@ -121,5 +119,5 @@ for i in range(x.shape[0]):
     for j in range(1, columns*rows +1):
         fig.add_subplot(rows, columns, j)
         plt.imshow(imgs[j-1], cmap='Greys_r')
-    plt.title("label = {}".format(y[i]))
+    plt.title("label = {}\nimage index={}".format(y[i], i))
     plt.show()
