@@ -13,6 +13,14 @@ import matplotlib.pyplot as plt
 # Proof of concept of surface brightness contouring
 
 
+def scale_img_dist_from_centre(img, scale_fac):
+    nx, ny = img.shape
+    x = np.arange(nx) - (nx-1)/2.  # x an y so they are distance from center, assuming array is "nx" long (as opposed to 1. which is the other common choice)
+    y = np.arange(ny) - (ny-1)/2.
+    X, Y = np.meshgrid(x, y)
+    d = np.sqrt(X**2 + Y**2)
+    return img * np.exp(-1*d/25)
+
 
 def apply_gaussian_kernel(numpy_array, kernel = None):
     if kernel == None:
@@ -84,22 +92,23 @@ for i in range(x.shape[0]):
     rr = 0.45
 
     #area filter
-    area = 35
+    area = 45
     mxt.areaOpen(area)
-
 
     # Computing bouding-box lengths from the
     # attributes stored in NA
     dx = mxt.node_array[7,:] - mxt.node_array[6,:]
     dy = mxt.node_array[10,:] - mxt.node_array[9,:]
     RR = 1.0 * area / (dx*dy)
+    # cx = mxt.node_array[6,:] + dx/2
+    # cy = mxt.node_array[9,:] + dy/2
 
     # extinction filter
     # Computes the area extinction values
-    n = 1
-    area = mxt.node_array[3,:]
-    area_ext = mxt.computeExtinctionValues(area, "area")
-    mxt.extinctionFilter(area_ext,n)
+    # n = 1
+    # area = mxt.node_array[3,:]
+    # area_ext = mxt.computeExtinctionValues(area, "area")
+    # mxt.extinctionFilter(area_ext,n)
 
     # Selecting nodes that fit the criteria
     nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & ((RR>1.1) | (RR<0.9))
@@ -110,6 +119,8 @@ for i in range(x.shape[0]):
     print("Number of max-tree nodes: %d" %mxt.node_array.shape[1])
     print("Number of max-tree leaves: %d" %(mxt.node_array[1,:] == 0).sum())
     img_filtered = mxt.getImage()
+
+    img_filtered = scale_img_dist_from_centre(img_filtered, scale_fac=20)
 
     imgs = [img, img_filtered]
 
