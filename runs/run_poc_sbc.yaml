@@ -18,7 +18,7 @@ normalize: "per_image"        #options = {"None", "per_image", "per_array", "ada
 
 # Chunk Parameters
 num_chunks: 100                      #int # Number of chunks to be generated 
-chunksize : 20                      #int # The number of images that will fit into one chunk
+chunksize : 50                      #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 100               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
@@ -44,6 +44,8 @@ es_patience      : 75                       #int# Early Stopping Patience if the
 lenses_path_train   : "data/train/lenses/"
 negatives_path_train: "data/train/negatives/"
 sources_path_train  : "data/small_sources_set/"
+# sources_path_train  : "data/train/sources/"
+
 
 lenses_path_validation   : "data/validation/lenses/"
 negatives_path_validation: "data/validation/negatives/"
