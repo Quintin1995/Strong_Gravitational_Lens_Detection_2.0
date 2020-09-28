@@ -18,7 +18,7 @@ normalize: "per_image"        #options = {"None", "per_image", "per_array", "ada
 
 # Chunk Parameters
 num_chunks: 100                      #int # Number of chunks to be generated 
-chunksize : 10                      #int # The number of images that will fit into one chunk
+chunksize : 20                      #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 100               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.

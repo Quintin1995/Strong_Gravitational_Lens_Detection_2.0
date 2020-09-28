@@ -45,15 +45,17 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 
 # 4.0 - Create Custom Data Generator
-mul = 93
-random.seed(325*mul)
-np.random.seed(789*mul)
+if True:
+    mul = 7
+    random.seed(325*mul)
+    np.random.seed(789*mul)
 dg = DataGenerator(params)
 
 
 # 5.0 - Create Data
 x, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg.Xsources_train, params.data_type, params.mock_lens_alpha_scaling)
 print(y)
+print(y.shape)
 
 # 5.1 - Visualize some data
 if False:
@@ -61,57 +63,63 @@ if False:
     plt.imshow(np.squeeze(x[0]), origin='lower', interpolation='none', cmap=plt.cm.binary)
     plt.show()
 
-# Possibilities for filter kernels:
-# Observations: 
-# (3,3) is to small, to many artifacts, due to noise
-# (13,13) is to big, some lensing features might disappear
-filter_kernels = [(5,5),(7,7),(9,9),(11,11)]
-# filter_kernels = [(4,4),(6,6),(8,8),(10,10),(12,12),(14,14),(16,16),(18,18),(20,20)]
+#structuring element, connectivity -8
+Bc8 = np.ones(shape=(3,3), dtype=bool)
+Bc4 = np.array([[False,True,False],
+                  [True,True,True],
+                  [False,True,False]], dtype=bool)
 
 for i in range(x.shape[0]):
     # 6.1 - Convert img format and plot
     img = np.clip(np.squeeze(x[i,:]) * 255, 0, 255)
     img = img.astype('uint16')
 
-    for j in range(len(filter_kernels)):
-        # 6.2 - Do smt here that i don't understand yet.
-        print("kernel = " + str(filter_kernels[j]))
-        Bc = np.ones(filter_kernels[j], dtype=bool)
-            #structuring element, connectivity -8
-        t = time.time()
-        mxt = siamxt.MaxTreeAlpha(img, Bc)
-        t = time.time() - t
+    t = time.time()
+    mxt = siamxt.MaxTreeAlpha(img, Bc8)
+    t = time.time() - t
 
-        # Size and shape threshold
-        Wmin,Wmax = 3,60
-        Hmin,Hmax = 3,60
-        rr = 0.45
+    # Size and shape threshold
+    Wmin,Wmax = 3,60
+    Hmin,Hmax = 3,60
+    # rr = 0.45
 
-        # Computing bouding-box lengths from the
-        # attributes stored in NA
-        dx = mxt.node_array[7,:] - mxt.node_array[6,:]
-        dy = mxt.node_array[10,:] - mxt.node_array[9,:]
-        area = mxt.node_array[3,:]
-        RR = 1.0 * area / (dx*dy)
+    # Computing bouding-box lengths from the
+    # attributes stored in NA
+    dx = mxt.node_array[7,:] - mxt.node_array[6,:]
+    dy = mxt.node_array[10,:] - mxt.node_array[9,:]
+    area = mxt.node_array[3,:]
+    # RR = 1.0 * area / (dx*dy)
 
-        # Selecting nodes that fit the criteria
-        nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & (RR>rr)
+    # Computes the area extinction values
+    area_ext = mxt.computeExtinctionValues(area,"area")
 
-        # Filtering
-        mxt.contractDR(nodes)
-        print("Max-tree build time: %fs" %t)
-        print("Number of max-tree nodes: %d" %mxt.node_array.shape[1])
-        print("Number of max-tree leaves: %d" %(mxt.node_array[1,:] == 0).sum())
-        img_filtered = mxt.getImage()
+    # Applies the  area extinction filter
+    n=10
+    mxt.extinctionFilter(area_ext, n)
+    
+    # Filter based on area
+    # areas = [10, 15, 20, 25, 30, 35, 40, 45, 50]
+    # for area in areas:
+    # area = 25
+    # mxt.areaOpen(area)
 
-        imgs = [img, img_filtered]
+    # Selecting nodes that fit the criteria
+    nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax)# & (RR>rr)
 
-        print("shape mxt = ", str(mxt.node_array))
-        fig=plt.figure(figsize=(8,8))
-        columns = 2
-        rows = 1
-        for i in range(1, columns*rows +1):
-            fig.add_subplot(rows, columns, i)
-            plt.imshow(imgs[i-1], cmap='Greys_r')
-            plt.title("kernel = {}".format(filter_kernels[j]))
-        plt.show()
+    # # Filtering
+    mxt.contractDR(nodes)
+    print("Max-tree build time: %fs" %t)
+    print("Number of max-tree nodes: %d" %mxt.node_array.shape[1])
+    print("Number of max-tree leaves: %d" %(mxt.node_array[1,:] == 0).sum())
+    img_filtered = mxt.getImage()
+
+    imgs = [img, img_filtered]
+
+    fig=plt.figure(figsize=(8,8))
+    columns = 2
+    rows = 1
+    for j in range(1, columns*rows +1):
+        fig.add_subplot(rows, columns, j)
+        plt.imshow(imgs[j-1], cmap='Greys_r')
+    plt.title("label = {}".format(y[i]))
+    plt.show()
