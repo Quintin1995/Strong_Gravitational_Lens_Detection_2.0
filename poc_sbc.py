@@ -11,19 +11,28 @@ from utils import load_settings_yaml, show_random_img_plt_and_stats
 import matplotlib.pyplot as plt
 from skimage.segmentation import flood, flood_fill
 
-
+# Perform the floodfill operation on pixel (20,20)
 def do_floodfill(img, tolerance=0):
     filled_img = flood_fill(img, (20, 20), 0, tolerance=tolerance)
     return filled_img
 
 
+# Scale brightness of pixel based on the distance from centre of the image
+# According to the following formula: e^(-distance/x_scale), which is exponential decay
 def scale_img_dist_from_centre(img, x_scale):
+
+    # Image dimensions
     nx, ny = img.shape
-    x = np.arange(nx) - (nx-1)/2.  # x an y so they are distance from center, assuming array is "nx" long (as opposed to 1. which is the other common choice)
+
+    # x and y distnace vectors from center of the image
+    x = np.arange(nx) - (nx-1)/2. 
     y = np.arange(ny) - (ny-1)/2.
+
+    # Calculate distance 2d matrix from centre
     X, Y = np.meshgrid(x, y)
     d = np.sqrt(X**2 + Y**2)
-    return img * np.exp(-1*d/x_scale)
+
+    return (img * np.exp(-1*d/x_scale)).astype(int)
 
 
 def apply_gaussian_kernel(numpy_array, kernel = None):
@@ -63,7 +72,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Create Custom Data Generator
 if True:
-    mul = 7
+    mul = 75
     random.seed(325*mul)
     np.random.seed(789*mul)
 dg = DataGenerator(params)

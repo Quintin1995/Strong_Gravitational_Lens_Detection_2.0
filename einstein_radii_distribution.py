@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pyfits
 from scipy import ndimage
 import scipy
+from scipy import signal
 
 def compute_PSF_r():
     ## This piece of code is needed for some reason that i will try to find out later.
@@ -90,8 +91,8 @@ def fill_dataframe(df, paths):
 ##################### script #####################
 
 # Set paths
-path = os.path.join("data", "train", "sources")
 path = os.path.join("data", "small_sources_set")
+path = os.path.join("data", "train", "sources")
 
 # Find all relevant files in subfolders
 paths = glob.glob(os.path.join(path, "*/*.fits"))
@@ -111,13 +112,24 @@ print(max_row)
 print(type(max_row))
 img = fits.getdata(max_row["path"]).astype(np.float32)
 PSF_r = compute_PSF_r()
-img = scipy.signal.fftconvolve(img, PSF_r, mode="same")
+img = signal.fftconvolve(img, PSF_r, mode="same")
 plt.imshow(img, origin='lower', interpolation='none', cmap=plt.cm.binary)
 plt.show()
 
 # What is the size of this sources in terms of pixels?
+# dx=(15,80)=65
+# dy=(24,75)=51
+# Observing the plot from the previous question:        (assuming circularity)
+# In order to get a circular mask that encompases all possible lenses we need to take max(dx,dy) as diameter of circular mask
 
-# plot distribution of certain parameter in dataframe
+# plot distribution of certain parameter in dataframe?
+# Einstein Radius
+LENSER = list(df['LENSER'])
+plt.hist(LENSER, bins=30)
+plt.title("Histogram of Einstein radii")
+plt.xlabel("Einstein radii")
+plt.ylabel("count")
+plt.show()
 
 
 hfjdks=5
