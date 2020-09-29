@@ -8,18 +8,25 @@ import psutil
 
 
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
-def show_random_img_plt_and_stats(data_array, num_imgs, title):
+def show_random_img_plt_and_stats(data_array, num_imgs=1, title="title", do_plot=True, do_seed=False, seed=7846):
     for _ in range(num_imgs):
+        if do_seed:
+            random.seed(seed)
         random_idx = random.randint(0, data_array.shape[0]-1)
-        img = np.squeeze(data_array[random_idx])                    #remove the color channel from the image for matplotlib
+        img = np.squeeze(data_array[random_idx])                    # Remove the color channel from the image
+        
+        fig=plt.figure()
         print("\n")
         print(title + " image data type: {}".format(img.dtype.name), flush=True)
         print(title + " image shape: {}".format(img.shape), flush=True)
         print(title + " image min: {}".format(np.amin(img)), flush=True)
         print(title + " image max: {}".format(np.amax(img)), flush=True)
         plt.title(title)
-        plt.imshow(img, origin='lower', interpolation='none', cmap=plt.cm.binary)
-        plt.show()
+        plt.imshow(img, origin='lower', interpolation='none', cmap='Greys_r')
+        if do_plot:
+            plt.show()
+
+
 
 
 # Show 2 images next to each other. Squeeze out the color channel if it exist and it is equal to 1.
@@ -181,4 +188,13 @@ def smooth_curve(points, factor=0.9):
 #         show2Imgs(pos_img, neg_img, "pos max pixel: {0:.3f}".format(np.amax(pos_img)), "neg max pixel: {0:.3f}".format(np.amax(neg_img)))
 #####################################3
 
-
+#####################################3
+# fig=plt.figure(figsize=(8,8))
+# columns = 2
+# rows = 1
+# for j in range(1, columns*rows +1):
+#     fig.add_subplot(rows, columns, j)
+#     plt.imshow(imgs[j-1], cmap='Greys_r')
+# plt.title("label = {}\nimage index={}".format(y[i], i))
+# plt.show()
+# #####################################3

@@ -64,17 +64,23 @@ def apply_gaussian_kernel(numpy_array, kernel = None):
 #   tolerance are floodfilled. The higher the value the more pixels are filled up.
 # Segmentations obtained with the max-tree and post processing (sgf) are used as mask for
 # the original image.
-def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False, do_sgf=False, x_scale=30, tolerance=20):
+def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False, do_sgf=False, x_scale=30, tolerance=20, area_th=45):
 
     #structuring element, connectivity 8, for each pixel all 8 surrounding pixels are considered.
     connectivity_kernel = np.ones(shape=(3,3), dtype=bool)
 
-    # Size and shape threshold
-    Wmin,Wmax = 3,60            # Emperically determined
-    Hmin,Hmax = 3,60            # Emperically determined
-    area_threshold = 45         # Emperically Determined
-    t = time.time()
-    numpy_array_copy = np.copy(numpy_array)
+    # Bounding-box criteria, Area size threshold, Squeare crop size
+    Wmin,Wmax           = 3,60                  # Emperically determined (ED)
+    Hmin,Hmax           = 3,60                  # ED
+    area_threshold      = area_th               # ED: size of a component
+    square_crop_size    = 73
+    t                   = time.time()           # record time
+
+    # create array where filtered data will be stored
+    if do_square_crop:
+        f_dat = np.zeros((numpy_array.shape[0], square_crop_size, square_crop_size, 1), dtype='uint16')
+    else:
+        f_dat = np.zeros((numpy_array.shape[0], numpy_array.shape[1], numpy_array.shape[2], 1), dtype='uint16')
 
     # loop over all images
     for i in range(numpy_array.shape[0]):
@@ -91,7 +97,7 @@ def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False
         # Computing boudingbox
         dx = mxt.node_array[7,:] - mxt.node_array[6,:]   # These specific idxs were predetermined, by the author of the package.
         dy = mxt.node_array[10,:] - mxt.node_array[9,:]  # These specific idxs were predetermined, by the author of the package.
-        RR = 1.0 * area / (dx*dy)                        # Rectangularity
+        RR = 1.0 * area_threshold / (dx*dy)                        # Rectangularity
 
         # Filter - Selecting nodes that fit the criteria
         nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & ((RR>1.1) | (RR<0.9))  #Emperically determined
@@ -100,16 +106,16 @@ def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False
         # Get the image from the max-tree data structure
         img_filtered = mxt.getImage()
 
-        # Filter
+        # Custom filter
         if do_sgf:
             img_filtered = scale_img_dist_from_centre(img_filtered, x_scale=x_scale)
             img_filtered = apply_gaussian_kernel(img_filtered)
             img_filtered = do_floodfill(img_filtered, tolerance=tolerance)
         
-        numpy_array_copy[i] = np.expand_dims(img_filtered, axis=2) 
+        f_dat[i] = np.expand_dims(img_filtered, axis=2) 
         
-    print("\nmax tree segmenter time: %fs\n" %(time.time() - t))
-    return numpy_array_copy
+    print("\nmax tree segmenter time: {:.01f}s, filtered data shape={}\n".format(time.time() - t, f_dat.shape), flush=True)
+    return f_dat
 
 
 
@@ -145,62 +151,9 @@ x, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg
 print(y)
 print(y.shape)
 
+seg_dat = max_tree_segmenter(x, do_square_crop=False, do_circular_crop=False, do_sgf=True, x_scale=30, tolerance=20, area_th=45)
+show_random_img_plt_and_stats(x, num_imgs=1, title="dat", do_plot=False, do_seed=True, seed=7846)
+show_random_img_plt_and_stats(seg_dat, num_imgs=1, title="seg dat", do_plot=False, do_seed=True, seed=7846)
+plt.show()
 
-#structuring element, connectivity -8
-Bc8 = np.ones(shape=(3,3), dtype=bool)
 
-for i in range(x.shape[0]):
-    # 6.1 - Convert img format and plot
-    img = np.clip(np.squeeze(x[i,:]) * 255, 0, 255)
-    img = img.astype('uint16')
-
-    t = time.time()
-    mxt = siamxt.MaxTreeAlpha(img, Bc8)
-    t = time.time() - t
-
-    # Size and shape threshold
-    Wmin,Wmax = 3,60
-    Hmin,Hmax = 3,60
-    rr = 0.45
-
-    # Filter 1
-    # Area filter
-    area = 45
-    mxt.areaOpen(area)
-
-    # Computing bouding-box lengths from the
-    dx = mxt.node_array[7,:] - mxt.node_array[6,:]
-    dy = mxt.node_array[10,:] - mxt.node_array[9,:]
-    RR = 1.0 * area / (dx*dy)
-
-    # Filter 2
-    # Selecting nodes that fit the criteria
-    nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & ((RR>1.1) | (RR<0.9))
-
-    # Filtering
-    mxt.contractDR(nodes)
-    print("Max-tree build time: %fs" %t)
-    print("Number of max-tree nodes: %d" %mxt.node_array.shape[1])
-    print("Number of max-tree leaves: %d" %(mxt.node_array[1,:] == 0).sum())
-    img_filtered = mxt.getImage()
-
-    # Filter 3
-    img_filtered = scale_img_dist_from_centre(img_filtered, x_scale=30)
-
-    # Filter 4
-    img_filtered = apply_gaussian_kernel(img_filtered)
-
-    # Filter 5
-    img_filtered = do_floodfill(img_filtered, tolerance=20)
-
-    # Add imgs to list for plotting
-    imgs = [img, img_filtered]
-
-    fig=plt.figure(figsize=(8,8))
-    columns = 2
-    rows = 1
-    for j in range(1, columns*rows +1):
-        fig.add_subplot(rows, columns, j)
-        plt.imshow(imgs[j-1], cmap='Greys_r')
-    plt.title("label = {}\nimage index={}".format(y[i], i))
-    plt.show()
