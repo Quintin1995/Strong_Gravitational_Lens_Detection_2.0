@@ -71,7 +71,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 
 # 4.0 - Create Custom Data Generator
-if True:
+if False:
     mul = 75
     random.seed(325*mul)
     np.random.seed(789*mul)
@@ -91,9 +91,6 @@ if False:
 
 #structuring element, connectivity -8
 Bc8 = np.ones(shape=(3,3), dtype=bool)
-Bc4 = np.array([[False,True,False],
-                  [True,True,True],
-                  [False,True,False]], dtype=bool)
 
 for i in range(x.shape[0]):
     # 6.1 - Convert img format and plot
