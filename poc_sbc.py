@@ -50,6 +50,68 @@ def apply_gaussian_kernel(numpy_array, kernel = None):
         return ndimage.convolve(numpy_array, kernel, mode='constant', cval=0.0)
 
 
+# do_sgf:           Scale-on-distance with Gaussian kernel convolution and Floodfill
+#   This basically removes a whole bunch of noise objects in the image.
+# do_square_crop:   take centering square out of the image, where the centering
+#   square has emperically been determined to be: (73, 73) pixels. All lensing 
+#   features should fall within this range.
+# do_circular_crop: Basically does the same thing as do_square_crop. However,
+#   all pixels outside the centered circle with radius 73 will be set to a zero value.
+# x_scale:          Parameter of brighness scaling based on distance. The higher the
+#   more distant objects (from centre) their brighness is retained. The lower, the
+#   more distant objects (from centre) their brightness is reduced.
+# tolerance:        Refereces floodfill, where pixel values with a difference of
+#   tolerance are floodfilled. The higher the value the more pixels are filled up.
+# Segmentations obtained with the max-tree and post processing (sgf) are used as mask for
+# the original image.
+def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False, do_sgf=False, x_scale=30, tolerance=20):
+
+    #structuring element, connectivity 8, for each pixel all 8 surrounding pixels are considered.
+    connectivity_kernel = np.ones(shape=(3,3), dtype=bool)
+
+    # Size and shape threshold
+    Wmin,Wmax = 3,60            # Emperically determined
+    Hmin,Hmax = 3,60            # Emperically determined
+    area_threshold = 45         # Emperically Determined
+    t = time.time()
+    numpy_array_copy = np.copy(numpy_array)
+
+    # loop over all images
+    for i in range(numpy_array.shape[0]):
+
+        # Convert image format for Max-Tree
+        img = np.clip(np.squeeze(x[i,:]) * 255, 0, 255).astype('uint16')
+
+        # Construct a Max-Tree
+        mxt = siamxt.MaxTreeAlpha(img, connectivity_kernel)
+
+        # Filter - Area Filter on max-tree datastructure
+        mxt.areaOpen(area_threshold)
+
+        # Computing boudingbox
+        dx = mxt.node_array[7,:] - mxt.node_array[6,:]   # These specific idxs were predetermined, by the author of the package.
+        dy = mxt.node_array[10,:] - mxt.node_array[9,:]  # These specific idxs were predetermined, by the author of the package.
+        RR = 1.0 * area / (dx*dy)                        # Rectangularity
+
+        # Filter - Selecting nodes that fit the criteria
+        nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & ((RR>1.1) | (RR<0.9))  #Emperically determined
+        mxt.contractDR(nodes)     # Filter out nodes in the Max-Tree that do not fit the given criteria
+
+        # Get the image from the max-tree data structure
+        img_filtered = mxt.getImage()
+
+        # Filter
+        if do_sgf:
+            img_filtered = scale_img_dist_from_centre(img_filtered, x_scale=x_scale)
+            img_filtered = apply_gaussian_kernel(img_filtered)
+            img_filtered = do_floodfill(img_filtered, tolerance=tolerance)
+        
+        numpy_array_copy[i] = np.expand_dims(img_filtered, axis=2) 
+        
+    print("\nmax tree segmenter time: %fs\n" %(time.time() - t))
+    return numpy_array_copy
+
+
 
 ################################# script #################################
 
@@ -83,11 +145,6 @@ x, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg
 print(y)
 print(y.shape)
 
-# 5.1 - Visualize some data
-if False:
-    plt.figure()
-    plt.imshow(np.squeeze(x[0]), origin='lower', interpolation='none', cmap=plt.cm.binary)
-    plt.show()
 
 #structuring element, connectivity -8
 Bc8 = np.ones(shape=(3,3), dtype=bool)
