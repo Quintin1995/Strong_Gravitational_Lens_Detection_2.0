@@ -47,9 +47,6 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
     if idx % 1000 == 0:
         print("loaded {} images".format(idx), flush=True)
     if are_sources:
-        # hdul = fits.open(filename)
-        # print("hereherehere")
-        # print(hdul[0].header["LENSER"])
         img = fits.getdata(filename).astype(data_type)
         img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                                # Convolve with psf_r, has to do with camara point spread function.
         return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)       # Expand color channel and normalize
@@ -157,7 +154,6 @@ class DataGenerator:
         Rr = 2.31
         Ri = 1.71
         return PSF_r
-        ### END OF IMPORTANT PIECE.
 
 
     # Returns a numpy array with lens images from disk
