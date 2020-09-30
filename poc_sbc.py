@@ -80,13 +80,7 @@ def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False
     r                   = square_crop_size//2   # Radius
     t                   = time.time()           # Record time
 
-    # create array where filtered data will be stored
-    if do_square_crop:
-        cx = numpy_array.shape[1]//2
-        cy = numpy_array.shape[2]//2
-        f_dat = numpy_array[:, cx-r:cx+r, cy-r:cy+r, :]
-    else:
-        f_dat = np.copy(numpy_array)        # work with a copy for now
+    f_dat = np.copy(numpy_array)                # work with a copy for now
 
     # loop over all images
     for i in range(f_dat.shape[0]):
@@ -117,12 +111,26 @@ def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False
             img_filtered = scale_img_dist_from_centre(img_filtered, x_scale=x_scale)
             img_filtered = apply_gaussian_kernel(img_filtered)
             img_filtered = do_floodfill(img_filtered, tolerance=tolerance)
-        
+
+        # Each zero in the filtered image should also be nulled/zerod in the original image. (masking)
+        numpy_array[i][np.where(img_filtered == 0)] = 0.0
+
+        # Add color channel back into the image
         f_dat[i] = np.expand_dims(img_filtered, axis=2) 
         
+    if do_square_crop: # create array where filtered data will be stored
+        numpy_array = centre_crop(numpy_array, r)
+    
     print("\nmax tree segmenter time: {:.01f}s, filtered data shape={}\n".format(time.time() - t, f_dat.shape), flush=True)
-    return f_dat
+    return numpy_array
 
+
+# Crops the given numpy array around the given center coordinates cx and cy, with radius r.
+# The given numpy array should be 4-dimensional: (num_imgs, widht, height, channel)
+def centre_crop(numpy_array, r):
+    cx = numpy_array.shape[1]//2
+    cy = numpy_array.shape[2]//2
+    return numpy_array[:, cx-r:cx+r, cy-r:cy+r, :]
 
 ################################# script #################################
 # 1.0 - Define ArgumentParser
@@ -150,11 +158,11 @@ dg = DataGenerator(params)
 x_dat, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg.Xsources_train, params.data_type, params.mock_lens_alpha_scaling)
 print(y)
 copy_x_dat = np.copy(x_dat)
-seg_dat = max_tree_segmenter(x_dat, do_square_crop=True, do_circular_crop=False, do_sgf=True, x_scale=30, tolerance=20, area_th=45)
+seg_dat = max_tree_segmenter(x_dat, do_square_crop=False, do_circular_crop=False, do_sgf=True, x_scale=30, tolerance=20, area_th=45)
 
-for i in range(5):
+for i in range(15):
     show_random_img_plt_and_stats(copy_x_dat, num_imgs=1, title="dat", do_plot=False, do_seed=True, seed=87*i)
-    show_random_img_plt_and_stats(seg_dat, num_imgs=1, title="seg dat", do_plot=False, do_seed=True, seed=87*i)
+    show_random_img_plt_and_stats(seg_dat, num_imgs=1, title="masked dat", do_plot=False, do_seed=True, seed=87*i)
     plt.show()
 
 
