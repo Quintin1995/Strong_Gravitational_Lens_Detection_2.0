@@ -11,7 +11,7 @@ from utils import load_settings_yaml, show_random_img_plt_and_stats
 import matplotlib.pyplot as plt
 import cv2
 from skimage.segmentation import flood, flood_fill
-
+import os
 
 # Perform the floodfill operation on pixel (2,2) - I just picked a pixel in the corner
 def perform_floodfill(img, tolerance=0):
@@ -239,8 +239,18 @@ dg = DataGenerator(params)
 
 # 5.0 - Create Data
 x_dat, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg.Xsources_train, params.data_type, params.mock_lens_alpha_scaling)
-print(y)
 copy_x_dat = np.copy(x_dat)
+
+# Write some images to file - temporarily
+if False:
+    for i in range(x_dat.shape[0]):
+        img = x_dat[i]
+        img = np.clip(np.squeeze(img) * 255, 0, 255).astype('uint8')
+        filename = os.path.join("test", "test{}.jpg".format(i))
+        cv2.imwrite(filename, img)
+        print("wrote img to file")
+
+# Create segmented data.
 seg_dat = max_tree_segmenter(x_dat, do_square_crop=False,
                                     do_circular_crop=False,
                                     do_scale=True,
@@ -252,6 +262,7 @@ seg_dat = max_tree_segmenter(x_dat, do_square_crop=False,
                                     ksize=(5,5),
                                     use_seg_imgs=False)
 
+# Plot results of segmented data
 for i in range(15):
     show_random_img_plt_and_stats(copy_x_dat, num_imgs=1, title="dat", do_plot=False, do_seed=True, seed=87*i)
     show_random_img_plt_and_stats(seg_dat, num_imgs=1, title="masked dat", do_plot=False, do_seed=True, seed=87*i)
