@@ -59,7 +59,7 @@ def fill_dataframe(df, paths):
             print("processing source idx: {}".format(idx))
         hdul = fits.open(filename)
 
-        LENSER[idx] = hdul[0].header["LENSER"] 
+        LENSER[idx] = hdul[0].header["LENSER"]
         LENSAR[idx] = hdul[0].header["LENSAR"] 
         LENSAA[idx] = hdul[0].header["LENSAA"] 
         LENSSH[idx] = hdul[0].header["LENSSH"] 

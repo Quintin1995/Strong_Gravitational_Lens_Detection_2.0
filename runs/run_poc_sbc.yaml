@@ -43,8 +43,8 @@ es_patience      : 75                       #int# Early Stopping Patience if the
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"
 negatives_path_train: "data/train/negatives/"
-sources_path_train  : "data/small_sources_set/"
-# sources_path_train  : "data/train/sources/"
+# sources_path_train  : "data/small_sources_set/"
+sources_path_train  : "data/train/sources/"
 
 
 lenses_path_validation   : "data/validation/lenses/"
