@@ -73,20 +73,28 @@ def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False
     connectivity_kernel = np.ones(shape=(3,3), dtype=bool)
 
     # Bounding-box criteria, Area size threshold, Squeare crop size
-    Wmin,Wmax           = 3, 60                 # Emperically determined (ED)
-    Hmin,Hmax           = 3, 60                 # ED
-    area_threshold      = area_th               # ED: size of a component
-    square_crop_size    = 74                    # Size of square crop. shape=(74, 74)
-    r                   = square_crop_size//2   # Radius
-    t                   = time.time()           # Record time
+    Wmin,Wmax           = 3, 60                     # Emperically determined (ED)
+    Hmin,Hmax           = 3, 60                     # ED
+    area_threshold      = area_th                   # ED: size of a component
+    t                   = time.time()               # Record time
+    
+    # Define a circular mask based on the incoming image dimensions
+    square_crop_size      = 74                        # Size of square crop. shape=(74, 74)
+    r                     = square_crop_size//2       # Radius
+    cx                    = numpy_array.shape[1]//2
+    cy                    = numpy_array.shape[2]//2
 
-    f_dat = np.copy(numpy_array)                # work with a copy for now
+    # This only needs to be computed once per 4d numpy array
+    xys_tup = get_indexes_negated_circle_crop(numpy_array.shape[1], numpy_array.shape[2], cx, cy, r)
 
     # loop over all images
-    for i in range(f_dat.shape[0]):
+    for i in range(numpy_array.shape[0]):
 
         # Convert image format for Max-Tree
-        img = np.clip(np.squeeze(f_dat[i,:]) * 255, 0, 255).astype('uint16')
+        img = np.clip(np.squeeze(numpy_array[i,:]) * 255, 0, 255).astype('uint16')
+
+        if do_circular_crop:
+            img[xys_tup] = 0
 
         # Construct a Max-Tree
         mxt = siamxt.MaxTreeAlpha(img, connectivity_kernel)
@@ -115,22 +123,38 @@ def max_tree_segmenter(numpy_array, do_square_crop=False, do_circular_crop=False
         # Each zero in the filtered image should also be nulled/zerod in the original image. (masking)
         numpy_array[i][np.where(img_filtered == 0)] = 0.0
 
-        # Add color channel back into the image
-        f_dat[i] = np.expand_dims(img_filtered, axis=2) 
         
     if do_square_crop: # create array where filtered data will be stored
-        numpy_array = centre_crop(numpy_array, r)
+        numpy_array = centre_crop(numpy_array, cx, cy, r)
     
     print("\nmax tree segmenter time: {:.01f}s, filtered data shape={}\n".format(time.time() - t, f_dat.shape), flush=True)
     return numpy_array
 
 
+# Return a tuple of 2 arrays. The x-indexes and y-indexes.
+# These indexes represent the whole area of the image where the circle is not located.
+def get_indexes_negated_circle_crop(width, height, cx, cy, r):
+
+    # Define nulled array
+    x = np.arange(0, width)
+    y = np.arange(0, height)
+    circle_mask = np.zeros((y.size, x.size))
+
+    # Create a circle based on cx, cy, and r
+    circle = (x[np.newaxis,:]-cx)**2 + (y[:,np.newaxis]-cy)**2 < r**2
+
+    # Impute the circle into the empty/nulled image.
+    circle_mask[circle] = 1.      # any non-zero value will work.
+
+    return np.where(circle_mask == 0)
+
+
+
 # Crops the given numpy array around the given center coordinates cx and cy, with radius r.
 # The given numpy array should be 4-dimensional: (num_imgs, widht, height, channel)
-def centre_crop(numpy_array, r):
-    cx = numpy_array.shape[1]//2
-    cy = numpy_array.shape[2]//2
+def centre_crop(numpy_array, cx, cy, r):
     return numpy_array[:, cx-r:cx+r, cy-r:cy+r, :]
+
 
 ################################# script #################################
 # 1.0 - Define ArgumentParser
@@ -158,7 +182,7 @@ dg = DataGenerator(params)
 x_dat, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg.Xsources_train, params.data_type, params.mock_lens_alpha_scaling)
 print(y)
 copy_x_dat = np.copy(x_dat)
-seg_dat = max_tree_segmenter(x_dat, do_square_crop=False, do_circular_crop=False, do_sgf=True, x_scale=30, tolerance=20, area_th=45)
+seg_dat = max_tree_segmenter(x_dat, do_square_crop=True, do_circular_crop=True, do_sgf=True, x_scale=30, tolerance=20, area_th=45)
 
 for i in range(15):
     show_random_img_plt_and_stats(copy_x_dat, num_imgs=1, title="dat", do_plot=False, do_seed=True, seed=87*i)
