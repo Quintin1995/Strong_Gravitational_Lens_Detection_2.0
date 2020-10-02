@@ -2,25 +2,26 @@ import numpy as np
 from skimage.segmentation import flood, flood_fill
 import siamxt
 from scipy import ndimage
+import time
 
 
 ######################## functions ########################
 
 # Perform the floodfill operation on pixel (2,2) - I just picked a pixel in the corner
-def perform_floodfill(img, tolerance=0):
+def _perform_floodfill(img, tolerance=0):
     filled_img = flood_fill(img, (2, 2), 0, tolerance=tolerance)
     return filled_img
 
 
 # Crops the given numpy array around the given center coordinates cx and cy, with radius r.
 # The given numpy array should be 4-dimensional: (num_imgs, widht, height, channel)
-def centre_crop_square(numpy_array, cx, cy, r):
+def _centre_crop_square(numpy_array, cx, cy, r):
     return numpy_array[:, cx-r:cx+r, cy-r:cy+r, :]
 
 
 # Returns a predefined convolutional kernel. To be used for convolution.
 # Convolutional kernels should have odd dimensions.
-def get_kernel(method="gaussian", size=(3,3)):
+def _get_kernel(method="gaussian", size=(3,3)):
     if method == "gaussian":
         if size == (3,3):
             kernel = np.array([[1,2,1],
@@ -48,7 +49,7 @@ def get_kernel(method="gaussian", size=(3,3)):
 
 # Convolve the given 2D kernel to the numpy array.
 # Either per image stack (4D) or per image (2D)
-def apply_conv_kernel(numpy_array, kernel):
+def _apply_conv_kernel(numpy_array, kernel):
     if numpy_array.ndim != 2:
         for i in range(numpy_array.shape[0]):
             img = np.squeeze(numpy_array[i])            # Squeeze out empty dimensions
@@ -61,7 +62,7 @@ def apply_conv_kernel(numpy_array, kernel):
 
 # Scale brightness of pixel based on the distance from centre of the image
 # According to the following formula: e^(-distance/x_scale), which is exponential decay
-def scale_img_dist_from_centre(img, x_scale):
+def _scale_img_dist_from_centre(img, x_scale):
 
     # Image dimensions
     nx, ny = img.shape
@@ -80,7 +81,7 @@ def scale_img_dist_from_centre(img, x_scale):
 
 # Return a tuple of 2 arrays. The x-indexes and y-indexes.
 # These indexes represent the whole area of the image where the circle is NOT located.
-def get_indexes_negated_circle_crop(width, height, cx, cy, r):
+def _get_indexes_negated_circle_crop(width, height, cx, cy, r):
 
     # Define zero'ed array
     x = np.arange(0, width)
@@ -97,7 +98,7 @@ def get_indexes_negated_circle_crop(width, height, cx, cy, r):
 
 
 # Constructs a max tree and filters on it with an area filter, and bounding box filter.
-def contruct_max_tree_and_filter(img, connectivity_kernel, area_threshold):
+def _contruct_max_tree_and_filter(img, connectivity_kernel, area_threshold):
 
     # Bounding box parameters
     Wmin,Wmax           = 3, 60         # Emperically determined
@@ -144,6 +145,7 @@ def contruct_max_tree_and_filter(img, connectivity_kernel, area_threshold):
 #   images are masked with the segmented images and returned.
 def max_tree_segmenter(numpy_array,
                        do_square_crop=False,
+                       square_crop_size=74,
                        do_circular_crop=False,
                        do_scale=False,
                        do_floodfill=False,
@@ -159,7 +161,6 @@ def max_tree_segmenter(numpy_array,
     t                   = time.time()               # Record time
     
     # Define a circular mask based on the incoming image dimensions
-    square_crop_size      = 74                        # Size of square crop. shape=(74, 74)
     r                     = square_crop_size//2       # Radius
     cx                    = numpy_array.shape[1]//2
     cy                    = numpy_array.shape[2]//2
@@ -168,10 +169,10 @@ def max_tree_segmenter(numpy_array,
         copy_dat = np.copy(numpy_array)
 
     # Define a kernel for convolution
-    kernel = get_kernel(method=conv_method, size=ksize)
+    kernel = _get_kernel(method=conv_method, size=ksize)
 
     # This only needs to be computed once per 4d numpy array
-    xys_tup = get_indexes_negated_circle_crop(numpy_array.shape[1], numpy_array.shape[2], cx, cy, r)
+    xys_tup = _get_indexes_negated_circle_crop(numpy_array.shape[1], numpy_array.shape[2], cx, cy, r)
 
     for i in range(numpy_array.shape[0]):
 
@@ -179,22 +180,22 @@ def max_tree_segmenter(numpy_array,
         img = np.clip(np.squeeze(numpy_array[i,:]) * 255, 0, 255).astype('uint16')
 
         # Apply a boxcar kernel
-        img_filtered = apply_conv_kernel(img, kernel)
+        img_filtered = _apply_conv_kernel(img, kernel)
 
         # Perform circular crop
         if do_circular_crop:
             img_filtered[xys_tup] = 0
 
         # Construct a max tree and filter based on area and rectangularity.
-        img_filtered = contruct_max_tree_and_filter(img, connectivity_kernel, area_th)
+        img_filtered = _contruct_max_tree_and_filter(img, connectivity_kernel, area_th)
 
         # Filter on distance from centre
         if do_scale:
-            img_filtered = scale_img_dist_from_centre(img_filtered, x_scale=x_scale)
+            img_filtered = _scale_img_dist_from_centre(img_filtered, x_scale=x_scale)
 
         # Filter with a floodfill
         if do_floodfill:
-            img_filtered = perform_floodfill(img_filtered, tolerance=tolerance)
+            img_filtered = _perform_floodfill(img_filtered, tolerance=tolerance)
 
         # Add color channel
         if use_seg_imgs:
@@ -205,7 +206,7 @@ def max_tree_segmenter(numpy_array,
 
     # Do centre square cropping.
     if do_square_crop:
-        numpy_array = centre_crop_square(numpy_array, cx, cy, r)
+        numpy_array = _centre_crop_square(numpy_array, cx, cy, r)
     
     print("\nmax tree segmenter time: {:.01f}s, masked data shape={}\n".format(time.time() - t, numpy_array.shape), flush=True)
     if use_seg_imgs:

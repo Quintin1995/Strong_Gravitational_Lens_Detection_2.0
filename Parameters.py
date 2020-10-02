@@ -121,12 +121,76 @@ class Parameters(object):
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
 
+        self._set_segmentation_parameters(settings)
+        
         if mode == "training":
             #copy run.yaml to model folder
             copyfile(yaml_fpath, os.path.join(self.model_path, "run.yaml"))
 
             #store all parameters of this object into a json file
-            self.write_parameters_to_file()
+            self._write_parameters_to_file()
+
+
+    # This function ensures that older run.yaml(s) are compatible with the newer ones.
+    def _set_segmentation_parameters(self, settings):
+        if "do_max_tree_seg" not in settings:
+            self.do_max_tree_seg       = False
+        else:
+            self.do_max_tree_seg       = settings["do_max_tree_seg"]            #Boolean, Whether to perform max_tree_segmenation or not.
+        
+        ## define kernel type and size
+        if "conv_method" not in settings:
+            self.conv_method           = "gaussian"
+        else:
+            self.conv_method           = settings["conv_method"]                #string# options= {"gaussian", "boxcar"}
+        if "ksize" not in settings:
+            self.ksize                 = 5
+        else:
+            self.ksize                 = settings["ksize"]                      #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
+        
+        ## Define cropping type and size
+        if "do_square_crop" not in settings:
+            self.do_square_crop        = False
+        else:
+            self.do_square_crop        = settings["do_square_crop"]             #Boolean, Whether to take a centered square crop
+        if "do_circular_crop" not in settings:
+            self.do_circular_crop      = False
+        else:
+            self.do_circular_crop      = settings["do_circular_crop"]           #Boolean, Whether to perform a circular cropping around the centre of the image
+        if "crop_size" not in settings:
+            self.crop_size             = 74
+        else:
+            self.crop_size             = settings["crop_size"]                  #int, size of the square/circular crop if enabled. (74,74) for example
+        
+        ## Define scaling factor
+        if "do_scale" not in settings:
+            self.do_scale              = False
+        else:
+            self.do_scale              = settings["do_scale"]                   #Boolean, Whether to perform brighness scaling of a pixel based on the distance from the centre of the image. The furter away the object the closer to zero its value will become.
+        if "x_scale" not in settings:
+            self.x_scale               = 30
+        else:
+            self.x_scale               = settings["x_scale"]                    #int # Scale brightness of pixel based on the distance from centre of the image   # According to the following formula e^(-distance/x_scale), which is exponential decay
+        
+        ## Define floodfill tolerance
+        if "do_floodfill" not in settings:
+            self.do_floodfill          = False
+        else:
+            self.do_floodfill          = settings["do_floodfill"]               #Boolean, to perform the floodfill operation after brightness distance scaling
+        if "tolerance" not in settings:
+            self.tolerance             = 20
+        else:
+            self.tolerance             = settings["tolerance"]                  #int, The allowed range of pixel intensity/brighness difference. The higher the value the more pixels will be floodfilled, and the smaller the segments will become.
+        
+        ## Filter max-tree based on node area size.
+        if "area_th" not in settings:
+            self.area_th               = 45
+        else:
+            self.area_th               = settings["area_th"]                    #int, Allowed minimum size of a node in the max-tree datastructure. If a certain structure in a max-tree-node has a smaller size, it is discarted.
+        if "use_seg_imgs" not in settings:
+            self.use_seg_imgs          = False
+        else:
+            self.use_seg_imgs          = settings["use_seg_imgs"]               #boolean# (if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
 
 
     # Model Storage with checkpoints and a reference with a .yaml file, from which epoch the model is.
@@ -159,7 +223,7 @@ class Parameters(object):
 
 
     # Write all the paramters defined in parameters class to a file
-    def write_parameters_to_file(self):
+    def _write_parameters_to_file(self):
         with open(self.full_path_param_dump, 'w') as outfile:
             json_content = self.toJSON()
             outfile.write(json_content)

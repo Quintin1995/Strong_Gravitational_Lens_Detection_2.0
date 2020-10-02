@@ -61,7 +61,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 class DataGenerator:
     def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
         self.params = params
-        self.PSF_r = self.compute_PSF_r()
+        self.PSF_r = self._compute_PSF_r()
 
         # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
         self.negative_sample_contaminant_prob = 0.8
@@ -126,14 +126,7 @@ class DataGenerator:
                 fill_mode=params.aug_default_fill_mode)
 
 
-                ###### Step 1.1: show some of the stored images from the data array to the user.
-        if params.verbatim:
-            show_random_img_plt_and_stats(Xsources_train,    num_imgs=1, title="lenses")
-            show_random_img_plt_and_stats(Xnegatives_train, num_imgs=1, title="negatives")
-            show_random_img_plt_and_stats(Xlenses_train,   num_imgs=1, title="sources")
-        
-
-    def compute_PSF_r(self):
+    def _compute_PSF_r(self):
         ## This piece of code is needed for some reason that i will try to find out later.
         nx = 101
         ny = 101
@@ -148,11 +141,11 @@ class DataGenerator:
             for jj in range(ny_):
                 PSF_r[ii + dx][jj + dy] = d1[ii][jj]
 
-        seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
+        # seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
 
-        Rg = 3.30
-        Rr = 2.31
-        Ri = 1.71
+        # Rg = 3.30
+        # Rr = 2.31
+        # Ri = 1.71
         return PSF_r
 
 
