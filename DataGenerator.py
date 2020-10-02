@@ -227,6 +227,23 @@ class DataGenerator:
             y_test  = np.ones(X_test.shape[0])
 
         return X_train, X_test, y_train, y_test
+
+    
+    # A simple wrapper function in order to keep other functions shorter in code length
+    def _fill_arguments_max_tree_segmenter(self, X_chunk):
+        from max_tree_segmenter import max_tree_segmenter
+        return max_tree_segmenter(X_chunk,
+                    do_square_crop=self.params.do_square_crop,
+                    square_crop_size=self.params.crop_size,
+                    do_circular_crop=self.params.do_circular_crop,
+                    do_scale=self.params.do_scale,
+                    do_floodfill=self.params.do_floodfill,
+                    x_scale=self.params.x_scale,
+                    tolerance=self.params.tolerance,
+                    area_th=self.params.area_th,
+                    conv_method=self.params.conv_method,
+                    ksize=(self.params.ksize,self.params.ksize),
+                    use_seg_imgs=self.params.use_seg_imgs)
     
 
     # Loading a chunk into memory
@@ -256,6 +273,9 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
+        if self.params.do_max_tree_seg:
+            X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
+
         print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
         return X_chunk, y_chunk
 
@@ -281,6 +301,9 @@ class DataGenerator:
         # Concatenate the positive and negative examples into one chunk (also the labels)
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
+
+        if self.params.do_max_tree_seg:
+            X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
 
         print("Creating validation chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
         return X_chunk, y_chunk
