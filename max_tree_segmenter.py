@@ -7,6 +7,10 @@ import time
 
 ######################## functions ########################
 
+# Normalizationp per image
+def _normalize_img(numpy_img):
+    return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img) + 0.0000001))
+
 # Perform the floodfill operation on pixel (2,2) - I just picked a pixel in the corner
 def _perform_floodfill(img, tolerance=0):
     filled_img = flood_fill(img, (2, 2), 0, tolerance=tolerance)
@@ -199,7 +203,7 @@ def max_tree_segmenter(numpy_array,
 
         # Add color channel
         if use_seg_imgs:
-            copy_dat[i] = np.expand_dims(img_filtered, axis=2)
+            copy_dat[i] =_normalize_img(np.expand_dims(img_filtered, axis=2))
 
         # Mask filtered (segmented) Image on Original image
         numpy_array[i][np.where(img_filtered == 0)] = 0.0

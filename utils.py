@@ -7,6 +7,35 @@ import yaml
 import psutil
 
 
+
+def plot_first_last_stats(X, y):
+
+    num_imgs = int(input("\nAmount of images to show to the user? integer value: "))
+
+    columns = 2
+    rows = 1
+    for img_num in range(num_imgs):
+        fig=plt.figure(figsize=(8, 8))
+        for i in range(1, columns*rows +1):
+            pos_img = np.squeeze(X[0+img_num])
+            neg_img = np.squeeze(X[-1-img_num])
+            print("pos image data type: {}".format(pos_img.dtype.name), flush=True)
+            print("pos image shape: {}".format(pos_img.shape), flush=True)
+            print("pos image min: {}".format(np.amin(pos_img)), flush=True)
+            print("pos image max: {}".format(np.amax(pos_img)), flush=True)
+            print("neg image data type: {}".format(neg_img.dtype.name), flush=True)
+            print("neg image shape: {}".format(neg_img.shape), flush=True)
+            print("neg image min: {}".format(np.amin(neg_img)), flush=True)
+            print("neg image max: {}".format(np.amax(neg_img)), flush=True)
+
+            fig.add_subplot(rows, columns, i)
+            plt.imshow(pos_img, origin='lower', interpolation='none', cmap='Greys_r')
+            plt.imshow(neg_img, origin='lower', interpolation='none', cmap='Greys_r')
+        fig.suptitle("label0: {}, label1: {}".format(y[0+img_num], y[-1-img_num]))
+        plt.show()
+
+
+
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
 def show_random_img_plt_and_stats(data_array, num_imgs=1, title="title", do_plot=True, do_seed=False, seed=7846):
     for _ in range(num_imgs):

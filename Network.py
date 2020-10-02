@@ -14,7 +14,7 @@ from tensorflow.keras import models
 from tensorflow.keras import backend as K
 import tensorflow as tf
 import time
-from utils import hms, plot_history
+from utils import hms, plot_history, plot_first_last_stats
 import os
 from ModelCheckpointYaml import *
 from f_beta_metric import FBetaMetric
@@ -134,6 +134,10 @@ class Network:
                 X_train_chunk, y_train_chunk = self.dg.load_chunk(self.params.chunksize, self.dg.Xlenses_train, self.dg.Xnegatives_train, self.dg.Xsources_train, self.params.data_type, self.params.mock_lens_alpha_scaling)
                 # Load validation chunk and targets
                 X_validation_chunk, y_validation_chunk = self.dg.load_chunk_val(data_type=np.float32, mock_lens_alpha_scaling=self.params.mock_lens_alpha_scaling)
+
+                # Plot some images and shows stats
+                if True:
+                    plot_first_last_stats(X_train_chunk, y_train_chunk)
 
                 # Define a train generator flow based on the ImageDataGenerator
                 train_generator_flowed = self.dg.train_generator.flow(
