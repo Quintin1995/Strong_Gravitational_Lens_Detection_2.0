@@ -1,17 +1,10 @@
+import numpy as np
+from skimage.segmentation import flood, flood_fill
 import siamxt
 from scipy import ndimage
-import argparse
-from DataGenerator import DataGenerator
-from Network import Network
-import time
-import random
-import numpy as np
-from Parameters import Parameters
-from utils import load_settings_yaml, show_random_img_plt_and_stats
-import matplotlib.pyplot as plt
-import cv2
-from skimage.segmentation import flood, flood_fill
-import os
+
+
+######################## functions ########################
 
 # Perform the floodfill operation on pixel (2,2) - I just picked a pixel in the corner
 def perform_floodfill(img, tolerance=0):
@@ -19,38 +12,14 @@ def perform_floodfill(img, tolerance=0):
     return filled_img
 
 
-# Scale brightness of pixel based on the distance from centre of the image
-# According to the following formula: e^(-distance/x_scale), which is exponential decay
-def scale_img_dist_from_centre(img, x_scale):
-
-    # Image dimensions
-    nx, ny = img.shape
-
-    # x and y distnace vectors from center of the image
-    x = np.arange(nx) - (nx-1)/2. 
-    y = np.arange(ny) - (ny-1)/2.
-
-    # Calculate distance 2d matrix from centre
-    X, Y = np.meshgrid(x, y)
-    d = np.sqrt(X**2 + Y**2)
-
-    return (img * np.exp(-1*d/x_scale)).astype(int)
-
-
-# Convolve the given 2D kernel to the numpy array.
-# Either per image stack (4D) or per image (2D)
-def apply_conv_kernel(numpy_array, kernel):
-    if numpy_array.ndim != 2:
-        for i in range(numpy_array.shape[0]):
-            img = np.squeeze(numpy_array[i])            # Squeeze out empty dimensions
-            conv_img = ndimage.convolve(img, kernel, mode='constant', cval=0.0) 
-            numpy_array[i] = np.expand_dims(conv_img, axis = 2) # Add empty dimension back in. (color channel)
-        return numpy_array
-    if numpy_array.ndim == 2:
-        return ndimage.convolve(numpy_array, kernel, mode='constant', cval=0.0)
+# Crops the given numpy array around the given center coordinates cx and cy, with radius r.
+# The given numpy array should be 4-dimensional: (num_imgs, widht, height, channel)
+def centre_crop_square(numpy_array, cx, cy, r):
+    return numpy_array[:, cx-r:cx+r, cy-r:cy+r, :]
 
 
 # Returns a predefined convolutional kernel. To be used for convolution.
+# Convolutional kernels should have odd dimensions.
 def get_kernel(method="gaussian", size=(3,3)):
     if method == "gaussian":
         if size == (3,3):
@@ -74,8 +43,57 @@ def get_kernel(method="gaussian", size=(3,3)):
                                [1,1,1,1,1],
                                [1,1,1,1,1],
                                [1,1,1,1,1]]) * (1/25.)
-    print(kernel)
     return kernel
+
+
+# Convolve the given 2D kernel to the numpy array.
+# Either per image stack (4D) or per image (2D)
+def apply_conv_kernel(numpy_array, kernel):
+    if numpy_array.ndim != 2:
+        for i in range(numpy_array.shape[0]):
+            img = np.squeeze(numpy_array[i])            # Squeeze out empty dimensions
+            conv_img = ndimage.convolve(img, kernel, mode='constant', cval=0.0) 
+            numpy_array[i] = np.expand_dims(conv_img, axis = 2) # Add empty dimension back in. (color channel)
+        return numpy_array
+    if numpy_array.ndim == 2:
+        return ndimage.convolve(numpy_array, kernel, mode='constant', cval=0.0)
+
+
+# Scale brightness of pixel based on the distance from centre of the image
+# According to the following formula: e^(-distance/x_scale), which is exponential decay
+def scale_img_dist_from_centre(img, x_scale):
+
+    # Image dimensions
+    nx, ny = img.shape
+
+    # x and y distance vectors from center of the image
+    x = np.arange(nx) - (nx-1)/2. 
+    y = np.arange(ny) - (ny-1)/2.
+
+    # Calculate distance 2d matrix from centre
+    X, Y = np.meshgrid(x, y)
+    d = np.sqrt(X**2 + Y**2)
+
+    # Multiply the image with 2d distance profile (brightness scaled down, when further away from centre.)
+    return (img * np.exp(-1*d/x_scale)).astype(int)
+
+
+# Return a tuple of 2 arrays. The x-indexes and y-indexes.
+# These indexes represent the whole area of the image where the circle is NOT located.
+def get_indexes_negated_circle_crop(width, height, cx, cy, r):
+
+    # Define zero'ed array
+    x = np.arange(0, width)
+    y = np.arange(0, height)
+    circle_mask = np.zeros((y.size, x.size))
+
+    # Create a circle based on cx, cy, and r
+    circle = (x[np.newaxis,:]-cx)**2 + (y[:,np.newaxis]-cy)**2 < r**2
+
+    # Impute the circle into the empty/nulled image.
+    circle_mask[circle] = 1.      # any non-zero value will work.
+
+    return np.where(circle_mask == 0)
 
 
 # Constructs a max tree and filters on it with an area filter, and bounding box filter.
@@ -102,6 +120,7 @@ def contruct_max_tree_and_filter(img, connectivity_kernel, area_threshold):
 
     # Get the image from the max-tree data structure
     return mxt.getImage()
+
 
 
 # Segmentations obtained with the max-tree and pre/post processing.
@@ -194,80 +213,4 @@ def max_tree_segmenter(numpy_array,
     return numpy_array
 
 
-# Return a tuple of 2 arrays. The x-indexes and y-indexes.
-# These indexes represent the whole area of the image where the circle is NOT located.
-def get_indexes_negated_circle_crop(width, height, cx, cy, r):
-
-    # Define nulled array
-    x = np.arange(0, width)
-    y = np.arange(0, height)
-    circle_mask = np.zeros((y.size, x.size))
-
-    # Create a circle based on cx, cy, and r
-    circle = (x[np.newaxis,:]-cx)**2 + (y[:,np.newaxis]-cy)**2 < r**2
-
-    # Impute the circle into the empty/nulled image.
-    circle_mask[circle] = 1.      # any non-zero value will work.
-
-    return np.where(circle_mask == 0)
-
-
-# Crops the given numpy array around the given center coordinates cx and cy, with radius r.
-# The given numpy array should be 4-dimensional: (num_imgs, widht, height, channel)
-def centre_crop_square(numpy_array, cx, cy, r):
-    return numpy_array[:, cx-r:cx+r, cy-r:cy+r, :]
-
-
-################################# script #################################
-# 1.0 - Define ArgumentParser
-parser = argparse.ArgumentParser()
-parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/run_poc_sbc.yaml", required=False)
-args = parser.parse_args()
-
-# 2.0 - Unpack args
-yaml_path = args.run
-
-# 3.0 - Load all settings from .yaml file
-settings_yaml = load_settings_yaml(yaml_path)                                           # Returns a dictionary object.
-params = Parameters(settings_yaml, yaml_path)
-params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
-
-# 4.0 - Create Custom Data Generator
-if False:
-    mul = 7
-    random.seed(325*mul)
-    np.random.seed(789*mul)
-dg = DataGenerator(params)
-
-# 5.0 - Create Data
-x_dat, y = dg.load_chunk(params.chunksize, dg.Xlenses_train, dg.Xnegatives_train, dg.Xsources_train, params.data_type, params.mock_lens_alpha_scaling)
-copy_x_dat = np.copy(x_dat)
-
-# Write some images to file - temporarily
-if False:
-    for i in range(x_dat.shape[0]):
-        img = x_dat[i]
-        img = np.clip(np.squeeze(img) * 255, 0, 255).astype('uint8')
-        filename = os.path.join("test", "test{}.jpg".format(i))
-        cv2.imwrite(filename, img)
-        print("wrote img to file")
-
-# Create segmented data.
-seg_dat = max_tree_segmenter(x_dat, do_square_crop=False,
-                                    do_circular_crop=False,
-                                    do_scale=True,
-                                    do_floodfill=True,
-                                    x_scale=30,
-                                    tolerance=20,
-                                    area_th=45,
-                                    conv_method="gaussian",
-                                    ksize=(5,5),
-                                    use_seg_imgs=False)
-
-# Plot results of segmented data
-for i in range(15):
-    show_random_img_plt_and_stats(copy_x_dat, num_imgs=1, title="dat", do_plot=False, do_seed=True, seed=87*i)
-    show_random_img_plt_and_stats(seg_dat, num_imgs=1, title="masked dat", do_plot=False, do_seed=True, seed=87*i)
-    plt.show()
-
-
+######################## end-functions ########################

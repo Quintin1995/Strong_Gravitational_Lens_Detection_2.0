@@ -30,6 +30,10 @@ validation_chunksize: 128
 ## EXPERIMENT PARAMETERS
 use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
+# Segmentation
+
+
+
 # Network Paramters
 net_name         : "simple_test_net"        #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
 net_learning_rate: 0.0001                   #float#
