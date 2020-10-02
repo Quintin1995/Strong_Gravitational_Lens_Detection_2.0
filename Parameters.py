@@ -10,25 +10,20 @@ class Parameters(object):
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
         
         # Create Directories used throughout the project
-        create_dir_if_not_exists("models")
-        create_dir_if_not_exists("runs")
-        create_dir_if_not_exists("slurms")
+        self._create_dirs()
         
-
         ##### Paths to data
-        self.lenses_path_train     = settings["lenses_path_train"]
-        self.negatives_path_train  = settings["negatives_path_train"]
-        self.sources_path_train    = settings["sources_path_train"]
-
-        self.lenses_path_validation     = settings["lenses_path_validation"]
-        self.negatives_path_validation  = settings["negatives_path_validation"]
-        self.sources_path_validation    = settings["sources_path_validation"]
+        self._set_data_paths(settings)
 
         # Data type of images in the numpy array
         self.data_type = None
 
-        # Image dimensionality
-        self.img_dims = (settings["img_width"], settings["img_height"], settings["img_channels"])
+        # Image dimensionality - also depends on cropping
+        self._set_segmentation_parameters(settings)
+        if self.do_square_crop and self.do_max_tree_seg:
+            self.img_dims = (self.crop_size, self.crop_size, settings["img_channels"])
+        else:
+            self.img_dims = (settings["img_width"], settings["img_height"], settings["img_channels"])
 
         # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
         self.normalize = settings["normalize"]        #options = {"None", "per_image", "per_array"}
@@ -39,33 +34,14 @@ class Parameters(object):
         # Whether you want to see plots and extra print output
         self.verbatim = settings["verbatim"]
 
-        # Data Augmenation Paramters
-        self.aug_zoom_range               = (settings["aug_zoom_range_min"], settings["aug_zoom_range_max"]) # This range will be sampled from uniformly.
-        self.aug_num_pixels_shift_allowed = settings["aug_num_pixels_shift_allowed"]              # In Pixels
-        self.aug_rotation_range           = settings["aug_rotation_range"]                        # In Degrees
-        self.aug_do_horizontal_flip       = settings["aug_do_horizontal_flip"]                    # 50% of the time do a horizontal flip)  
-        self.aug_default_fill_mode        = settings["aug_default_fill_mode"]                     # Interpolation method, for data augmentation.
-        self.aug_width_shift_range        = self.aug_num_pixels_shift_allowed / self.img_dims[0]  # Fraction of width as allowed shift
-        self.aug_height_shift_range       = self.aug_num_pixels_shift_allowed / self.img_dims[1]  # Fraction of height as allowed shift
+        # Data Augmenation Parameters
+        self._set_augmentation_params(settings)
 
         # Network Paramters
-        self.net_name          = settings["net_name"]
-        self.net_learning_rate = settings["net_learning_rate"]
-        self.net_model_metrics = settings["net_model_metrics"]
-        self.net_loss_function = settings["net_loss_function"]
-        self.net_num_outputs   = settings["net_num_outputs"]
-        self.net_epochs        = settings["net_epochs"]
-        self.net_batch_size    = settings["net_batch_size"]
-        self.es_patience       = settings["es_patience"]
+        self._set_network_params(settings)
 
         # Loading the input data - What fraction of the data should be loaded into ram?
-        self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]
-        self.fraction_to_load_negatives_train = settings["fraction_to_load_negatives_train"]  # range = [0,1]
-        self.fraction_to_load_sources_train   = settings["fraction_to_load_sources_train"]    # range = [0,1]
-
-        self.fraction_to_load_lenses_vali    = settings["fraction_to_load_lenses_vali"]       # range = [0,1]
-        self.fraction_to_load_negatives_vali = settings["fraction_to_load_negatives_vali"]    # range = [0,1]
-        self.fraction_to_load_sources_vali   = settings["fraction_to_load_sources_vali"]      # range = [0,1]
+        self._set_data_fractions(settings)
 
         # Chunk Parameters
         self.num_chunks = settings["num_chunks"]  # Number of chunks to be generated 
@@ -84,7 +60,7 @@ class Parameters(object):
         self.filename_weights       = self.model_name + "_weights_only" + self.weights_extension
         self.full_path_of_weights   = os.path.join(self.model_path, self.filename_weights)
 
-        self.set_checkpoint_properties()
+        self._set_checkpoint_properties()
 
         # Csv logger file to store the callback of the .fit function. It stores the history of the training session.
         self.history_extension      = ".csv"                 #Extension for history callback
@@ -120,8 +96,6 @@ class Parameters(object):
 
         # EXPERIMENT PARAMTERS
         self.use_avg_pooling_2D    = settings["use_avg_pooling_2D"]
-
-        self._set_segmentation_parameters(settings)
         
         if mode == "training":
             #copy run.yaml to model folder
@@ -130,6 +104,53 @@ class Parameters(object):
             #store all parameters of this object into a json file
             self._write_parameters_to_file()
 
+
+    def _set_data_fractions(self, settings):
+        self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]
+        self.fraction_to_load_negatives_train = settings["fraction_to_load_negatives_train"]  # range = [0,1]
+        self.fraction_to_load_sources_train   = settings["fraction_to_load_sources_train"]    # range = [0,1]
+
+        self.fraction_to_load_lenses_vali    = settings["fraction_to_load_lenses_vali"]       # range = [0,1]
+        self.fraction_to_load_negatives_vali = settings["fraction_to_load_negatives_vali"]    # range = [0,1]
+        self.fraction_to_load_sources_vali   = settings["fraction_to_load_sources_vali"]      # range = [0,1]
+
+
+    def _set_network_params(self, settings):
+        self.net_name          = settings["net_name"]
+        self.net_learning_rate = settings["net_learning_rate"]
+        self.net_model_metrics = settings["net_model_metrics"]
+        self.net_loss_function = settings["net_loss_function"]
+        self.net_num_outputs   = settings["net_num_outputs"]
+        self.net_epochs        = settings["net_epochs"]
+        self.net_batch_size    = settings["net_batch_size"]
+        self.es_patience       = settings["es_patience"]
+
+    # Data Augmentation parameters
+    def _set_augmentation_params(self, settings):
+        self.aug_zoom_range               = (settings["aug_zoom_range_min"], settings["aug_zoom_range_max"]) # This range will be sampled from uniformly.
+        self.aug_num_pixels_shift_allowed = settings["aug_num_pixels_shift_allowed"]              # In Pixels
+        self.aug_rotation_range           = settings["aug_rotation_range"]                        # In Degrees
+        self.aug_do_horizontal_flip       = settings["aug_do_horizontal_flip"]                    # 50% of the time do a horizontal flip)  
+        self.aug_default_fill_mode        = settings["aug_default_fill_mode"]                     # Interpolation method, for data augmentation.
+        self.aug_width_shift_range        = self.aug_num_pixels_shift_allowed / self.img_dims[0]  # Fraction of width as allowed shift
+        self.aug_height_shift_range       = self.aug_num_pixels_shift_allowed / self.img_dims[1]  # Fraction of height as allowed shift
+
+
+    def _create_dirs(self):
+        create_dir_if_not_exists("models")
+        create_dir_if_not_exists("runs")
+        create_dir_if_not_exists("slurms")
+
+
+    # Set paths to data directories for training and validation
+    def _set_data_paths(self, settings):
+        self.lenses_path_train     = settings["lenses_path_train"]
+        self.negatives_path_train  = settings["negatives_path_train"]
+        self.sources_path_train    = settings["sources_path_train"]
+
+        self.lenses_path_validation     = settings["lenses_path_validation"]
+        self.negatives_path_validation  = settings["negatives_path_validation"]
+        self.sources_path_validation    = settings["sources_path_validation"]
 
     # This function ensures that older run.yaml(s) are compatible with the newer ones.
     def _set_segmentation_parameters(self, settings):
@@ -194,7 +215,7 @@ class Parameters(object):
 
 
     # Model Storage with checkpoints and a reference with a .yaml file, from which epoch the model is.
-    def set_checkpoint_properties(self):
+    def _set_checkpoint_properties(self):
         # Best validation loss Weights .h5 file
         self.filename_weights_loss         = self.model_name + "_best_val_loss" + self.weights_extension
         self.full_path_of_weights_loss     = os.path.join(self.model_path, "checkpoints", self.filename_weights_loss)

@@ -210,7 +210,7 @@ def max_tree_segmenter(numpy_array,
     
     print("\nmax tree segmenter time: {:.01f}s, masked data shape={}\n".format(time.time() - t, numpy_array.shape), flush=True)
     if use_seg_imgs:
-        return copy_dat
+        return _centre_crop_square(copy_dat, cx, cy, r)
     return numpy_array
 
 
