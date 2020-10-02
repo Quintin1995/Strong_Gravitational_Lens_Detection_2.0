@@ -136,7 +136,7 @@ class Network:
                 X_validation_chunk, y_validation_chunk = self.dg.load_chunk_val(data_type=np.float32, mock_lens_alpha_scaling=self.params.mock_lens_alpha_scaling)
 
                 # Plot some images and shows stats
-                if True:
+                if self.params.show_plot_of_data_before_training:
                     plot_first_last_stats(X_train_chunk, y_train_chunk)
 
                 # Define a train generator flow based on the ImageDataGenerator

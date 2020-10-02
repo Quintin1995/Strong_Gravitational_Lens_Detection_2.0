@@ -8,7 +8,10 @@ class Parameters(object):
 
         # Model Name
         self.model_name      = settings["model_name"]  # for example "first_model" must be something unique
-        
+
+        # Set whether the user wants to see a plot of the images before training.
+        self._set_whether_to_plot(settings)
+
         # Create Directories used throughout the project
         self._create_dirs()
         
@@ -104,6 +107,12 @@ class Parameters(object):
             #store all parameters of this object into a json file
             self._write_parameters_to_file()
 
+
+    def _set_whether_to_plot(self, settings):
+        if "show_plot_of_data_before_training" not in settings:
+            self.show_plot_of_data_before_training = False
+        else:
+            self.show_plot_of_data_before_training = settings["show_plot_of_data_before_training"]
 
     def _set_data_fractions(self, settings):
         self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]

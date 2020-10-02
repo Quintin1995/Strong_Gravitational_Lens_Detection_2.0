@@ -4,6 +4,9 @@
 # Model Name
 model_name: "f_beta"    # String
 
+# Development parameters
+show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
+
 # Loading the input data
 fraction_to_load_sources_train  : 0.01     #float # range = [0,1]  train
 fraction_to_load_negatives_train: 0.1     #float # range = [0,1]  train
@@ -48,7 +51,7 @@ do_floodfill    : True           #Boolean, to perform the floodfill operation af
 tolerance       : 20              #int, The allowed range of pixel intensity/brighness difference. The higher the value the more pixels will be floodfilled, and the smaller the segments will become.
 # Filter max-tree based on node area size.
 area_th         : 45              #int, Allowed minimum size of a node in the max-tree datastructure. If a certain structure in a max-tree-node has a smaller size, it is discarted.
-use_seg_imgs    : True           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
+use_seg_imgs    : False           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
 
 
 # Network Paramters
