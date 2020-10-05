@@ -9,6 +9,18 @@ Use the following command to install required packages:
 ~~~
 pip3 install -r requirements.txt
 ~~~
+If you wish to make use of the max-tree segmentation as preprocessing step, then you need to take the following steps:
+- Get the zip file "siamxt-master.zip" from: https://github.com/rmsouza01/siamxt
+- Transfer this file to the machine that you will use (for example Peregrine)
+- Load Python, for example I would do this on Peregrine: (This forces Python to be loaded)
+	- module load TensorFlow/2.1.0-fosscuda-2019b-Python-3.7.4
+	- module load matplotlib/3.1.1-fosscuda-2019b-Python-3.7.4
+	- module load scikit-image/0.16.2-fosscuda-2019b-Python-3.7.4
+- Now that python is loaded you can install using: (This installs directly from .zip file)
+~~~
+pip3 install siamxt-master.zip --user.
+~~~
+
 
 
 ## How to run

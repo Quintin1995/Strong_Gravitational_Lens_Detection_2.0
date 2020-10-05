@@ -4,7 +4,7 @@
 # Model Name
 model_name: "f_beta"    # String
 # Development parameters
-show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
+show_plot_of_data_before_training: True   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 
 # Loading the input data
 fraction_to_load_sources_train  : 0.01     #float # range = [0,1]  train
