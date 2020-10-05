@@ -20,6 +20,7 @@ If you wish to make use of the max-tree segmentation as preprocessing step, then
 ~~~
 pip3 install siamxt-master.zip --user.
 ~~~
+If succesful, then the parameter "do_max_tree_seg" can be set to True.
 
 
 
