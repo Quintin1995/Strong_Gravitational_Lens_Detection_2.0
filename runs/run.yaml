@@ -32,26 +32,24 @@ validation_chunksize: 128
 ## EXPERIMENT PARAMETERS
 use_avg_pooling_2D: True          #Boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
-
 # Segmentation Parameters - default values are emperically determined.
 do_max_tree_seg : True            #Boolean, Whether to perform max_tree_segmenation or not.
 # define kernel type and size
 conv_method     : "gaussian"      #string# options= {"gaussian", "boxcar"}
-ksize           : 5               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
+ksize           : 3               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
 # Define cropping type and size
-do_square_crop  : True           #Boolean, Whether to take a centered square crop
-do_circular_crop: True           #Boolean, Whether to perform a circular cropping around the centre of the image
+do_square_crop  : True            #Boolean, Whether to take a centered square crop
+do_circular_crop: True            #Boolean, Whether to perform a circular cropping around the centre of the image
 crop_size       : 74              #int, size of the square/circular crop if enabled. (74,74) for example
 # Define scaling factor
-do_scale        : True           #Boolean, Whether to perform brighness scaling of a pixel based on the distance from the centre of the image. The furter away the object the closer to zero its value will become.
+do_scale        : True            #Boolean, Whether to perform brighness scaling of a pixel based on the distance from the centre of the image. The furter away the object the closer to zero its value will become.
 x_scale         : 30              #int # Scale brightness of pixel based on the distance from centre of the image   # According to the following formula e^(-distance/x_scale), which is exponential decay
 # Define floodfill tolerance
-do_floodfill    : True           #Boolean, to perform the floodfill operation after brightness distance scaling
+do_floodfill    : True            #Boolean, to perform the floodfill operation after brightness distance scaling
 tolerance       : 20              #int, The allowed range of pixel intensity/brighness difference. The higher the value the more pixels will be floodfilled, and the smaller the segments will become.
 # Filter max-tree based on node area size.
 area_th         : 45              #int, Allowed minimum size of a node in the max-tree datastructure. If a certain structure in a max-tree-node has a smaller size, it is discarted.
 use_seg_imgs    : False           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
-
 
 # Network Paramters
 net_name         : "simple_test_net"        #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
