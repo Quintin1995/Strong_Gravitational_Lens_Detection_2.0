@@ -7,19 +7,52 @@ import yaml
 import psutil
 
 
+
+def plot_first_last_stats(X, y):
+    num_imgs = int(input("\nAmount of images to show to the user? integer value: "))
+    columns = 2
+    rows = 1
+    for img_num in range(num_imgs):
+        fig=plt.figure(figsize=(8, 8))
+        pos_img = np.squeeze(X[0+img_num])
+        neg_img = np.squeeze(X[-1-img_num])
+        imgs = [pos_img, neg_img]
+        print("pos image data type: {}".format(pos_img.dtype.name), flush=True)
+        print("pos image shape: {}".format(pos_img.shape), flush=True)
+        print("pos image min: {}".format(np.amin(pos_img)), flush=True)
+        print("pos image max: {}".format(np.amax(pos_img)), flush=True)
+        print("neg image data type: {}".format(neg_img.dtype.name), flush=True)
+        print("neg image shape: {}".format(neg_img.shape), flush=True)
+        print("neg image min: {}".format(np.amin(neg_img)), flush=True)
+        print("neg image max: {}".format(np.amax(neg_img)), flush=True)
+        for i in range(1, columns*rows +1):
+            fig.add_subplot(rows, columns, i)
+            plt.imshow(imgs[i-1], origin='lower', interpolation='none', cmap='Greys_r')
+        fig.suptitle("label0: {}, label1: {}".format(y[0+img_num], y[-1-img_num]))
+        plt.show()
+
+
+
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
-def show_random_img_plt_and_stats(data_array, num_imgs, title):
+def show_random_img_plt_and_stats(data_array, num_imgs=1, title="title", do_plot=True, do_seed=False, seed=7846):
     for _ in range(num_imgs):
-        random_idx = random.randint(0, data_array.shape[0])
-        img = np.squeeze(data_array[random_idx])                    #remove the color channel from the image for matplotlib
+        if do_seed:
+            random.seed(seed)
+        random_idx = random.randint(0, data_array.shape[0]-1)
+        img = np.squeeze(data_array[random_idx])                    # Remove the color channel from the image
+        
+        fig=plt.figure()
         print("\n")
         print(title + " image data type: {}".format(img.dtype.name), flush=True)
         print(title + " image shape: {}".format(img.shape), flush=True)
         print(title + " image min: {}".format(np.amin(img)), flush=True)
         print(title + " image max: {}".format(np.amax(img)), flush=True)
         plt.title(title)
-        plt.imshow(img, norm=None)
-        plt.show()
+        plt.imshow(img, origin='lower', interpolation='none', cmap='Greys_r')
+        if do_plot:
+            plt.show()
+
+
 
 
 # Show 2 images next to each other. Squeeze out the color channel if it exist and it is equal to 1.
@@ -31,12 +64,11 @@ def show2Imgs(img1_numpy, img2_numpy, img1_title, img2_title):
 
     plt.figure()
     plt.subplot(1, 2, 1)
-    plt.imshow(img1_numpy, norm=None)
+    plt.imshow(img1_numpy,cmap='Greys_r')
     plt.title(img1_title)
     plt.subplot(1, 2, 2)
-    plt.imshow(img2_numpy, norm=None)
+    plt.imshow(img2_numpy, cmap='Greys_r')
     plt.title(img2_title)
-    plt.show()
 
 
 # One imshow, Un-Normalized.
@@ -182,4 +214,13 @@ def smooth_curve(points, factor=0.9):
 #         show2Imgs(pos_img, neg_img, "pos max pixel: {0:.3f}".format(np.amax(pos_img)), "neg max pixel: {0:.3f}".format(np.amax(neg_img)))
 #####################################3
 
-
+#####################################3
+# fig=plt.figure(figsize=(8,8))
+# columns = 2
+# rows = 1
+# for j in range(1, columns*rows +1):
+#     fig.add_subplot(rows, columns, j)
+#     plt.imshow(imgs[j-1], cmap='Greys_r')
+# plt.title("label = {}\nimage index={}".format(y[i], i))
+# plt.show()
+# #####################################3

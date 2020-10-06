@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "norm_perImage"    # String
+model_name: "resnet50_norm"    # String
 
 # Loading the input data
 fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
@@ -17,8 +17,8 @@ fraction_to_load_lenses_vali   : 1.0     #float # range = [0,1]   validation
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
-num_chunks: 500                      #int # Number of chunks to be generated 
-chunksize : 65536                      #int # The number of images that will fit into one chunk
+num_chunks: 500                           #int # Number of chunks to be generated 
+chunksize : 65536                         #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 100               #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
@@ -31,15 +31,14 @@ validation_chunksize: 128
 use_avg_pooling_2D: True            #boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Network Paramters
-net_name         : "resnet18"               #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
+net_name         : "resnet50"               #string# Determines which model will be loaded options={"resnet18", "resnet50"}
 net_learning_rate: 0.0001                   #float#
-net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy", "macro_f1", "f_beta_soft"}
-net_loss_function: "binary_crossentropy"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
+net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy", "macro_f1"}
+net_loss_function: "binary_crossentropy"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1"}
 net_num_outputs  : 1                        #int# How many output neurons does the network need?
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
-net_batch_size   : 512                       #int#
+net_batch_size   : 512                      #int#
 es_patience      : 85                       #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
-
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"

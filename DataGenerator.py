@@ -61,7 +61,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 class DataGenerator:
     def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
         self.params = params
-        self.PSF_r = self.compute_PSF_r()
+        self.PSF_r = self._compute_PSF_r()
 
         # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
         self.negative_sample_contaminant_prob = 0.8
@@ -126,14 +126,7 @@ class DataGenerator:
                 fill_mode=params.aug_default_fill_mode)
 
 
-                ###### Step 1.1: show some of the stored images from the data array to the user.
-        if params.verbatim:
-            show_random_img_plt_and_stats(Xsources_train,    num_imgs=1, title="lenses")
-            show_random_img_plt_and_stats(Xnegatives_train, num_imgs=1, title="negatives")
-            show_random_img_plt_and_stats(Xlenses_train,   num_imgs=1, title="sources")
-        
-
-    def compute_PSF_r(self):
+    def _compute_PSF_r(self):
         ## This piece of code is needed for some reason that i will try to find out later.
         nx = 101
         ny = 101
@@ -148,13 +141,12 @@ class DataGenerator:
             for jj in range(ny_):
                 PSF_r[ii + dx][jj + dy] = d1[ii][jj]
 
-        seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
+        # seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
 
-        Rg = 3.30
-        Rr = 2.31
-        Ri = 1.71
+        # Rg = 3.30
+        # Rr = 2.31
+        # Ri = 1.71
         return PSF_r
-        ### END OF IMPORTANT PIECE.
 
 
     # Returns a numpy array with lens images from disk
@@ -235,6 +227,23 @@ class DataGenerator:
             y_test  = np.ones(X_test.shape[0])
 
         return X_train, X_test, y_train, y_test
+
+    
+    # A simple wrapper function in order to keep other functions shorter in code length
+    def _fill_arguments_max_tree_segmenter(self, X_chunk):
+        from max_tree_segmenter import max_tree_segmenter
+        return max_tree_segmenter(X_chunk,
+                    do_square_crop=self.params.do_square_crop,
+                    square_crop_size=self.params.crop_size,
+                    do_circular_crop=self.params.do_circular_crop,
+                    do_scale=self.params.do_scale,
+                    do_floodfill=self.params.do_floodfill,
+                    x_scale=self.params.x_scale,
+                    tolerance=self.params.tolerance,
+                    area_th=self.params.area_th,
+                    conv_method=self.params.conv_method,
+                    ksize=(self.params.ksize,self.params.ksize),
+                    use_seg_imgs=self.params.use_seg_imgs)
     
 
     # Loading a chunk into memory
@@ -264,6 +273,9 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
+        if self.params.do_max_tree_seg:
+            X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
+
         print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
         return X_chunk, y_chunk
 
@@ -290,6 +302,9 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
+        if self.params.do_max_tree_seg:
+            X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
+
         print("Creating validation chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
         return X_chunk, y_chunk
     
@@ -307,9 +322,9 @@ class DataGenerator:
         # mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
         mock_lens = mock_lens.clip(min=0.0, max=1.0)
 
-        # if show_imgs:
+        # if True:
         #     show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
-        #     show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
+            # show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
 
         return mock_lens
 
