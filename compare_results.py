@@ -104,7 +104,7 @@ def get_h5s_paths(models):
         if verbatim:
             print("Model: {} - h5 file".format(idx))
         try:
-            h5_path = glob.glob(model + "/*/*_val_metric.h5")[0]
+            h5_path = glob.glob(model + "/*/*_val_loss.h5")[0]
         except:
             h5_path = glob.glob(model + "/*.h5")[0]
         paths_h5s.append(h5_path)
