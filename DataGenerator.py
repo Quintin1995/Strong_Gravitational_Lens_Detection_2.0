@@ -59,7 +59,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 
 
 class DataGenerator:
-    def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
+    def __init__(self, params, mode="training", do_shuffle_data=True, do_load_validation=True, *args, **kwargs):
         self.params = params
         self.PSF_r = self._compute_PSF_r()
 
@@ -88,27 +88,27 @@ class DataGenerator:
                                                             normalize_dat=self.params.normalize,
                                                             do_shuffle=do_shuffle_data,
                                                             pool=p)
-
-            # Load all validation data.
-            print("\n\n\nLoading Validation Data", flush=True)
-            self.Xsources_validation = self.get_data_array(path=self.params.sources_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_sources_vali,
-                                                        are_sources=True,
-                                                        normalize_dat=self.params.normalize,
-                                                        do_shuffle=do_shuffle_data,
-                                                        pool=p)
-            self.Xnegatives_validation = self.get_data_array(path=self.params.negatives_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_negatives_vali,
-                                                        are_sources=False,
-                                                        normalize_dat=self.params.normalize,
-                                                        do_shuffle=do_shuffle_data,
-                                                        pool=p)
-            self.Xlenses_validation    = self.get_data_array(path=self.params.lenses_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_lenses_vali,
-                                                        are_sources=False,
-                                                        normalize_dat=self.params.normalize,
-                                                        do_shuffle=do_shuffle_data,
-                                                        pool=p)
+            if do_load_validation:
+                # Load all validation data.
+                print("\n\n\nLoading Validation Data", flush=True)
+                self.Xsources_validation = self.get_data_array(path=self.params.sources_path_validation,
+                                                            fraction_to_load=self.params.fraction_to_load_sources_vali,
+                                                            are_sources=True,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+                self.Xnegatives_validation = self.get_data_array(path=self.params.negatives_path_validation,
+                                                            fraction_to_load=self.params.fraction_to_load_negatives_vali,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+                self.Xlenses_validation    = self.get_data_array(path=self.params.lenses_path_validation,
+                                                            fraction_to_load=self.params.fraction_to_load_lenses_vali,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
         p.join()
 
         ###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
