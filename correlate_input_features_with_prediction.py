@@ -95,7 +95,8 @@ def fill_dataframe(df, paths):
 def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
 
     # Add lens and source together | We rescale the brightness of the simulated source to the peak brightness of the LRG in the r-band multiplied by a factor of alpha randomly drawn from the interval [0.02,0.3]
-    mock_lens = lens + source / np.amax(source) * np.amax(lens) * np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
+    alpha_scaling = np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
+    mock_lens = lens + source / np.amax(source) * np.amax(lens) * alpha_scaling
     
     # Take a square root stretch to emphesize lower luminosity features.
     mock_lens = np.sqrt(mock_lens)
@@ -108,7 +109,7 @@ def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), 
     #     show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
         # show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
 
-    return mock_lens
+    return mock_lens, alpha_scaling
 
 
 # This function should read images from the lenses- and sources data array,
@@ -119,10 +120,14 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
     X_train_positive = np.empty((lenses_array.shape[0], lenses_array.shape[1], lenses_array.shape[2], lenses_array.shape[3]), dtype=np.float32)
     Y_train_positive = np.ones(lenses_array.shape[0], dtype=np.float32)
     
+    # for correlating input features with prediction, we also want to keep track of alpha scaling.
+    # This is the ratio between peak brighntess of the lens versus that of the source.
+    alpha_scalings = list()
+
     for i in range(lenses_array.shape[0]):
         lens   = lenses_array[i]
         source = sources_array[i]
-        mock_lens = merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
+        mock_lens, alpha_scaling = merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
 
         # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
         # import matplotlib.pyplot as plt
@@ -140,8 +145,9 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
         # plt.show()
 
         X_train_positive[i] = mock_lens
+        alpha_scalings.append(alpha_scaling)
 
-    return X_train_positive, Y_train_positive
+    return X_train_positive, Y_train_positive, alpha_scalings
 
 
 def compute_PSF_r():
@@ -211,7 +217,7 @@ def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
     data_array = np.zeros((len(filenames), 101, 101, 1))
 
     for idx, filename in enumerate(filenames):
-        if idx % 10 == 0:
+        if idx % 100 == 0:
             print("loaded {} images".format(idx), flush=True)
         if are_sources:
             img = fits.getdata(filename).astype(data_type)
@@ -245,7 +251,8 @@ params = Parameters(settings_yaml, yaml_path, mode="no_training")               
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
 # 4.0 - Select random sample from the data (with replacement)
-sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=1000)
+sample_size = int(input("How many samples do you want to create and run (int): "))
+sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=sample_size)
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources
@@ -253,7 +260,7 @@ lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat=
 sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 
 # 6.0 - Create mock lenses based on the sample
-mock_lenses, _ = merge_lenses_and_sources(lenses, sources)
+mock_lenses, y, alpha_scalings = merge_lenses_and_sources(lenses, sources)
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
@@ -267,21 +274,56 @@ dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_val
 network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
 
-
 # 10.0 - Use the network to predict on the sample
-preds = network.model.predict(mock_lenses)
-preds = list(np.squeeze(preds))
-
-low  = [pred for pred in preds if pred<0.5]
-high = [pred for pred in preds if pred>=0.5]
-print(len(low))
-print(len(high))
+einstein_radii = list(df["LENSER"])
+predictions = network.model.predict(mock_lenses)
+predictions = list(np.squeeze(predictions))
 
 # 11.0 - Make a plot of einstein radius and network certainty
-einstein_radii = list(df["LENSER"])
-plt.plot(einstein_radii, preds, 'o', color='blue')
-plt.title("Einstein radius and network certainty")
+threshold = float(input("What model threshold do you want to set (float): "))
+low_preds  = [pred for pred in predictions if pred<threshold]
+high_preds = [pred for pred in predictions if pred>=threshold]
+
+idx_positives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred>=threshold]
+idx_negatives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred<threshold]
+
+print(len(idx_positives))
+print(len(idx_negatives))
+
+einstein_radii_positives = list()
+preds_positives          = list()
+for idx, pred in idx_positives:
+    einstein_radii_positives.append(einstein_radii[idx])
+    preds_positives.append(pred)
+
+einstein_radii_negatives = list()
+preds_negatives          = list()
+for idx, pred in idx_negatives:
+    einstein_radii_negatives.append(einstein_radii[idx])
+    preds_negatives.append(pred)
+
+print("minimum Einstein Radii = {}".format(min(einstein_radii)))
+plt.plot(einstein_radii_positives, preds_positives, 'o', color='blue', label="positives {}".format(len(preds_positives)))
+plt.plot(einstein_radii_negatives, preds_negatives, 'o', color='red', label="negatives {}".format(len(preds_negatives)))
+
+plt.title("Einstein radius and network certainty. FNR: {:.2f}".format(len(preds_negatives)/sample_size))
 plt.xlabel("Einstein Radius of source")
 plt.ylabel("Model prediction")
+plt.legend()
 plt.show()
 s=3
+
+
+# 12.0 - Lets try to make a 3D plot, with:
+# x-axis is Einstein Radius
+# y-axis is alpha_scaling
+# z-axis is prediction of model.
+from mpl_toolkits.mplot3d import Axes3D
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
+plt.xlabel("Einstein Radius")
+plt.ylabel("Source Intensity Scaling")
+plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+plt.show()
