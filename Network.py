@@ -21,11 +21,10 @@ from f_beta_metric import FBetaMetric
 from f_beta_soft_metric import SoftFBeta
 
 
-
 class Network:
 
     def __init__(self, params, datagenerator, training):
-
+        # Turn of eager execution, for better performance
         tf.compat.v1.disable_eager_execution()
 
         # Set parameters of the Network class
