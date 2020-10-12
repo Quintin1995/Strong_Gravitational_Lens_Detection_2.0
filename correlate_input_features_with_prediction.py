@@ -1,17 +1,31 @@
-import os
 from compare_results import set_experiment_folder, set_models_folders, load_settings_yaml
 from DataGenerator import DataGenerator
+import glob
 from Network import Network
 import numpy as np
-from Parameters import Parameters
 import tensorflow as tf
-import glob
+import matplotlib.pyplot as plt
 from astropy.io import fits
 from skimage import exposure
+import os
 import scipy
 import pyfits
 import random
+from Parameters import Parameters
 import pandas as pd
+
+
+def get_h5_path_dialog(model_paths):
+    h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
+    if h5_choice == 1:
+        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*loss.h5"))
+    elif h5_choice == 2:
+        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*metric.h5"))
+    else:
+        h5_paths = glob.glob(os.path.join(model_paths[0], "*.h5"))
+
+    print("Choice h5 path: {}".format(h5_paths[0]))
+    return h5_paths[0]
 
 
 def get_empty_dataframe():
@@ -221,6 +235,9 @@ tf.compat.v1.disable_eager_execution()
 # 2.0 - Model Selection from directory
 model_paths = get_model_paths()
 
+# 2.1 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
+h5_path = get_h5_path_dialog(model_paths)
+
 # 3.0 - Load params - used for normalization etc -
 yaml_path = glob.glob(os.path.join(model_paths[0], "run.yaml"))[0]                      # Only choose the first one for now
 settings_yaml = load_settings_yaml(yaml_path)                                           # Returns a dictionary object.
@@ -228,7 +245,7 @@ params = Parameters(settings_yaml, yaml_path, mode="no_training")               
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
 # 4.0 - Select random sample from the data (with replacement)
-sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=10)
+sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=1000)
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources
@@ -236,15 +253,35 @@ lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat=
 sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 
 # 6.0 - Create mock lenses based on the sample
-mock_lenses = merge_lenses_and_sources(lenses, sources)
+mock_lenses, _ = merge_lenses_and_sources(lenses, sources)
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
 df = fill_dataframe(df, sources_fnames)
+print(df.head())
 
 # 8.0 - Create a dataGenerator object, because the network class wants it
 dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_validation=False)
 
-# 9.0  - Construct a Network object that has a model as property
+# 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
-x=3
+network.model.load_weights(h5_path)
+
+
+# 10.0 - Use the network to predict on the sample
+preds = network.model.predict(mock_lenses)
+preds = list(np.squeeze(preds))
+
+low  = [pred for pred in preds if pred<0.5]
+high = [pred for pred in preds if pred>=0.5]
+print(len(low))
+print(len(high))
+
+# 11.0 - Make a plot of einstein radius and network certainty
+einstein_radii = list(df["LENSER"])
+plt.plot(einstein_radii, preds, 'o', color='blue')
+plt.title("Einstein radius and network certainty")
+plt.xlabel("Einstein Radius of source")
+plt.ylabel("Model prediction")
+plt.show()
+s=3
