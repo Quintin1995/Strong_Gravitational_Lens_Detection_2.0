@@ -284,8 +284,11 @@ class DataGenerator:
     def load_chunk_val(self, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
         num_positive = self.Xlenses_validation.shape[0]
-        num_negative = self.Xnegatives_validation.shape[0] + self.Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
+        # num_negative = self.Xnegatives_validation.shape[0] + self.Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
         
+        # Lets create a balanced validation set.
+        num_negative = num_positive
+
         # Get mock lenses data and labels
         X_pos, y_pos = self.merge_lenses_and_sources(self.Xlenses_validation, self.Xsources_validation, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=True)
             
@@ -294,8 +297,15 @@ class DataGenerator:
         y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
 
         # Negatives consist of the negatives set and the unmerged lenses set. A lens unmerged with a source is basically a negative.
-        X_neg[0:num_positive] = self.Xlenses_validation
-        X_neg[num_positive:num_negative] = self.Xnegatives_validation
+        n = int(num_negative // 2)  # number samples to take from lenses-, and negatives set.
+        
+        indexes_lenses = np.random.choice(self.Xlenses_validation.shape[0], n, replace=False)  
+        X_neg[0:int(num_negative//2)] = self.Xlenses_validation[indexes_lenses] # first half of negative chunk is a random selection from lenses without replacement
+
+        indexes_negatives = np.random.choice(self.Xlenses_validation.shape[0], n+1, replace=False)  
+        X_neg[int(num_negative//2):num_negative] = self.Xnegatives_validation[indexes_negatives] # second half of negatives are a random selection from the negatives without replacement
+        
+        # The negatives need a square root stretch, just like the positives.
         X_neg = np.sqrt(X_neg)
 
         # Concatenate the positive and negative examples into one chunk (also the labels)
