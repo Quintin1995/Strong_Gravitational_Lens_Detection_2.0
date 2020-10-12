@@ -110,7 +110,6 @@ class Network:
                 mc_dict_filename=self.params.full_path_of_yaml_metric
             )
 
-
         # A printout of the model to a txt file
         if training:
             self.save_model_to_file()

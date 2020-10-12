@@ -11,7 +11,123 @@ from skimage import exposure
 import scipy
 import pyfits
 import random
-from einstein_radii_distribution import get_empty_dataframe, fill_dataframe
+import pandas as pd
+
+
+def get_empty_dataframe():
+    # Define which parameter to collect
+    column_names = ["LENSER", "LENSAR", "LENSAA", "LENSSH", "LENSSA", "SRCER", "SRCX", "SRCY", "SRCAR", "SRCAA", "SRCSI", "path"]
+
+    # Create a dataframe for parameter storage
+    return pd.DataFrame(columns = column_names)
+
+
+# Fill the dataframe with SIE parameters and Sersic parameters
+# use numpy arrays for speed
+def fill_dataframe(df, paths):
+
+    # Define numpy arrays to temporarily hold the parameters
+    # LENS PARAMETERS
+    LENSER = np.zeros((len(paths),), dtype=np.float32)
+    LENSAR = np.zeros((len(paths),), dtype=np.float32)
+    LENSAA = np.zeros((len(paths),), dtype=np.float32)
+    LENSSH = np.zeros((len(paths),), dtype=np.float32)
+    LENSSA = np.zeros((len(paths),), dtype=np.float32)
+    # SERSIC PARAMETERS
+    SRCER = np.zeros((len(paths),), dtype=np.float32)
+    SRCX = np.zeros((len(paths),), dtype=np.float32)
+    SRCY = np.zeros((len(paths),), dtype=np.float32)
+    SRCAR = np.zeros((len(paths),), dtype=np.float32)
+    SRCAA = np.zeros((len(paths),), dtype=np.float32)
+    SRCSI = np.zeros((len(paths),), dtype=np.float32)
+
+    # Loop over all sources files
+    for idx, filename in enumerate(paths):
+        if idx % 1000 == 0:
+            print("processing source idx: {}".format(idx))
+        hdul = fits.open(filename)
+
+        LENSER[idx] = hdul[0].header["LENSER"]
+        LENSAR[idx] = hdul[0].header["LENSAR"] 
+        LENSAA[idx] = hdul[0].header["LENSAA"] 
+        LENSSH[idx] = hdul[0].header["LENSSH"] 
+        LENSSA[idx] = hdul[0].header["LENSSA"] 
+
+        SRCER[idx] = hdul[0].header["SRCER"] 
+        SRCX[idx] = hdul[0].header["SRCX"] 
+        SRCY[idx] = hdul[0].header["SRCY"] 
+        SRCAR[idx] = hdul[0].header["SRCAR"] 
+        SRCAA[idx] = hdul[0].header["SRCAA"] 
+        SRCSI[idx] = hdul[0].header["SRCSI"]
+
+    df["LENSER"] = LENSER
+    df["LENSAR"] = LENSAR
+    df["LENSAA"] = LENSAA
+    df["LENSSH"] = LENSSH
+    df["LENSSA"] = LENSSA
+
+    df["SRCER"] = SRCER
+    df["SRCX"] = SRCX
+    df["SRCY"] = SRCY
+    df["SRCAR"] = SRCAR
+    df["SRCAA"] = SRCAA
+    df["SRCSI"] = SRCSI
+
+    df["path"] = paths
+    return df
+
+
+# Merge a single lens and source together into a mock lens.
+def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
+
+    # Add lens and source together | We rescale the brightness of the simulated source to the peak brightness of the LRG in the r-band multiplied by a factor of alpha randomly drawn from the interval [0.02,0.3]
+    mock_lens = lens + source / np.amax(source) * np.amax(lens) * np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
+    
+    # Take a square root stretch to emphesize lower luminosity features.
+    mock_lens = np.sqrt(mock_lens)
+    
+    # Basically removes negative values - should not be necessary, because all input data should be normalized anyway. (I will leave it for now, but should be removed soon.)
+    # mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
+    mock_lens = mock_lens.clip(min=0.0, max=1.0)
+
+    # if True:
+    #     show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
+        # show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
+
+    return mock_lens
+
+
+# This function should read images from the lenses- and sources data array,
+# and merge them together into a lensing system, further described as 'mock lens'.
+# These mock lenses represent a strong gravitational lensing system that should 
+# get the label 1.0 (positive label). 
+def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scaling = (0.02, 0.30)):
+    X_train_positive = np.empty((lenses_array.shape[0], lenses_array.shape[1], lenses_array.shape[2], lenses_array.shape[3]), dtype=np.float32)
+    Y_train_positive = np.ones(lenses_array.shape[0], dtype=np.float32)
+    
+    for i in range(lenses_array.shape[0]):
+        lens   = lenses_array[i]
+        source = sources_array[i]
+        mock_lens = merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
+
+        # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
+        # import matplotlib.pyplot as plt
+        # l = np.squeeze(lens)
+        # s = np.squeeze(source)
+        # m = np.squeeze(mock_lens)
+        # plt.imshow(l, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.title("lens")
+        # plt.show()
+        # plt.imshow(s, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.title("source")
+        # plt.show()
+        # plt.imshow(m, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.title("mock lens")
+        # plt.show()
+
+        X_train_positive[i] = mock_lens
+
+    return X_train_positive, Y_train_positive
 
 
 def compute_PSF_r():
@@ -29,11 +145,6 @@ def compute_PSF_r():
             for jj in range(ny_):
                 PSF_r[ii + dx][jj + dy] = d1[ii][jj]
 
-        # seds = np.loadtxt("data/SED_colours_2017-10-03.dat")
-
-        # Rg = 3.30
-        # Rr = 2.31
-        # Ri = 1.71
         return PSF_r
 
 
@@ -102,7 +213,7 @@ def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
     return data_array
 
 
-############################## script ##############################
+############################################################ script ############################################################
 
 # Fix memory leaks if running on tensorflow 2
 tf.compat.v1.disable_eager_execution()
@@ -123,11 +234,18 @@ PSF_r = compute_PSF_r()
 sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=10)
 
 # Load lenses and sources in 4D numpy arrays
-lenses, _ = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
-sources, source_params = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
+lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
+sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 
 # Initialize a pandas dataframe to store source parameters
 df = get_empty_dataframe()
 df = fill_dataframe(df, sources_fnames)
 
+mock_lenses = merge_lenses_and_sources(lenses, sources)
+
+
+# first create a dataGenerator object, because the network class wants it
+dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_validation=False)
+
+network = Network(params, dg, training=False)
 x=3
