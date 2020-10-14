@@ -180,9 +180,9 @@ def get_model_paths(root_dir="models"):
 
 
 # Select a random sample with replacement from all files.
-def get_sample_lenses_and_sources(size=1000):
-    lenses_path_train    = os.path.join("data", "train", "lenses")
-    sources_path_train   = os.path.join("data", "train", "sources")
+def get_sample_lenses_and_sources(size=1000, type_data="validation"):
+    lenses_path_train    = os.path.join("data", type_data, "lenses")
+    sources_path_train   = os.path.join("data", type_data, "sources")
     # negatives_path_train = os.path.join("data", "train", "negatives")
 
     # Try to glob files in the given path

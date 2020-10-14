@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "MT_Gaus5x5_softloss_seg_imgs"          # String
+model_name: "MT_Gaus5x5_softloss_seg_imgs_v2"          # String
 # Development parameters
 show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 
@@ -38,7 +38,7 @@ do_max_tree_seg : True            #Boolean, Whether to perform max_tree_segmenat
 conv_method     : "gaussian"        #string# options= {"gaussian", "boxcar"}
 ksize           : 5               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
 # Define cropping type and size
-do_square_crop  : False            #Boolean, Whether to take a centered square crop
+do_square_crop  : True            #Boolean, Whether to take a centered square crop
 do_circular_crop: True            #Boolean, Whether to perform a circular cropping around the centre of the image
 crop_size       : 74              #int, size of the square/circular crop if enabled. (74,74) for example
 # Define scaling factor
