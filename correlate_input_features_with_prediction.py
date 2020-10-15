@@ -281,9 +281,6 @@ predictions = list(np.squeeze(predictions))
 
 # 11.0 - Make a plot of einstein radius and network certainty
 threshold = float(input("What model threshold do you want to set (float): "))
-low_preds  = [pred for pred in predictions if pred<threshold]
-high_preds = [pred for pred in predictions if pred>=threshold]
-
 idx_positives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred>=threshold]
 idx_negatives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred<threshold]
 
@@ -311,10 +308,22 @@ plt.xlabel("Einstein Radius of source")
 plt.ylabel("Model prediction")
 plt.legend()
 plt.show()
-s=3
 
 
-# 12.0 - Lets try to make a 3D plot, with:
+# 12.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
+# For each data-point based on these features, assign a color based on the model prediction.
+fig, ax = plt.subplots()
+plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
+plt.xlabel("Einstein Radius")
+plt.ylabel("Source Intensity Scaling")
+plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+cbar = plt.colorbar()
+cbar.ax.get_yaxis().labelpad = 15
+cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+plt.show()
+
+
+# 13.0 - Lets try to make a 3D plot, with:
 # x-axis is Einstein Radius
 # y-axis is alpha_scaling
 # z-axis is prediction of model.
