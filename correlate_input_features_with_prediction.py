@@ -312,6 +312,7 @@ plt.show()
 
 # 12.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
 # For each data-point based on these features, assign a color based on the model prediction.
+# PLOT1
 fig, ax = plt.subplots()
 plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
 plt.xlabel("Einstein Radius")
@@ -320,7 +321,18 @@ plt.title("Influence of brightness intensity scaling of Source and Einstein Radi
 cbar = plt.colorbar()
 cbar.ax.get_yaxis().labelpad = 15
 cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+
+# PLOT2
+fig, ax = plt.subplots()
+plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=15, cmap='copper')
+plt.xlabel("Einstein Radius")
+plt.ylabel("Source Intensity Scaling")
+plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+cbar = plt.colorbar()
+cbar.ax.get_yaxis().labelpad = 15
+cbar.ax.set_ylabel('Prediction value Model', rotation=270)
 plt.show()
+
 
 
 # 13.0 - Lets try to make a 3D plot, with:
