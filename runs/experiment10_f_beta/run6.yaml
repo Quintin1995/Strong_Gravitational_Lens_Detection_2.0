@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "f_beta_soft_resnet18_4"    # String
+model_name: "f_beta_soft_resnet18_v6_Noavgpooling"    # String
 
 # Loading the input data
 fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
@@ -28,7 +28,7 @@ chunk_save_interval: 50                   #int # After this amount of chunks the
 validation_chunksize: 128
 
 ## EXPERIMENT PARAMETERS
-use_avg_pooling_2D: True                  #boolean, # Whether the resnet contains GLOBAL AVG POOLING
+use_avg_pooling_2D: False                  #boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Network Paramters
 net_name         : "resnet18"               #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
@@ -38,7 +38,7 @@ net_loss_function: "f_beta_soft_loss"       #string # Which loss function should
 net_num_outputs  : 1                        #int# How many output neurons does the network need?
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
 net_batch_size   : 512                      #int#
-es_patience      : 85                       #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
+es_patience      : 50                       #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"

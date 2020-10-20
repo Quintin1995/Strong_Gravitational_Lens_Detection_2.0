@@ -21,11 +21,10 @@ from f_beta_metric import FBetaMetric
 from f_beta_soft_metric import SoftFBeta
 
 
-
 class Network:
 
     def __init__(self, params, datagenerator, training):
-
+        # Turn of eager execution, for better performance
         tf.compat.v1.disable_eager_execution()
 
         # Set parameters of the Network class
@@ -109,7 +108,6 @@ class Network:
                 save_weights_only=False,
                 mc_dict_filename=self.params.full_path_of_yaml_metric
             )
-
 
         # A printout of the model to a txt file
         if training:
@@ -267,12 +265,12 @@ class Network:
     # consuming when models get large.
     def reset_keras_backend(self):
         begin_time = time.time()
-        print("\n\n----Reseting tensorflow keras backend", flush=True)
+        print("\n\n\n\n----Reseting tensorflow keras backend", flush=True)
         self.model.save(self.params.full_path_model_storage)
         tf.keras.backend.clear_session()
         self.model = tf.keras.models.load_model(self.params.full_path_model_storage, compile=False)
         self.model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
-        print("\n reset time: {}\n----".format(hms(time.time() - begin_time)), flush=True)
+        print("\n reset time: {}\n----\n\n".format(hms(time.time() - begin_time)), flush=True)
 
 
     # Update network properties, based on the history of the trained network.

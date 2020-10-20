@@ -134,6 +134,7 @@ class Parameters(object):
         self.net_batch_size    = settings["net_batch_size"]
         self.es_patience       = settings["es_patience"]
 
+
     # Data Augmentation parameters
     def _set_augmentation_params(self, settings):
         self.aug_zoom_range               = (settings["aug_zoom_range_min"], settings["aug_zoom_range_max"]) # This range will be sampled from uniformly.

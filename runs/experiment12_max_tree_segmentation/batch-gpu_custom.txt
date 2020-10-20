@@ -4,8 +4,8 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:v100:1
-#SBATCH --job-name=max_tree_S0
-#SBATCH --array=1
+#SBATCH --job-name=max_tree_v2
+#SBATCH --array=4
 
 module load TensorFlow/2.1.0-fosscuda-2019b-Python-3.7.4
 module load matplotlib/3.1.1-fosscuda-2019b-Python-3.7.4

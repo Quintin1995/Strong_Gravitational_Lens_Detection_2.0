@@ -24,7 +24,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 # Create Custom Data Generator
 datagen = DataGenerator(params)
 
-# Create Neural Network - Resnet18
+# Create Neural Network
 network = Network(params, datagen, training=True) # The network needs to know hyper-paramters from params, and needs to know how to generate data with a datagenerator object.
 
 # Train the network

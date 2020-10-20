@@ -97,6 +97,7 @@ def get_jsons(models):
 
 # For each model path in models find a .h5 file path and return it.
 def get_h5s_paths(models):
+    model_choice = input("Do you want to select a model based on loss or based on validation metric?: type either 'loss' or 'metric': ")
     if verbatim:
         print("\n\nh5 files: ")
     paths_h5s = []
@@ -104,7 +105,8 @@ def get_h5s_paths(models):
         if verbatim:
             print("Model: {} - h5 file".format(idx))
         try:
-            h5_path = glob.glob(model + "/*/*_val_metric.h5")[0]
+            
+            h5_path = glob.glob(model + "/*/*_val_{}.h5".format(model_choice))[0]
         except:
             h5_path = glob.glob(model + "/*.h5")[0]
         paths_h5s.append(h5_path)

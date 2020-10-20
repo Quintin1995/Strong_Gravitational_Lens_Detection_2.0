@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "f_beta_soft_resnet18_4"    # String
+model_name: "f_beta_soft_resnet18_v5"    # String
 
 # Loading the input data
 fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
