@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "f_beta_softloss_test"    # String
+model_name: "test"    # String
 # Development parameters
 show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 
@@ -33,13 +33,13 @@ validation_chunksize: 128
 use_avg_pooling_2D: True          #Boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Segmentation Parameters - default values are emperically determined.
-do_max_tree_seg : True            #Boolean, Whether to perform max_tree_segmenation or not.
+do_max_tree_seg : False            #Boolean, Whether to perform max_tree_segmenation or not.
 # define kernel type and size
 conv_method     : "gaussian"        #string# options= {"gaussian", "boxcar"}
 ksize           : 5               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
 # Define cropping type and size
-do_square_crop  : True            #Boolean, Whether to take a centered square crop
-do_circular_crop: True            #Boolean, Whether to perform a circular cropping around the centre of the image
+do_square_crop  : False            #Boolean, Whether to take a centered square crop
+do_circular_crop: False            #Boolean, Whether to perform a circular cropping around the centre of the image
 crop_size       : 74              #int, size of the square/circular crop if enabled. (74,74) for example
 # Define scaling factor
 do_scale        : True            #Boolean, Whether to perform brighness scaling of a pixel based on the distance from the centre of the image. The furter away the object the closer to zero its value will become.
@@ -49,13 +49,13 @@ do_floodfill    : True            #Boolean, to perform the floodfill operation a
 tolerance       : 20              #int, The allowed range of pixel intensity/brighness difference. The higher the value the more pixels will be floodfilled, and the smaller the segments will become.
 # Filter max-tree based on node area size.
 area_th         : 45              #int, Allowed minimum size of a node in the max-tree datastructure. If a certain structure in a max-tree-node has a smaller size, it is discarted.
-use_seg_imgs    : True           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
+use_seg_imgs    : False           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
 
 # Network Paramters
-net_name         : "simple_test_net"        #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
+net_name         : "resnet18_no_downscaling"        #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net", "resnet18_no_downscaling"}
 net_learning_rate: 0.0001                   #float#
-net_model_metrics: "f_beta_soft"        #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
-net_loss_function: "f_beta_soft_loss"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
+net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
+net_loss_function: "binary_crossentropy"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
 net_num_outputs  : 1                        #int# How many output neurons does the network need?
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
 net_batch_size   : 32                       #int#
