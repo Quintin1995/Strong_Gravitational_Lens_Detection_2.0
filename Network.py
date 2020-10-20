@@ -21,11 +21,10 @@ from f_beta_metric import FBetaMetric
 from f_beta_soft_metric import SoftFBeta
 
 
-
 class Network:
 
     def __init__(self, params, datagenerator, training):
-
+        # Turn of eager execution, for better performance
         tf.compat.v1.disable_eager_execution()
 
         # Set parameters of the Network class
@@ -65,14 +64,10 @@ class Network:
             self.model          = self.build_simple_test_net(input_shape = self.input_shape, num_outputs = self.num_outputs)
 
         # Parameters used when training the model
-        self.loss     = []              # Store loss of the model
-        self.acc      = []              # Store binary accuracy of the model        or it holds other metric values such as f1-softloss (scores)
-        self.val_loss = []              # Store validation loss of the model
-        self.val_metric  = []           # Store validation binary accuracy           or it holds other metric values such as f1-softloss (scores)
-
-        # Not every iteration/epoch has a validation value. In order to store a value for each epoch we need an initial value (this is just a guess and should not affect performance in any way.)
-        self.val_loss.append(3.0)       # initial validation loss value
-        self.val_metric.append(0.05)     # initial validation metric value
+        self.loss        = []              # Store loss of the model
+        self.score       = []              # Store score, such as (binary accuracy or f1-macro scores) of the model     or it holds other metric values such as f1-softloss (scores)
+        self.val_loss    = []              # Store validation loss of the model
+        self.val_metric  = []              # Store validation metric           or it holds other metric values such as f1-softloss (scores)
 
         # Model Selection
         self.best_val_loss    = 9999.0
@@ -113,7 +108,6 @@ class Network:
                 save_weights_only=False,
                 mc_dict_filename=self.params.full_path_of_yaml_metric
             )
-
 
         # A printout of the model to a txt file
         if training:
@@ -179,9 +173,10 @@ class Network:
                 if(psutil.virtual_memory().percent > 75.0):
                     self.reset_keras_backend()
 
-                # Early stopping
-                if self.do_early_stopping(self.val_loss[-1]):
-                    break
+                # Early stopping - Early stopping cannot occur the first iteration
+                if chunk_idx != 0:
+                    if self.do_early_stopping(self.val_loss[-1]):
+                        break
 
                 # Store loss and accuracy in list - Must be done after early stopping call
                 self.update_loss_and_acc(history)
@@ -189,7 +184,7 @@ class Network:
                 # Plot loss and accuracy on interval (also validation loss and accuracy) (to a png file)
                 if self.params.verbatim:
                     if chunk_idx % self.params.chunk_plot_interval == 0:
-                        plot_history(self.acc, self.val_metric, self.loss, self.val_loss, self.params)
+                        plot_history(self.score, self.val_metric, self.loss, self.val_loss, self.params)
 
         except KeyboardInterrupt:
             self.model.save_weights(self.params.full_path_of_weights)
@@ -270,34 +265,34 @@ class Network:
     # consuming when models get large.
     def reset_keras_backend(self):
         begin_time = time.time()
-        print("\n\n----Reseting tensorflow keras backend", flush=True)
+        print("\n\n\n\n----Reseting tensorflow keras backend", flush=True)
         self.model.save(self.params.full_path_model_storage)
         tf.keras.backend.clear_session()
         self.model = tf.keras.models.load_model(self.params.full_path_model_storage, compile=False)
         self.model.compile(optimizer=self.optimizer, loss=self.loss_function, metrics=self.metrics)
-        print("\n reset time: {}\n----".format(hms(time.time() - begin_time)), flush=True)
+        print("\n reset time: {}\n----\n\n".format(hms(time.time() - begin_time)), flush=True)
 
 
     # Update network properties, based on the history of the trained network.
     def update_loss_and_acc(self, history):
-        if self.metrics == "binary_accuracy":
+        if self.params.net_model_metrics == "binary_accuracy":
             self.loss.append(history.history["loss"][0])
-            self.acc.append(history.history["binary_accuracy"][0])
+            self.score.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_binary_accuracy"][0])
         elif self.params.net_model_metrics == "macro_f1":
             self.loss.append(history.history["loss"][0])
-            self.acc.append(history.history["macro_f1"][0])
+            self.score.append(history.history["macro_f1"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_macro_f1"][0])
         elif self.params.net_model_metrics == "f_beta":
             self.loss.append(history.history["loss"][0])
-            self.acc.append(history.history["binary_accuracy"][0])
+            self.score.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_f_beta"][0])
         elif self.params.net_model_metrics == "f_beta_soft":
             self.loss.append(history.history["loss"][0])
-            self.acc.append(history.history["binary_accuracy"][0])
+            self.score.append(history.history["binary_accuracy"][0])
             self.val_loss.append(history.history["val_loss"][0])
             self.val_metric.append(history.history["val_binary_accuracy"][0])
 

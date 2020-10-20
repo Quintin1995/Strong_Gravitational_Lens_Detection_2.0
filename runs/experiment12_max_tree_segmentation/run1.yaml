@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "MT_s0_Gaus3x3"    # String
+model_name: "MT_s0_Gaus3x3_v2"    # String
 # Development parameters
 show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 

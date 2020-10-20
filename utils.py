@@ -69,6 +69,7 @@ def show2Imgs(img1_numpy, img2_numpy, img1_title, img2_title):
     plt.subplot(1, 2, 2)
     plt.imshow(img2_numpy, cmap='Greys_r')
     plt.title(img2_title)
+    plt.show()
 
 
 # One imshow, Un-Normalized.

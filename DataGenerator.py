@@ -59,7 +59,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 
 
 class DataGenerator:
-    def __init__(self, params, mode="training", do_shuffle_data=True, *args, **kwargs):
+    def __init__(self, params, mode="training", do_shuffle_data=True, do_load_validation=True, *args, **kwargs):
         self.params = params
         self.PSF_r = self._compute_PSF_r()
 
@@ -88,27 +88,27 @@ class DataGenerator:
                                                             normalize_dat=self.params.normalize,
                                                             do_shuffle=do_shuffle_data,
                                                             pool=p)
-
-            # Load all validation data.
-            print("\n\n\nLoading Validation Data", flush=True)
-            self.Xsources_validation = self.get_data_array(path=self.params.sources_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_sources_vali,
-                                                        are_sources=True,
-                                                        normalize_dat=self.params.normalize,
-                                                        do_shuffle=do_shuffle_data,
-                                                        pool=p)
-            self.Xnegatives_validation = self.get_data_array(path=self.params.negatives_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_negatives_vali,
-                                                        are_sources=False,
-                                                        normalize_dat=self.params.normalize,
-                                                        do_shuffle=do_shuffle_data,
-                                                        pool=p)
-            self.Xlenses_validation    = self.get_data_array(path=self.params.lenses_path_validation,
-                                                        fraction_to_load=self.params.fraction_to_load_lenses_vali,
-                                                        are_sources=False,
-                                                        normalize_dat=self.params.normalize,
-                                                        do_shuffle=do_shuffle_data,
-                                                        pool=p)
+            if do_load_validation:
+                # Load all validation data.
+                print("\n\n\nLoading Validation Data", flush=True)
+                self.Xsources_validation = self.get_data_array(path=self.params.sources_path_validation,
+                                                            fraction_to_load=self.params.fraction_to_load_sources_vali,
+                                                            are_sources=True,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+                self.Xnegatives_validation = self.get_data_array(path=self.params.negatives_path_validation,
+                                                            fraction_to_load=self.params.fraction_to_load_negatives_vali,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+                self.Xlenses_validation    = self.get_data_array(path=self.params.lenses_path_validation,
+                                                            fraction_to_load=self.params.fraction_to_load_lenses_vali,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
         p.join()
 
         ###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
@@ -284,8 +284,11 @@ class DataGenerator:
     def load_chunk_val(self, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
         num_positive = self.Xlenses_validation.shape[0]
-        num_negative = self.Xnegatives_validation.shape[0] + self.Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
+        # num_negative = self.Xnegatives_validation.shape[0] + self.Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
         
+        # Lets create a balanced validation set.
+        num_negative = num_positive
+
         # Get mock lenses data and labels
         X_pos, y_pos = self.merge_lenses_and_sources(self.Xlenses_validation, self.Xsources_validation, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=True)
             
@@ -294,8 +297,15 @@ class DataGenerator:
         y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
 
         # Negatives consist of the negatives set and the unmerged lenses set. A lens unmerged with a source is basically a negative.
-        X_neg[0:num_positive] = self.Xlenses_validation
-        X_neg[num_positive:num_negative] = self.Xnegatives_validation
+        n = int(num_negative // 2)  # number samples to take from lenses-, and negatives set.
+        
+        indexes_lenses = np.random.choice(self.Xlenses_validation.shape[0], n, replace=False)  
+        X_neg[0:int(num_negative//2)] = self.Xlenses_validation[indexes_lenses] # first half of negative chunk is a random selection from lenses without replacement
+
+        indexes_negatives = np.random.choice(self.Xlenses_validation.shape[0], n+1, replace=False)  
+        X_neg[int(num_negative//2):num_negative] = self.Xnegatives_validation[indexes_negatives] # second half of negatives are a random selection from the negatives without replacement
+        
+        # The negatives need a square root stretch, just like the positives.
         X_neg = np.sqrt(X_neg)
 
         # Concatenate the positive and negative examples into one chunk (also the labels)
