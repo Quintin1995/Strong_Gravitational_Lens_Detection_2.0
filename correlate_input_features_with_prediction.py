@@ -3,7 +3,6 @@ from DataGenerator import DataGenerator
 import glob
 from Network import Network
 import numpy as np
-import tensorflow as tf
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from skimage import exposure
@@ -14,6 +13,9 @@ import random
 from Parameters import Parameters
 import pandas as pd
 from utils import show2Imgs
+import tensorflow as tf
+from tensorflow.keras import backend as K
+import cv2
 
 
 def get_h5_path_dialog(model_paths):
@@ -258,7 +260,8 @@ def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
     return data_array
 
 
-
+# Makes a plot of a feature versus model prediction in a 2D plot. The plot is seperated into
+# two classes, positive and negative, based on a given threshold.
 def plot_feature_versus_prediction(predictions, feature_list, threshold=None, title=""):
     if threshold == None:
         threshold = float(input("What model threshold do you want to set (float): "))
@@ -331,23 +334,67 @@ dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_val
 network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
 
+
+
+
+# 9.5 - Create a heatmap of a given image.
+for i in range(10):
+    img = mock_lenses[i]
+    plt.imshow(np.squeeze(img), cmap='Greys_r')
+    plt.title("mock lens")
+    plt.show()
+
+    img = np.expand_dims(img, axis=0)
+
+    mock_lens_output = network.model.output[:, 0]
+
+    last_conv_layer = network.model.get_layer('conv2d_19')
+
+    grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
+
+    pooled_grads = K.mean(grads, axis=(0,1,2))
+
+    iterate = K.function([network.model.input],
+                        [pooled_grads, last_conv_layer.output[0]])
+
+    pooled_grads_value, conv_layer_output_value = iterate([img])
+
+    for i in range(512):
+        conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
+
+    heatmap = np.mean(conv_layer_output_value, axis=-1)
+
+    heatmap = np.maximum(heatmap, 0)
+    heatmap /= np.max(heatmap)
+    plt.matshow(heatmap)
+    plt.title("heatmap of input image")
+    plt.show()
+
+    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[2]))
+
+    superimposed_img = heatmap + 0.4 * np.squeeze(img)
+    plt.imshow(superimposed_img, cmap='Greys_r')
+    plt.title("Heat map superimposed on input image")
+    plt.show()
+
+    x=4
+
+
+
 # 10.0 - Use the network to predict on the sample
 einstein_radii = list(df["LENSER"])
 predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
-
-# 10.5 - Lets make a plot of feature area size versus prediction value of a given model.
+# 11.0 - Lets make a plot of feature area size versus network certainty.
 plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
 
-
-# 11.0 - Make a plot of einstein radius and network certainty
+# 12.0 - Make a plot of einstein radius and network certainty
 plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
-
-# 12.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
+# 13.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
 # For each data-point based on these features, assign a color based on the model prediction.
-# PLOT1
+# SCATTER - PLOT 1
 fig, ax = plt.subplots()
 plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
 plt.xlabel("Einstein Radius")
@@ -357,7 +404,7 @@ cbar = plt.colorbar()
 cbar.ax.get_yaxis().labelpad = 15
 cbar.ax.set_ylabel('Prediction value Model', rotation=270)
 
-# PLOT2
+# HEXBIN - PLOT 2
 fig, ax = plt.subplots()
 plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=15, cmap='copper')
 plt.xlabel("Einstein Radius")
@@ -369,8 +416,7 @@ cbar.ax.set_ylabel('Prediction value Model', rotation=270)
 plt.show()
 
 
-
-# 13.0 - Lets try to make a 3D plot, with:
+# 14.0 - Lets try to make a 3D plot, with:
 # x-axis is Einstein Radius
 # y-axis is alpha_scaling
 # z-axis is prediction of model.
