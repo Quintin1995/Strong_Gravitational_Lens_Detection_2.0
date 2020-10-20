@@ -13,6 +13,7 @@ import pyfits
 import random
 from Parameters import Parameters
 import pandas as pd
+from utils import show2Imgs
 
 
 def get_h5_path_dialog(model_paths):
@@ -92,42 +93,65 @@ def fill_dataframe(df, paths):
 
 
 # Merge a single lens and source together into a mock lens.
-def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
+def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False, do_plot=False, noise_fac=2.0):
 
-    # Add lens and source together | We rescale the brightness of the simulated source to the peak brightness of the LRG in the r-band multiplied by a factor of alpha randomly drawn from the interval [0.02,0.3]
+    # Set a noise factor - 2.0 meaning that any pixel value higher than 2 times the noise level will be counted
+    # noise_fac = 1.5
+
+    # Determine noise level of lens - First the naive approach
+    noise_lens = np.mean(lens)
+
+    # Determine alpha scaling drawn from the interval [0.02,0.3]
     alpha_scaling = np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
-    mock_lens = lens + source / np.amax(source) * np.amax(lens) * alpha_scaling
+
+    # We rescale the brightness of the simulated source to the peak brightness
+    source = source / np.amax(source) * np.amax(lens) * alpha_scaling
     
-    # Take a square root stretch to emphesize lower luminosity features.
+    # Get indexes where lensing features have pixel values below: noise_factor*noise
+    idxs = np.where(source < (noise_fac * noise_lens))
+
+    # Make a copy of the source and set all below noise_factor*noise to 0.0
+    trimmed_source = np.copy(source)
+    trimmed_source[idxs] = 0.0
+
+    # Calculate surface area of visual features that are stronger than noise_fac*noise
+    (x_idxs,_,_) = np.where(source >= (noise_fac * noise_lens))
+    feature_area_frac = len(x_idxs) / (source.shape[0] * source.shape[1])
+    
+    # Add lens and source together 
+    mock_lens = lens + source
+    
+    # Perform a square root stretch to emphesize lower luminosity features.
     mock_lens = np.sqrt(mock_lens)
     
     # Basically removes negative values - should not be necessary, because all input data should be normalized anyway. (I will leave it for now, but should be removed soon.)
     # mock_lens_sqrt = mock_lens_sqrt.clip(min=0.0, max=1.0)
     mock_lens = mock_lens.clip(min=0.0, max=1.0)
 
-    # if True:
-    #     show2Imgs(lens, source, "Lens max pixel: {0:.3f}".format(np.amax(lens)), "Source max pixel: {0:.3f}".format(np.amax(source)))
+    if do_plot:
+        show2Imgs(source, trimmed_source, "Lens max pixel: {0:.3f}".format(np.amax(source)), "Source max pixel: {0:.3f}".format(np.amax(trimmed_source)))
         # show2Imgs(mock_lens, mock_lens_sqrt, "mock_lens max pixel: {0:.3f}".format(np.amax(mock_lens)), "mock_lens_sqrt max pixel: {0:.3f}".format(np.amax(mock_lens_sqrt)))
 
-    return mock_lens, alpha_scaling
+    return mock_lens, alpha_scaling, feature_area_frac
 
 
 # This function should read images from the lenses- and sources data array,
 # and merge them together into a lensing system, further described as 'mock lens'.
 # These mock lenses represent a strong gravitational lensing system that should 
 # get the label 1.0 (positive label). 
-def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scaling = (0.02, 0.30)):
+def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scaling = (0.02, 0.30), noise_fac=2.0):
     X_train_positive = np.empty((lenses_array.shape[0], lenses_array.shape[1], lenses_array.shape[2], lenses_array.shape[3]), dtype=np.float32)
     Y_train_positive = np.ones(lenses_array.shape[0], dtype=np.float32)
     
-    # for correlating input features with prediction, we also want to keep track of alpha scaling.
+    # For correlating input features with prediction, we also want to keep track of alpha scaling.
     # This is the ratio between peak brighntess of the lens versus that of the source.
     alpha_scalings = list()
+    feature_areas_fracs  = list()   # We want to keep track of feature area size in order to correlate it with neural network prediction values
 
     for i in range(lenses_array.shape[0]):
         lens   = lenses_array[i]
         source = sources_array[i]
-        mock_lens, alpha_scaling = merge_lens_and_source(lens, source, mock_lens_alpha_scaling)
+        mock_lens, alpha_scaling, feature_area_frac = merge_lens_and_source(lens, source, mock_lens_alpha_scaling, noise_fac=noise_fac)
 
         # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
         # import matplotlib.pyplot as plt
@@ -146,8 +170,9 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
 
         X_train_positive[i] = mock_lens
         alpha_scalings.append(alpha_scaling)
+        feature_areas_fracs.append(feature_area_frac)
 
-    return X_train_positive, Y_train_positive, alpha_scalings
+    return X_train_positive, Y_train_positive, alpha_scalings, feature_areas_fracs
 
 
 def compute_PSF_r():
@@ -233,6 +258,37 @@ def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
     return data_array
 
 
+
+def plot_feature_versus_prediction(predictions, feature_list, threshold=None, title=""):
+    if threshold == None:
+        threshold = float(input("What model threshold do you want to set (float): "))
+    idx_positives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred>=threshold]
+    idx_negatives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred<threshold]
+
+    print("Number positive: {}".format(len(idx_positives)))
+    print("Number negative: {}".format(len(idx_negatives)))
+    print("Minimum {} value = {}".format(title, min(feature_list)))
+    print("Maximum {} value = {}".format(title, max(feature_list)))
+
+    positives, preds_positives = list(), list()
+    for idx, pred in idx_positives:
+        positives.append(feature_list[idx])
+        preds_positives.append(pred)
+
+    negatives, preds_negatives = list(), list()
+    for idx, pred in idx_negatives:
+        negatives.append(feature_list[idx])
+        preds_negatives.append(pred)
+
+    plt.plot(positives, preds_positives, 'o', color='blue', label="positives {}".format(len(preds_positives)))
+    plt.plot(negatives, preds_negatives, 'o', color='red', label="negatives {}".format(len(preds_negatives)))
+
+    plt.title("{} and network certainty. FNR: {:.2f}".format(title, len(preds_negatives)/sample_size))
+    plt.xlabel("{} of source".format(title))
+    plt.ylabel("Model prediction")
+    plt.legend()
+    plt.show()
+
 ############################################################ script ############################################################
 
 # 1.0 - Fix memory leaks if running on tensorflow 2
@@ -260,7 +316,8 @@ lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat=
 sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 
 # 6.0 - Create mock lenses based on the sample
-mock_lenses, y, alpha_scalings = merge_lenses_and_sources(lenses, sources)
+noise_fac = 2.0
+mock_lenses, y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
@@ -279,35 +336,13 @@ einstein_radii = list(df["LENSER"])
 predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
+
+# 10.5 - Lets make a plot of feature area size versus prediction value of a given model.
+plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
+
+
 # 11.0 - Make a plot of einstein radius and network certainty
-threshold = float(input("What model threshold do you want to set (float): "))
-idx_positives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred>=threshold]
-idx_negatives  = [(idx, pred) for idx, pred in enumerate(predictions) if pred<threshold]
-
-print(len(idx_positives))
-print(len(idx_negatives))
-
-einstein_radii_positives = list()
-preds_positives          = list()
-for idx, pred in idx_positives:
-    einstein_radii_positives.append(einstein_radii[idx])
-    preds_positives.append(pred)
-
-einstein_radii_negatives = list()
-preds_negatives          = list()
-for idx, pred in idx_negatives:
-    einstein_radii_negatives.append(einstein_radii[idx])
-    preds_negatives.append(pred)
-
-print("minimum Einstein Radii = {}".format(min(einstein_radii)))
-plt.plot(einstein_radii_positives, preds_positives, 'o', color='blue', label="positives {}".format(len(preds_positives)))
-plt.plot(einstein_radii_negatives, preds_negatives, 'o', color='red', label="negatives {}".format(len(preds_negatives)))
-
-plt.title("Einstein radius and network certainty. FNR: {:.2f}".format(len(preds_negatives)/sample_size))
-plt.xlabel("Einstein Radius of source")
-plt.ylabel("Model prediction")
-plt.legend()
-plt.show()
+plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
 
 # 12.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
