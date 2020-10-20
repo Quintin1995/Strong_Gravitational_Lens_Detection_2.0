@@ -339,12 +339,13 @@ network.model.load_weights(h5_path)
 
 # 9.5 - Create a heatmap of a given image.
 for i in range(10):
-    img = mock_lenses[i]
-    plt.imshow(np.squeeze(img), cmap='Greys_r')
-    plt.title("mock lens")
+    inp_img = mock_lenses[i]
+    plot_title = "Prediction: {:.3f}".format(network.model.predict(np.expand_dims(inp_img, axis=0))[0][0])
+    plt.imshow(np.squeeze(inp_img), cmap='Greys_r')
+    plt.title("Mock lens {}".format(plot_title))
     plt.show()
 
-    img = np.expand_dims(img, axis=0)
+    inp_img = np.expand_dims(inp_img, axis=0)
 
     mock_lens_output = network.model.output[:, 0]
 
@@ -357,7 +358,7 @@ for i in range(10):
     iterate = K.function([network.model.input],
                         [pooled_grads, last_conv_layer.output[0]])
 
-    pooled_grads_value, conv_layer_output_value = iterate([img])
+    pooled_grads_value, conv_layer_output_value = iterate([inp_img])
 
     for i in range(512):
         conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
@@ -367,14 +368,21 @@ for i in range(10):
     heatmap = np.maximum(heatmap, 0)
     heatmap /= np.max(heatmap)
     plt.matshow(heatmap)
-    plt.title("heatmap of input image")
+    plt.title("Heatmap of input image - {}".format(plot_title))
     plt.show()
 
-    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[2]))
+    heatmap = cv2.resize(heatmap, (inp_img.shape[1], inp_img.shape[2]))
+    inp_img = np.squeeze(inp_img)
 
-    superimposed_img = heatmap + 0.4 * np.squeeze(img)
-    plt.imshow(superimposed_img, cmap='Greys_r')
-    plt.title("Heat map superimposed on input image")
+    color_img = np.zeros((heatmap.shape[0], heatmap.shape[1], 3))
+    color_img[:,:,2] = heatmap
+    color_img[:,:,0] = np.zeros((inp_img.shape[0], inp_img.shape[1]))
+    color_img[:,:,1] = inp_img
+
+    # superimposed_img = heatmap + 0.4 * inp_img
+
+    plt.imshow(color_img)
+    plt.title("Heatmap superimposed on input image - {}".format(plot_title))
     plt.show()
 
     x=4
