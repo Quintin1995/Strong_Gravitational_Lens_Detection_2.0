@@ -314,9 +314,9 @@ def _plot_image_grid_GRADCAM(img_list, layer_name, plot_title):
         axes.append( fig.add_subplot(rows, cols, a+1) )
         axes[-1].set_title(subplot_titles[a])
         if a == 0:
-            plt.imshow(img_list[a], cmap='Greys_r')
+            plt.imshow(np.squeeze(img_list[a]), cmap='Greys_r')
         else:
-            plt.imshow(img_list[a])
+            plt.imshow(np.squeeze(img_list[a]))
         axes[-1].axis('off')
     fig.tight_layout()
     fig.suptitle("Heatmap Superimposed\n{}\nLayer name: {}".format(plot_title, layer_name), fontsize=16)
@@ -336,74 +336,82 @@ def _normalize_heatmap(heatmap):
 
 # Create a color image from a greyscale image a heatmap and an empty color channel.
 def _construct_color_img(inp_img, heatmap):
-    color_img = np.zeros((inp_img.shape[1], inp_img.shape[2], 3))
+    inp_img = np.squeeze(inp_img)
+    color_img = np.zeros((inp_img.shape[0], inp_img.shape[1], 3))
     color_img[:,:,2] = heatmap
     color_img[:,:,1] = np.zeros((inp_img.shape[0], inp_img.shape[1]))
     color_img[:,:,0] = np.squeeze(inp_img)
     return color_img
 
 
+# Construct a Gradient based Class Activation Map of a given input image,
+# for a given model and layer
+def Grad_CAM(inp_img, model, layer_name):
+    # Add batch dimension to the image so that we can feed it into the model
+    inp_img = np.expand_dims(inp_img, axis=0)
+
+    # Mock lens output index of the model, in the prediction vector.
+    # It is still a vector, only it has one scaler. Therefore we still index
+    # it, as if it is a vector(array).
+    mock_lens_output = model.output[:, 0]
+
+    # Output feature map of the block 'layer_name' layer, the last convolutional layer.
+    last_conv_layer = model.get_layer(layer_name) # "add_5", "layer_name" are pretty good
+
+    # Gradient of the mock lens class with regard to the output feature map of "layer_name
+    grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
+
+    # Vector of shape (num_featuresmaps,) where each entry is the mean intensity of the
+    # gradient over a specidfic feature map channel 
+    pooled_grads = K.mean(grads, axis=(0,1,2))
+
+    # Lets you access the values of the quantities you just defined. (keras doesnt
+    # calculate them, until told so.): pooled_grads and the output feature map of
+    # layer_name given the sample image
+    iterate = K.function([model.input],
+                        [pooled_grads, last_conv_layer.output[0]])
+
+    # Values of these two quantities as Numpy arrays, given the sample mock lens
+    pooled_grads_value, conv_layer_output_value = iterate([inp_img])
+
+    # Multiplies each channel in the feature-map array by "how important this channel is"
+    # with regard to the "mock_lens" class.
+    for i in range(model.get_layer(layer_name).output.shape[-1]):
+        conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
+
+    #The channel-wise mean of the resulting feature map is the heat map of the class activation.
+    heatmap = np.mean(conv_layer_output_value, axis=-1)
+
+    # Normalize to bring values between 0.0 and 1.0
+    return _normalize_heatmap(heatmap)
+
+
 # Shows input images to the user and heatmaps of where the model looks.
-def Grad_CAM_plot(image_set, model, layer_name, title="title"):
-    
+def Grad_CAM_plot(image_set, model, layer_list):
+
+    layer_name = layer_list[0]
     for i in range(image_set.shape[0]):
-
-        # Copy input image for plotting
         inp_img = image_set[i]
-        inp_img_sq = np.copy(np.squeeze(inp_img))
 
-        # Add batch dimension to the image so that we can feed it into the model
-        inp_img = np.expand_dims(inp_img, axis=0)
-
-        # Mock lens output index of the model, in the prediction vector.
-        # It is still a vector, only it has one scaler. Therefore we still index
-        # it, as if it is a vector(array).
-        mock_lens_output = model.output[:, 0]
-
-        # Output feature map of the block 'layer_name' layer, the last convolutional layer.
-        last_conv_layer = model.get_layer(layer_name) # "add_5", "layer_name" are pretty good
-
-        # Gradient of the mock lens class with regard to the output feature map of "layer_name
-        grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
-
-        # Vector of shape (num_featuresmaps,) where each entry is the mean intensity of the
-        # gradient over a specidfic feature map channel 
-        pooled_grads = K.mean(grads, axis=(0,1,2))
-
-        # Lets you access the values of the quantities you just defined. (keras doesnt
-        # calculate them, until told so.): pooled_grads and the output feature map of
-        # layer_name given the sample image
-        iterate = K.function([model.input],
-                            [pooled_grads, last_conv_layer.output[0]])
-
-        # Values of these two quantities as Numpy arrays, given the sample mock lens
-        pooled_grads_value, conv_layer_output_value = iterate([inp_img])
-
-        # Multiplies each channel in the feature-map array by "how important this channel is"
-        # with regard to the "mock_lens" class.
-        for i in range(model.get_layer(layer_name).output.shape[-1]):
-            conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
-
-        #The channel-wise mean of the resulting feature map is the heat map of the class activation.
-        heatmap = np.mean(conv_layer_output_value, axis=-1)
-
-        # Normalize to bring values between 0.0 and 1.0
-        heatmap = _normalize_heatmap(heatmap)
+        # Perform the Gradient Class Activation Map algorithm
+        heatmap = Grad_CAM(inp_img, model, layer_name)
         
         # Show the heatmap
         low_res_heatmap = np.copy(heatmap)
         
         # Resize heatmap for sumperimposing with input image
-        heatmap = cv2.resize(heatmap, (inp_img.shape[1], inp_img.shape[2]))  
+        heatmap = cv2.resize(heatmap, (inp_img.shape[0], inp_img.shape[1]))  
 
         # Construct a color image, with heatmap as one channel and input image another. The third channel are zeros
         color_img = _construct_color_img(inp_img, heatmap)
 
         # Collect all three images into a list and their respective plot titles
-        images = [inp_img_sq, low_res_heatmap, color_img]
+        images = [inp_img, low_res_heatmap, color_img]
+        # list_of_rows.append(images)
         
         # Format Plotting
-        plot_title = "Prediction: {:.3f}".format(model.predict(inp_img)[0][0])      # Predict input image
+        # Predict input image for figure title
+        plot_title = "Prediction: {:.3f}".format(model.predict(np.expand_dims(inp_img, axis=0))[0][0])      
         _plot_image_grid_GRADCAM(images, layer_name, plot_title)
 
 
@@ -453,9 +461,9 @@ network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
 
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
-Grad_CAM_plot(mock_lenses, network.model, layer_name="add_5")
+Grad_CAM_plot(mock_lenses, network.model, layer_list=["add_5", "add_7"])
 # And now a negative image.
-Grad_CAM_plot(negatives, network.model, layer_name="add_5")
+# Grad_CAM_plot(negatives, network.model, layer_name="add_5")
 
 
 # 10.0 - Use the network to predict on the sample
