@@ -213,7 +213,7 @@ def get_model_paths(root_dir="models"):
 
 
 # Select a random sample with replacement from all files.
-def get_sample_lenses_and_sources(size=1000, type_data="validation"):
+def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"):
     lenses_path_train    = os.path.join("data", type_data, "lenses")
     sources_path_train   = os.path.join("data", type_data, "sources")
     negatives_path_train = os.path.join("data", type_data, "negatives")
@@ -227,6 +227,8 @@ def get_sample_lenses_and_sources(size=1000, type_data="validation"):
     print("lenses count {}".format(len(lenses_fnames)))
     print("negatives count {}".format(len(negatives_fnames)))
 
+    if deterministic:
+        random.seed(seed)
     sources_fnames   = random.sample(sources_fnames, size)
     lenses_fnames    = random.sample(lenses_fnames, size)
     negatives_fnames = random.sample(negatives_fnames, size)
@@ -321,7 +323,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames, negatives_fnames = get_sample_lenses_and_sources(size=sample_size)
+sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=True)
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources
@@ -351,13 +353,13 @@ network.model.load_weights(h5_path)
 # 9.5 - Create a heatmap of a given image.
 # lets give it another shot with Layer-wise Relevance Propagation (LRP)
 if True:
-    for i in range(10):
+    for i in range(100):
         inp_img = mock_lenses[i]      #positives
         # inp_img = negatives[i]          #negatives
         plot_title = "Prediction: {:.3f}".format(network.model.predict(np.expand_dims(inp_img, axis=0))[0][0])
         plt.imshow(np.squeeze(inp_img), cmap='Greys_r')
         plt.title("Mock lens {}".format(plot_title))
-        plt.show()
+        # plt.show()
 
         # Add batch dimension to the image so that we can feed it into the neural network
         inp_img = np.expand_dims(inp_img, axis=0)
@@ -368,7 +370,7 @@ if True:
         mock_lens_output = network.model.output[:, 0]
 
         # Output feature map of the block 'conv2d_19' layer, the last convolutional layer.
-        last_conv_layer = network.model.get_layer('batch_normalization_16') # "add_5", "conv2d_19" are pretty good
+        last_conv_layer = network.model.get_layer('add_7') # "add_5", "conv2d_19" are pretty good
 
         # Gradient of the mock lens class with regard to the output feature map of "conv2d_19
         grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
@@ -404,7 +406,7 @@ if True:
         # plt.matshow(heatmap)
         plt.imshow(np.squeeze(heatmap), cmap='Greys_r')
         plt.title("Heatmap of input image - {}".format(plot_title))
-        plt.show()
+        # plt.show()
 
         heatmap = cv2.resize(heatmap, (inp_img.shape[1], inp_img.shape[2]))
         inp_img = np.squeeze(inp_img)
