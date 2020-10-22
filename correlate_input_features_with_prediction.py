@@ -17,6 +17,7 @@ import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
+from functools import reduce
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
@@ -306,20 +307,30 @@ def plot_feature_versus_prediction(predictions, feature_list, threshold=None, ti
 
 
 # Plot an image grid given a list of images.
-def _plot_image_grid_GRADCAM(img_list, layer_name, plot_title):
-    subplot_titles = ["Input Image", "Heatmap\nLayer: {}".format(layer_name), "Superimposed\nHeatmap"]
-    rows, cols, axes = 1, len(img_list), []
+def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
+
+    subplot_titles = list()
+    for layer_name in layer_names:
+        subplot_titles.append( ["Input Image", "Heatmap\nLayer: {}".format(layer_name), "Superimposed\nHeatmap"] )
+    
+    # all_imgs   = [y for y in x for x in list_of_rows]
+    all_imgs = reduce(lambda l1, l2: l1+l2, list_of_rows)
+
+    # all_titles = [y for y in x for x in subplot_titles]
+    all_titles = reduce(lambda l1, l2: l1+l2, subplot_titles)
+
+    rows, cols, axes = len(layer_names), len(list_of_rows[0]), []
     fig=plt.figure()
     for a in range(rows*cols):
         axes.append( fig.add_subplot(rows, cols, a+1) )
-        axes[-1].set_title(subplot_titles[a])
+        axes[-1].set_title(all_titles[a], fontsize=10)
         if a == 0:
-            plt.imshow(np.squeeze(img_list[a]), cmap='Greys_r')
+            plt.imshow(np.squeeze(all_imgs[a]), cmap='Greys_r')
         else:
-            plt.imshow(np.squeeze(img_list[a]))
+            plt.imshow(np.squeeze(all_imgs[a]))
         axes[-1].axis('off')
     fig.tight_layout()
-    fig.suptitle("Heatmap Superimposed\n{}\nLayer name: {}".format(plot_title, layer_name), fontsize=16)
+    fig.suptitle("Grad-CAM\n{}".format(plot_title), fontsize=8)
     plt.show()
 
 
@@ -389,30 +400,37 @@ def Grad_CAM(inp_img, model, layer_name):
 # Shows input images to the user and heatmaps of where the model looks.
 def Grad_CAM_plot(image_set, model, layer_list):
 
-    layer_name = layer_list[0]
+    list_of_rows = list()
+
     for i in range(image_set.shape[0]):
+        
+        # Set input image
         inp_img = image_set[i]
 
-        # Perform the Gradient Class Activation Map algorithm
-        heatmap = Grad_CAM(inp_img, model, layer_name)
-        
-        # Show the heatmap
-        low_res_heatmap = np.copy(heatmap)
-        
-        # Resize heatmap for sumperimposing with input image
-        heatmap = cv2.resize(heatmap, (inp_img.shape[0], inp_img.shape[1]))  
-
-        # Construct a color image, with heatmap as one channel and input image another. The third channel are zeros
-        color_img = _construct_color_img(inp_img, heatmap)
-
-        # Collect all three images into a list and their respective plot titles
-        images = [inp_img, low_res_heatmap, color_img]
-        # list_of_rows.append(images)
-        
-        # Format Plotting
         # Predict input image for figure title
-        plot_title = "Prediction: {:.3f}".format(model.predict(np.expand_dims(inp_img, axis=0))[0][0])      
-        _plot_image_grid_GRADCAM(images, layer_name, plot_title)
+        plot_title = "Model Prediction: {:.3f}".format(model.predict(np.expand_dims(inp_img, axis=0))[0][0])      
+
+        for layer_name in layer_list:
+
+            # Perform the Gradient Class Activation Map algorithm
+            heatmap = Grad_CAM(inp_img, model, layer_name)
+            
+            # Show the heatmap
+            low_res_heatmap = np.copy(heatmap)
+            
+            # Resize heatmap for sumperimposing with input image
+            heatmap = cv2.resize(heatmap, (inp_img.shape[0], inp_img.shape[1]))  
+
+            # Construct a color image, with heatmap as one channel and input image another. The third channel are zeros
+            color_img = _construct_color_img(inp_img, heatmap)
+
+            # Collect all three images into a list and their respective plot titles
+            images = [inp_img, low_res_heatmap, color_img]
+            list_of_rows.append(images)
+            
+        # Format Plotting
+        _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_title)
+        list_of_rows = list()
 
 
 
@@ -436,7 +454,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=True)
+sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources
@@ -461,7 +479,9 @@ network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
 
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
-Grad_CAM_plot(mock_lenses, network.model, layer_list=["add_5", "add_7"])
+good_list = ["add_5", "add_7"]
+another_list = ["batch_normalization_16", "activation_12", "activation_8"]
+Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list)
 # And now a negative image.
 # Grad_CAM_plot(negatives, network.model, layer_name="add_5")
 
