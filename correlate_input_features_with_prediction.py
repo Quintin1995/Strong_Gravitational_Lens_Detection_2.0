@@ -15,6 +15,12 @@ import pandas as pd
 from utils import show2Imgs
 import tensorflow as tf
 from tensorflow.keras import backend as K
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
 import cv2
 
 
@@ -210,17 +216,21 @@ def get_model_paths(root_dir="models"):
 def get_sample_lenses_and_sources(size=1000, type_data="validation"):
     lenses_path_train    = os.path.join("data", type_data, "lenses")
     sources_path_train   = os.path.join("data", type_data, "sources")
-    # negatives_path_train = os.path.join("data", "train", "negatives")
+    negatives_path_train = os.path.join("data", type_data, "negatives")
 
     # Try to glob files in the given path
-    sources_fnames = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
-    lenses_fnames  = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
+    sources_fnames      = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
+    lenses_fnames       = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
+    negatives_fnames    = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
+
     print("\nsources count {}".format(len(sources_fnames)))
     print("lenses count {}".format(len(lenses_fnames)))
+    print("negatives count {}".format(len(negatives_fnames)))
 
-    sources_fnames = random.sample(sources_fnames, size)
-    lenses_fnames  = random.sample(lenses_fnames, size)
-    return sources_fnames, lenses_fnames
+    sources_fnames   = random.sample(sources_fnames, size)
+    lenses_fnames    = random.sample(lenses_fnames, size)
+    negatives_fnames = random.sample(negatives_fnames, size)
+    return sources_fnames, lenses_fnames, negatives_fnames
 
 
 # Normalizationp per image
@@ -311,12 +321,13 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=sample_size)
+sources_fnames, lenses_fnames, negatives_fnames = get_sample_lenses_and_sources(size=sample_size)
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources
 lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
 sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
+negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
 
 # 6.0 - Create mock lenses based on the sample
 noise_fac = 2.0
@@ -338,55 +349,78 @@ network.model.load_weights(h5_path)
 
 
 # 9.5 - Create a heatmap of a given image.
-for i in range(10):
-    inp_img = mock_lenses[i]
-    plot_title = "Prediction: {:.3f}".format(network.model.predict(np.expand_dims(inp_img, axis=0))[0][0])
-    plt.imshow(np.squeeze(inp_img), cmap='Greys_r')
-    plt.title("Mock lens {}".format(plot_title))
-    plt.show()
+# lets give it another shot with Layer-wise Relevance Propagation (LRP)
+if True:
+    for i in range(10):
+        inp_img = mock_lenses[i]      #positives
+        # inp_img = negatives[i]          #negatives
+        plot_title = "Prediction: {:.3f}".format(network.model.predict(np.expand_dims(inp_img, axis=0))[0][0])
+        plt.imshow(np.squeeze(inp_img), cmap='Greys_r')
+        plt.title("Mock lens {}".format(plot_title))
+        plt.show()
 
-    inp_img = np.expand_dims(inp_img, axis=0)
+        # Add batch dimension to the image so that we can feed it into the neural network
+        inp_img = np.expand_dims(inp_img, axis=0)
 
-    mock_lens_output = network.model.output[:, 0]
+        # Mock lens output index of the neural network, in the prediction vector.
+        # It is still a vector, only it has one scaler. Therefore we still index
+        # it, as if it is a vector(array).
+        mock_lens_output = network.model.output[:, 0]
 
-    last_conv_layer = network.model.get_layer('conv2d_19')
+        # Output feature map of the block 'conv2d_19' layer, the last convolutional layer.
+        last_conv_layer = network.model.get_layer('batch_normalization_16') # "add_5", "conv2d_19" are pretty good
 
-    grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
+        # Gradient of the mock lens class with regard to the output feature map of "conv2d_19
+        grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
 
-    pooled_grads = K.mean(grads, axis=(0,1,2))
+        # Vector of shape (num_featuresmaps,) where each entry is the mean intensity of the
+        # gradient over a specidfic feature map channel 
+        pooled_grads = K.mean(grads, axis=(0,1,2))
 
-    iterate = K.function([network.model.input],
-                        [pooled_grads, last_conv_layer.output[0]])
+        # Lets you access the values of the quantities you just defined. (keras doesnt
+        # calculate them, until told so.): pooled_grads and the output feature map of
+        # conv2d_19 given the sample image
+        iterate = K.function([network.model.input],
+                            [pooled_grads, last_conv_layer.output[0]])
 
-    pooled_grads_value, conv_layer_output_value = iterate([inp_img])
+        # Values of these two quantities as Numpy arrays, given the sample mock lens
+        pooled_grads_value, conv_layer_output_value = iterate([inp_img])
 
-    for i in range(512):
-        conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
+        # Multiplies each channel in the feature-map array by "how important this channel is" with regard to the "mock_lens" class.
+        for i in range(512):
+            conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
 
-    heatmap = np.mean(conv_layer_output_value, axis=-1)
+        #The channel-wise mean of the resulting feature map is the heat map of the class activation.
+        heatmap = np.mean(conv_layer_output_value, axis=-1)
 
-    heatmap = np.maximum(heatmap, 0)
-    heatmap /= np.max(heatmap)
-    plt.matshow(heatmap)
-    plt.title("Heatmap of input image - {}".format(plot_title))
-    plt.show()
+        # Normalize the heatmap
+        if np.max(heatmap) < 0.0:
+            heatmap = np.ones((heatmap.shape[0], heatmap.shape[1])) * 0.0000001
+        else:
+            heatmap = np.maximum(heatmap, 0.0)
+            heatmap /= np.max(heatmap)
+        
+        # Show the heatmap
+        # plt.matshow(heatmap)
+        plt.imshow(np.squeeze(heatmap), cmap='Greys_r')
+        plt.title("Heatmap of input image - {}".format(plot_title))
+        plt.show()
 
-    heatmap = cv2.resize(heatmap, (inp_img.shape[1], inp_img.shape[2]))
-    inp_img = np.squeeze(inp_img)
+        heatmap = cv2.resize(heatmap, (inp_img.shape[1], inp_img.shape[2]))
+        inp_img = np.squeeze(inp_img)
 
-    color_img = np.zeros((heatmap.shape[0], heatmap.shape[1], 3))
-    color_img[:,:,2] = heatmap
-    color_img[:,:,0] = np.zeros((inp_img.shape[0], inp_img.shape[1]))
-    color_img[:,:,1] = inp_img
+        color_img = np.zeros((heatmap.shape[0], heatmap.shape[1], 3))
+        color_img[:,:,2] = heatmap
+        color_img[:,:,1] = np.zeros((inp_img.shape[0], inp_img.shape[1]))
+        color_img[:,:,0] = inp_img
 
-    # superimposed_img = heatmap + 0.4 * inp_img
+        # superimposed_img = heatmap + 0.4 * inp_img
 
-    plt.imshow(color_img)
-    plt.title("Heatmap superimposed on input image - {}".format(plot_title))
-    plt.show()
+        plt.imshow(color_img)
+        plt.title("Heatmap superimposed on input image - {}".format(plot_title))
+        plt.show()
 
     x=4
-
 
 
 # 10.0 - Use the network to predict on the sample
