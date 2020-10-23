@@ -311,23 +311,23 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
 
     subplot_titles = list()
     for layer_name in layer_names:
-        subplot_titles.append( ["Input Image", "Heatmap\nLayer: {}".format(layer_name), "Superimposed\nHeatmap"] )
+        subplot_titles.append( ["Input Image", "Grad-CAM Layer: {}".format(layer_name), "Superimposed Heatmap"] )
     
     all_imgs = reduce(lambda l1, l2: l1+l2, list_of_rows)
     all_titles = reduce(lambda l1, l2: l1+l2, subplot_titles)
 
     rows, cols, axes = len(layer_names), len(list_of_rows[0]), []
-    fig=plt.figure()
+    fig=plt.figure(figsize=(10,3))
     for a in range(rows*cols):
         axes.append( fig.add_subplot(rows, cols, a+1) )
-        axes[-1].set_title(all_titles[a], fontsize=10)
+        axes[-1].set_title(all_titles[a], fontsize=8)
         if a%3 == 0:
             plt.imshow(np.squeeze(all_imgs[a]), cmap='Greys_r')
         else:
             plt.imshow(np.squeeze(all_imgs[a]))
         axes[-1].axis('off')
-    fig.tight_layout()
-    fig.suptitle("Grad-CAM\n{}".format(plot_title), fontsize=8)
+    # fig.tight_layout()
+    fig.suptitle("Grad-CAM\n{}".format(plot_title), fontsize=9)
     plt.show()
 
 
@@ -403,12 +403,17 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
         
         # Set input image
         inp_img = image_set[i]
-
+        
         # Predict input image for figure title
-        threshold = 0.5
         prediction = model.predict(np.expand_dims(inp_img, axis=0))[0][0]
-        if prediction < threshold:
-            continue
+
+        # Finding false negatives and false positives in the sample data
+        if True:   
+            threshold = 0.5
+            if prediction < threshold:
+                continue
+
+        # Title for plot
         plot_string = "Model Prediction: {:.3f}\n{}".format(prediction, plot_title)      
 
         for layer_name in layer_list:
@@ -442,11 +447,14 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
 # 1.0 - Fix memory leaks if running on tensorflow 2
 tf.compat.v1.disable_eager_execution()
 
+
 # 2.0 - Model Selection from directory
 model_paths = get_model_paths()
 
+
 # 2.1 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
 h5_path = get_h5_path_dialog(model_paths)
+
 
 # 3.0 - Load params - used for normalization etc -
 yaml_path = glob.glob(os.path.join(model_paths[0], "run.yaml"))[0]                      # Only choose the first one for now
@@ -454,9 +462,11 @@ settings_yaml = load_settings_yaml(yaml_path)                                   
 params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
+
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
 sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources
@@ -464,30 +474,34 @@ lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat=
 sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
 
+
 # 6.0 - Create mock lenses based on the sample
 noise_fac = 2.0
-mock_lenses, y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
 df = fill_dataframe(df, sources_fnames)
 print(df.head())
 
+
 # 8.0 - Create a dataGenerator object, because the network class wants it
 dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_validation=False)
+
 
 # 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
 
+
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
 good_list = ["add_5", "add_7"]
 another_list = ["batch_normalization_16", "activation_12", "activation_8"]
-if False:
-    Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=y)
-# And now a negative image.
-Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example")
-# Grad_CAM_plot(negatives, network.model, layer_name="add_5")
+another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
+if True:
+    # Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
+    Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example")
 
 
 # 10.0 - Use the network to predict on the sample
@@ -495,11 +509,14 @@ einstein_radii = list(df["LENSER"])
 predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
+
 # 11.0 - Lets make a plot of feature area size versus network certainty.
 plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
 
+
 # 12.0 - Make a plot of einstein radius and network certainty
 plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
+
 
 # 13.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
 # For each data-point based on these features, assign a color based on the model prediction.
