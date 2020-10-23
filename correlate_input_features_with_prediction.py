@@ -313,10 +313,7 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
     for layer_name in layer_names:
         subplot_titles.append( ["Input Image", "Heatmap\nLayer: {}".format(layer_name), "Superimposed\nHeatmap"] )
     
-    # all_imgs   = [y for y in x for x in list_of_rows]
     all_imgs = reduce(lambda l1, l2: l1+l2, list_of_rows)
-
-    # all_titles = [y for y in x for x in subplot_titles]
     all_titles = reduce(lambda l1, l2: l1+l2, subplot_titles)
 
     rows, cols, axes = len(layer_names), len(list_of_rows[0]), []
@@ -324,7 +321,7 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
     for a in range(rows*cols):
         axes.append( fig.add_subplot(rows, cols, a+1) )
         axes[-1].set_title(all_titles[a], fontsize=10)
-        if a == 0:
+        if a%3 == 0:
             plt.imshow(np.squeeze(all_imgs[a]), cmap='Greys_r')
         else:
             plt.imshow(np.squeeze(all_imgs[a]))
@@ -398,7 +395,7 @@ def Grad_CAM(inp_img, model, layer_name):
 
 
 # Shows input images to the user and heatmaps of where the model looks.
-def Grad_CAM_plot(image_set, model, layer_list):
+def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
 
     list_of_rows = list()
 
@@ -408,7 +405,11 @@ def Grad_CAM_plot(image_set, model, layer_list):
         inp_img = image_set[i]
 
         # Predict input image for figure title
-        plot_title = "Model Prediction: {:.3f}".format(model.predict(np.expand_dims(inp_img, axis=0))[0][0])      
+        threshold = 0.5
+        prediction = model.predict(np.expand_dims(inp_img, axis=0))[0][0]
+        if prediction < threshold:
+            continue
+        plot_string = "Model Prediction: {:.3f}\n{}".format(prediction, plot_title)      
 
         for layer_name in layer_list:
 
@@ -429,8 +430,9 @@ def Grad_CAM_plot(image_set, model, layer_list):
             list_of_rows.append(images)
             
         # Format Plotting
-        _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_title)
+        _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_string)
         list_of_rows = list()
+        plt.close()
 
 
 
@@ -481,8 +483,10 @@ network.model.load_weights(h5_path)
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
 good_list = ["add_5", "add_7"]
 another_list = ["batch_normalization_16", "activation_12", "activation_8"]
-Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list)
+if False:
+    Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=y)
 # And now a negative image.
+Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example")
 # Grad_CAM_plot(negatives, network.model, layer_name="add_5")
 
 
