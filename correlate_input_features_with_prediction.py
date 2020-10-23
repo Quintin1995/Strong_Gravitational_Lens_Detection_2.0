@@ -496,10 +496,9 @@ network.model.load_weights(h5_path)
 
 
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
-good_list = ["add_5", "add_7"]
-another_list = ["batch_normalization_16", "activation_12", "activation_8"]
-another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
-if True:
+if bool(input("\nView heatmaps (yes/no?) (1/0): ")):
+    another_list = ["batch_normalization_16", "activation_12", "activation_8"]
+    another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
     # Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
     Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example")
 
