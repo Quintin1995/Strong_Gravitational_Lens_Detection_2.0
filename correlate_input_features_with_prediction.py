@@ -18,6 +18,8 @@ from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
 from functools import reduce
+from photutils import make_source_mask
+from astropy.stats import sigma_clipped_stats
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
@@ -103,12 +105,13 @@ def fill_dataframe(df, paths):
 
 # Merge a single lens and source together into a mock lens.
 def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False, do_plot=False, noise_fac=2.0):
-
-    # Set a noise factor - 2.0 meaning that any pixel value higher than 2 times the noise level will be counted
-    # noise_fac = 1.5
-
     # Determine noise level of lens - First the naive approach
-    noise_lens = np.mean(lens)
+    # noise_lens = np.mean(lens)
+    # print("\n\nMean all mock lenses: {}".format(np.mean(mock_lenses)))
+    
+    mask = make_source_mask(np.squeeze(lens), nsigma=2, npixels=5, dilate_size=11)
+    mean, median, std = sigma_clipped_stats(np.squeeze(lens), sigma=3.0, mask=mask)
+    noise_lens = mean
 
     # Determine alpha scaling drawn from the interval [0.02,0.3]
     alpha_scaling = np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
@@ -222,7 +225,7 @@ def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"
     # Try to glob files in the given path
     sources_fnames      = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
     lenses_fnames       = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
-    negatives_fnames    = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
+    negatives_fnames    = glob.glob(os.path.join(negatives_path_train, "*_r_*.fits"))
 
     print("\nsources count {}".format(len(sources_fnames)))
     print("lenses count {}".format(len(lenses_fnames)))
@@ -248,6 +251,8 @@ def normalize_function(img, norm_type, data_type):
     if norm_type == "adapt_hist_eq":
         img = normalize_img(img)
         img = exposure.equalize_adapthist(img).astype(data_type)
+    if norm_type == "None":
+        return img
     return img
 
 
@@ -408,7 +413,7 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
         prediction = model.predict(np.expand_dims(inp_img, axis=0))[0][0]
 
         # Finding false negatives and false positives in the sample data
-        if True:   
+        if False:   
             threshold = 0.5
             if prediction < threshold:
                 continue
@@ -480,6 +485,21 @@ noise_fac = 2.0
 mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
 
 
+# 6.5 - Determine noise level of a given image.
+# sources_unnorm = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
+if False:
+    print("\n\nMean all mock lenses: {}".format(np.mean(mock_lenses)))
+    for i in range(sample_size):
+        img = np.squeeze(mock_lenses[i])
+        mask = make_source_mask(img, nsigma=2, npixels=5, dilate_size=11)
+        mean, median, std = sigma_clipped_stats(img, sigma=3.0, mask=mask)
+        print("\nImg idx: {}\nmean: {}\nmedian: {}\nstd: {}".format(i, mean, median, std))
+        # plt.hist(img.ravel(), bins=256, range=(0.0, 1.0), fc='k', ec='k') #calculating histogram
+        # plt.title("Histogram of image pixels")
+        # plt.show()
+        x=5
+
+
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
 df = fill_dataframe(df, sources_fnames)
@@ -496,11 +516,11 @@ network.model.load_weights(h5_path)
 
 
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
-if bool(input("\nView heatmaps (yes/no?) (1/0): ")):
+if False:
     another_list = ["batch_normalization_16", "activation_12", "activation_8"]
     another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
-    # Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
-    Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example")
+    Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
+    Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0)
 
 
 # 10.0 - Use the network to predict on the sample
