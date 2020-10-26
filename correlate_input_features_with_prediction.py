@@ -27,6 +27,16 @@ session = InteractiveSession(config=config)
 import cv2
 
 
+def binary_dialog(question_string):
+    print("\nType 'y' or '1' for yes, '0' or 'n' for no")
+    ans = input(question_string + ": ")
+    if ans in ["1", "y", "Y", "Yes", "yes"]:
+        ans = True
+    else:
+        ans = False
+    return ans
+
+
 def get_h5_path_dialog(model_paths):
     h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
     if h5_choice == 1:
@@ -487,16 +497,16 @@ mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sour
 
 # 6.5 - Determine noise level of a given image.
 # sources_unnorm = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
-if False:
+if binary_dialog("Calculate and view noise of an image?"):
     print("\n\nMean all mock lenses: {}".format(np.mean(mock_lenses)))
     for i in range(sample_size):
-        img = np.squeeze(mock_lenses[i])
+        img = np.squeeze(lenses[i])
         mask = make_source_mask(img, nsigma=2, npixels=5, dilate_size=11)
         mean, median, std = sigma_clipped_stats(img, sigma=3.0, mask=mask)
         print("\nImg idx: {}\nmean: {}\nmedian: {}\nstd: {}".format(i, mean, median, std))
-        # plt.hist(img.ravel(), bins=256, range=(0.0, 1.0), fc='k', ec='k') #calculating histogram
-        # plt.title("Histogram of image pixels")
-        # plt.show()
+        plt.hist(img.ravel(), bins=256, range=(0.0, 1.0), fc='k', ec='k') #calculating histogram
+        plt.title("Histogram of image pixels")
+        plt.show()
         x=5
 
 
@@ -516,7 +526,7 @@ network.model.load_weights(h5_path)
 
 
 # 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
-if False:
+if binary_dialog("Do Grad-CAM?"):
     another_list = ["batch_normalization_16", "activation_12", "activation_8"]
     another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
     Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
@@ -529,12 +539,12 @@ predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
 
-# 11.0 - Lets make a plot of feature area size versus network certainty.
-plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
+if binary_dialog("Do you want to plot feature versus prediction?"):
+    # 11.0 - Lets make a plot of feature area size versus network certainty.
+    plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
 
-
-# 12.0 - Make a plot of einstein radius and network certainty
-plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
+    # 12.0 - Make a plot of einstein radius and network certainty
+    plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
 
 # 13.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
