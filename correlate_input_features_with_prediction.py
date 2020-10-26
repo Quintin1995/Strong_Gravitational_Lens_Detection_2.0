@@ -12,7 +12,7 @@ import pyfits
 import random
 from Parameters import Parameters
 import pandas as pd
-from utils import show2Imgs
+from utils import show2Imgs, calc_RMS
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
@@ -266,7 +266,8 @@ def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"
 
 # Normalizationp per image
 def normalize_img(numpy_img):
-    return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
+    numpy_img = ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
+    return numpy_img
 
 
 # Simple case function to reduce line count in other function
@@ -274,7 +275,7 @@ def normalize_function(img, norm_type, data_type):
     if norm_type == "per_image":
         img = normalize_img(img)
     if norm_type == "adapt_hist_eq":
-        img = normalize_img(img)
+        # img = normalize_img(img)
         img = exposure.equalize_adapthist(img).astype(data_type)
     if norm_type == "None":
         return img
@@ -505,24 +506,37 @@ sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="
 negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
 
 
-# 6.0 - Create mock lenses based on the sample
-noise_fac = 2.0
-mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+# 5.1 - Determine negative (one-sided) gaussian noise level.
+lenses_unnormalized    = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=lenses_fnames)
+sources_unnormalized   = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
 
 
-# 6.5 - Determine noise level of a given image.
+# 5.5 - Determine noise level of a given image.
 # sources_unnorm = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
 if binary_dialog("Calculate and view noise of an image?"):
-    print("\n\nMean all mock lenses: {}".format(np.mean(mock_lenses)))
     for i in range(sample_size):
-        img = np.squeeze(lenses[i])
+        
+        img = np.squeeze(lenses_unnormalized[i])
+        RMS = calc_RMS(img)
+        noise_level = (RMS - np.amin(img)) / (np.amax(img) - np.amin(img))
+        
+        print("\n\n\nper img rms = {}".format(RMS))
+        print("per img min = {}".format(np.min(img)))
+        print("per img max = {}".format(np.max(img)))
+        print("per img predicted noise level = {}".format(noise_level))
+
         mask = make_source_mask(img, nsigma=2, npixels=5, dilate_size=11)
         mean, median, std = sigma_clipped_stats(img, sigma=3.0, mask=mask)
-        print("\nImg idx: {}\nmean: {}\nmedian: {}\nstd: {}".format(i, mean, median, std))
-        plt.hist(img.ravel(), bins=256, range=(0.0, 1.0), fc='k', ec='k') #calculating histogram
+        print("\nTRUE\nImg idx: {}\nmean: {}\nmedian: {}\nstd: {}".format(i, (mean - np.amin(img)) / (np.amax(img) - np.amin(img)), median, std))
+        plt.hist(img.ravel(), bins=256, fc='k', ec='k') #calculating histogram
         plt.title("Histogram of image pixels")
         plt.show()
         x=5
+
+
+# 6.0 - Create mock lenses based on the sample
+noise_fac = 2.0
+mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources_unnormalized, noise_fac=noise_fac)
 
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
@@ -554,11 +568,10 @@ predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
 
+# 11.0 - Lets make a plot of feature area size versus network certainty.
+# 12.0 - Make a plot of einstein radius and network certainty
 if binary_dialog("Do you want to plot feature versus prediction?"):
-    # 11.0 - Lets make a plot of feature area size versus network certainty.
     plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
-
-    # 12.0 - Make a plot of einstein radius and network certainty
     plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
 
@@ -591,9 +604,7 @@ plt.show()
 
 
 # 14.0 - Lets try to make a 3D plot, with:
-# x-axis is Einstein Radius
-# y-axis is alpha_scaling
-# z-axis is prediction of model.
+# x-axis is Einstein Radius, # y-axis is alpha_scaling, # z-axis is prediction of model.
 from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')

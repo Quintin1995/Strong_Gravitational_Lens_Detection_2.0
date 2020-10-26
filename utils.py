@@ -7,6 +7,30 @@ import yaml
 import psutil
 
 
+# Calculate the Root-Mean-Square of a 4d numpy array. Considering only the negative one sided gaussian.
+def calc_RMS(unnormalized_3d_numpy_array):
+    print(unnormalized_3d_numpy_array.shape)
+    # set all positive values to zero
+    clipped = np.clip(unnormalized_3d_numpy_array, -1.0, 0.0)
+
+    # Mask all zero values
+    masked = np.ma.masked_equal(clipped, 0.0)
+
+    # Remove the zero values from the array aswell, so that we truely have an array with negative values only.
+    negs = masked.compressed()
+    negs = np.ravel(negs)
+    num_samples = negs.shape[0]
+
+    # Calculate Root-Mean-Square
+    rms_half = np.square(negs)
+    rms_half = np.sum(rms_half)
+    rms_half = (1/num_samples) * rms_half
+    rms_half = np.sqrt(rms_half)
+
+    rms_two_sided = rms_half / np.sqrt(1.0 - (2/np.pi))
+    return rms_two_sided
+
+
 
 def plot_first_last_stats(X, y):
     num_imgs = int(input("\nAmount of images to show to the user? integer value: "))
