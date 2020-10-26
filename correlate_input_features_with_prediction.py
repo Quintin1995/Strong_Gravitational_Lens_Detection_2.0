@@ -20,11 +20,26 @@ from tensorflow.compat.v1 import InteractiveSession
 from functools import reduce
 from photutils import make_source_mask
 from astropy.stats import sigma_clipped_stats
+from functools import partial
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
 session = InteractiveSession(config=config)
 import cv2
+
+
+#TEST FUNCTION
+def reduce_C_function_TPR(predictions, threshold):
+    #We can calculate Recall or True Positive Rate
+    TP_count, FN_count = 0, 0
+    for pred in predictions:
+        if pred >= threshold:
+            TP_count += 1
+        else:
+            FN_count += 1
+    TPR = TP_count / (TP_count + FN_count)
+    print("TPR = {}, sample size={}".format(TPR, len(predictions)))
+    return TPR
 
 
 def binary_dialog(question_string):
@@ -553,21 +568,25 @@ if binary_dialog("Do you want to plot feature versus prediction?"):
 fig, ax = plt.subplots()
 plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
 plt.xlabel("Einstein Radius")
-plt.ylabel("Source Intensity Scaling")
-plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+plt.ylabel("Source Brighness Scaling")
+plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
 cbar = plt.colorbar()
 cbar.ax.get_yaxis().labelpad = 15
 cbar.ax.set_ylabel('Prediction value Model', rotation=270)
 
 # HEXBIN - PLOT 2
+# Firstly, ask the user for a threshold:
+threshold = float(input("\n\nWhat hexbin threshold should be used? (float): "))
+# Define a partial function so that we can pass parameters to the reduce_C_function.
+reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
 fig, ax = plt.subplots()
-plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=15, cmap='copper')
+plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
 plt.xlabel("Einstein Radius")
-plt.ylabel("Source Intensity Scaling")
-plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+plt.ylabel("Source Brighness Scaling")
+plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
 cbar = plt.colorbar()
 cbar.ax.get_yaxis().labelpad = 15
-cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
 plt.show()
 
 
