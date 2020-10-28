@@ -581,10 +581,8 @@ sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, 
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources only
-lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
-sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
-negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
-
+# lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
+# sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 
 # 5.1 - Load unnormalized data in order to calculate the amount of noise in a lens. 
 lenses_unnormalized    = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=lenses_fnames)
@@ -616,6 +614,7 @@ if binary_dialog("Do Grad-CAM?"):
     another_list = ["batch_normalization_16", "activation_12", "activation_8"]
     another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
     Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
+    negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
     Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0)
 
 
@@ -650,5 +649,5 @@ if binary_dialog("Do SNR vs TPR plot?"):
 
 # 14.0 - Lets try to make a 3D plot, with:
 # x-axis is Einstein Radius, # y-axis is alpha_scaling, # z-axis is prediction of model.
-if binary_dialog("Make 3D plot of Einstein Radii vs Brighness Scaling vs Model Certainty?"):
+if binary_dialog("Make 3D plot?"):
     plot_3D(con_fea1 = einstein_radii, con_fea2 = alpha_scalings, con_fea3 = predictions)
