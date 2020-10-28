@@ -9,7 +9,6 @@ import psutil
 
 # Calculate the Root-Mean-Square of a 4d numpy array. Considering only the negative one sided gaussian.
 def calc_RMS(unnormalized_3d_numpy_array):
-    print(unnormalized_3d_numpy_array.shape)
     # set all positive values to zero
     clipped = np.clip(unnormalized_3d_numpy_array, -1.0, 0.0)
 

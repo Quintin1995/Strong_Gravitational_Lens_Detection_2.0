@@ -130,13 +130,13 @@ def fill_dataframe(df, paths):
 
 # Merge a single lens and source together into a mock lens.
 def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False, do_plot=False, noise_fac=2.0):
-    # Determine noise level of lens - First the naive approach
-    # noise_lens = np.mean(lens)
-    # print("\n\nMean all mock lenses: {}".format(np.mean(mock_lenses)))
     
-    mask = make_source_mask(np.squeeze(lens), nsigma=2, npixels=5, dilate_size=11)
-    mean, median, std = sigma_clipped_stats(np.squeeze(lens), sigma=3.0, mask=mask)
-    noise_lens = mean
+    # Keep a copy of the lens end source normalized.
+    lens_norm   = normalize_img(np.copy(lens))
+    source_norm = normalize_img(np.copy(source))
+
+    # Determine the noise level of the lens before merging it with the source
+    rms_lens = calc_RMS(lens)
 
     # Determine alpha scaling drawn from the interval [0.02,0.3]
     alpha_scaling = np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
@@ -145,18 +145,18 @@ def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), 
     source = source / np.amax(source) * np.amax(lens) * alpha_scaling
     
     # Get indexes where lensing features have pixel values below: noise_factor*noise
-    idxs = np.where(source < (noise_fac * noise_lens))
+    idxs = np.where(source < (noise_fac * rms_lens))
 
     # Make a copy of the source and set all below noise_factor*noise to 0.0
     trimmed_source = np.copy(source)
     trimmed_source[idxs] = 0.0
 
     # Calculate surface area of visual features that are stronger than noise_fac*noise
-    (x_idxs,_,_) = np.where(source >= (noise_fac * noise_lens))
+    (x_idxs,_,_) = np.where(source >= (noise_fac * rms_lens))
     feature_area_frac = len(x_idxs) / (source.shape[0] * source.shape[1])
     
     # Add lens and source together 
-    mock_lens = lens + source
+    mock_lens = lens_norm + source_norm / np.amax(source_norm) * np.amax(lens_norm) * alpha_scaling
     
     # Perform a square root stretch to emphesize lower luminosity features.
     mock_lens = np.sqrt(mock_lens)
@@ -191,20 +191,19 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
         mock_lens, alpha_scaling, feature_area_frac = merge_lens_and_source(lens, source, mock_lens_alpha_scaling, noise_fac=noise_fac)
 
         # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
-        # import matplotlib.pyplot as plt
-        # l = np.squeeze(lens)
-        # s = np.squeeze(source)
-        # m = np.squeeze(mock_lens)
-        # plt.imshow(l, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # l = np.squeeze(normalize_img(lens))
+        # s = np.squeeze(normalize_img(source))
+        # m = np.squeeze(normalize_img(mock_lens))
+        # plt.imshow(l, cmap='Greys_r')
         # plt.title("lens")
         # plt.show()
-        # plt.imshow(s, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.imshow(s, cmap='Greys_r')
         # plt.title("source")
+        # plt.xlabel("jemoeder")
         # plt.show()
-        # plt.imshow(m, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.imshow(m, cmap='Greys_r')
         # plt.title("mock lens")
         # plt.show()
-
         X_train_positive[i] = mock_lens
         alpha_scalings.append(alpha_scaling)
         feature_areas_fracs.append(feature_area_frac)
@@ -506,37 +505,16 @@ sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="
 negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
 
 
-# 5.1 - Determine negative (one-sided) gaussian noise level.
+# 5.1 - Load unnormalized data in order to calculate the amount of noise in a lens. 
 lenses_unnormalized    = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=lenses_fnames)
-sources_unnormalized   = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
-
-
-# 5.5 - Determine noise level of a given image.
-# sources_unnorm = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
-if binary_dialog("Calculate and view noise of an image?"):
-    for i in range(sample_size):
-        
-        img = np.squeeze(lenses_unnormalized[i])
-        RMS = calc_RMS(img)
-        noise_level = (RMS - np.amin(img)) / (np.amax(img) - np.amin(img))
-        
-        print("\n\n\nper img rms = {}".format(RMS))
-        print("per img min = {}".format(np.min(img)))
-        print("per img max = {}".format(np.max(img)))
-        print("per img predicted noise level = {}".format(noise_level))
-
-        mask = make_source_mask(img, nsigma=2, npixels=5, dilate_size=11)
-        mean, median, std = sigma_clipped_stats(img, sigma=3.0, mask=mask)
-        print("\nTRUE\nImg idx: {}\nmean: {}\nmedian: {}\nstd: {}".format(i, (mean - np.amin(img)) / (np.amax(img) - np.amin(img)), median, std))
-        plt.hist(img.ravel(), bins=256, fc='k', ec='k') #calculating histogram
-        plt.title("Histogram of image pixels")
-        plt.show()
-        x=5
+sources_unnormalized   = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
 
 
 # 6.0 - Create mock lenses based on the sample
 noise_fac = 2.0
-mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources_unnormalized, noise_fac=noise_fac)
+
+# mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses_unnormalized, sources_unnormalized, noise_fac=noise_fac)
 
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
@@ -595,6 +573,20 @@ reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
 fig, ax = plt.subplots()
 plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
 plt.xlabel("Einstein Radius")
+plt.ylabel("Source Brighness Scaling")
+plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
+cbar = plt.colorbar()
+cbar.ax.get_yaxis().labelpad = 15
+cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
+plt.show()
+
+
+# HEXBIN - PLOT 3
+# Define a partial function so that we can pass parameters to the reduce_C_function.
+reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
+fig, ax = plt.subplots()
+plt.hexbin(x=features_areas_fracs, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
+plt.xlabel("Signal to Noise Ratio")
 plt.ylabel("Source Brighness Scaling")
 plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
 cbar = plt.colorbar()
