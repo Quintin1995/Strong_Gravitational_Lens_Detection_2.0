@@ -1,33 +1,49 @@
+from astropy.stats import sigma_clipped_stats
+from astropy.io import fits
 from compare_results import set_experiment_folder, set_models_folders, load_settings_yaml
+import cv2
 from DataGenerator import DataGenerator
+from functools import reduce, partial
 import glob
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from Network import Network
 import numpy as np
-import matplotlib.pyplot as plt
-from astropy.io import fits
-from skimage import exposure
 import os
-import scipy
-import pyfits
-import random
 from Parameters import Parameters
+from photutils import make_source_mask
+import pyfits
 import pandas as pd
-from utils import show2Imgs, calc_RMS
+import random
+import scipy
+from skimage import exposure
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
-from functools import reduce
-from photutils import make_source_mask
-from astropy.stats import sigma_clipped_stats
-from functools import partial
+from utils import show2Imgs, calc_RMS
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
 session = InteractiveSession(config=config)
-import cv2
 
 
+# Make a simple 3D plot based on 3 continuous variables/features.
+def plot_3D(con_fea1, con_fea2, con_fea3):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Intensity Scaling")
+    plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+    plt.show()
+
+
+
+# This plot approximates a 3D plot. A 2D plane gets hexogonal tesselation.
+# A datapoint in a 2D space (so based on 2 continuous variables/features)
+# Gets assigned a color based on model average model certainty in that tile, or
+# assigned a color based on the True Positive Rate in that tile.
 def hexbin_plot(con_fea1, con_fea2, predictions, gridsize=10, calc_TPR=True):
     if calc_TPR:
         threshold = float(input("\n\nWhat should the model threshold be? (float): "))
@@ -537,8 +553,6 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
         plt.close()
 
 
-
-
 ############################################################ script ############################################################
 
 # 1.0 - Fix memory leaks if running on tensorflow 2
@@ -566,7 +580,7 @@ sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, 
 
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
-PSF_r = compute_PSF_r()  # Used for sources
+PSF_r = compute_PSF_r()  # Used for sources only
 lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
 sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
@@ -578,16 +592,14 @@ sources_unnormalized   = load_normalize_img(params.data_type, are_sources=True, 
 
 
 # 6.0 - Create mock lenses based on the sample
-
-# mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
 noise_fac = 2.0
+# mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
 mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses_unnormalized, sources_unnormalized, noise_fac=noise_fac)
 
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
 df = fill_dataframe(df, sources_fnames)
-print(df.head())
 
 
 # 8.0 - Create a dataGenerator object, because the network class wants it
@@ -614,9 +626,12 @@ predictions = list(np.squeeze(predictions))
 
 
 # 11.0 - Make a plot of feature area size versus network certainty.
-# 12.0 - Make a plot of einstein radius and network certainty
-if binary_dialog("Do you want to plot feature versus prediction?"):
+if binary_dialog("Do you want to plot SNR versus prediction?"):
     plot_feature_versus_prediction(predictions, SNRs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
+
+
+# 12.0 - Make a plot of einstein radius and network certainty
+if binary_dialog("Do you want to plot Einstein Radii versus prediction?"):
     plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
 
@@ -636,12 +651,4 @@ if binary_dialog("Do SNR vs TPR plot?"):
 # 14.0 - Lets try to make a 3D plot, with:
 # x-axis is Einstein Radius, # y-axis is alpha_scaling, # z-axis is prediction of model.
 if binary_dialog("Make 3D plot of Einstein Radii vs Brighness Scaling vs Model Certainty?"):
-    from mpl_toolkits.mplot3d import Axes3D
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
-    plt.xlabel("Einstein Radius")
-    plt.ylabel("Source Intensity Scaling")
-    plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
-    plt.show()
+    plot_3D(con_fea1 = einstein_radii, con_fea2 = alpha_scalings, con_fea3 = predictions)
