@@ -28,7 +28,39 @@ session = InteractiveSession(config=config)
 import cv2
 
 
-#TEST FUNCTION
+# Plot Signal to Noise Ratio (binned) versus the true positive rate of that bin.
+def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
+    
+    # Define the bins as an array with floats.
+    bins = np.arange(0.0, 1.0, 1.0/num_bins)
+
+    # Array that keeps track of the count of True Positives per bin.
+    TPs = np.zeros((num_bins))
+    # Array that keeps track of the count of False Negatives per bin.
+    FNs = np.zeros((num_bins))
+    
+    # The SNRs and predictions are still in the same order.
+    for pred, SNR in zip(predictions, SNRs):
+        if pred < threshold:
+            FNs[int(SNR*num_bins)] += 1.0       # The max of SNR = 1.0, therefore the SNR decides in which bin it ends up.
+        else:
+            TPs[int(SNR*num_bins)] += 1.0
+
+    # Calculate the True Positive Rate per bin, set it to zero, if we divide by 0.
+    TPRs = [tp/(tp+fn) if (tp+fn) != 0 else 0 for tp, fn in zip(list(TPs), list(FNs))]
+
+    # Plot the results
+    plt.clf()
+    plt.plot(bins, TPRs)
+    plt.title("SNR versus TPR")
+    plt.xlabel("SNR")
+    plt.ylabel("TPR")
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.show()
+
+
+
+# Function used by hexbin in order to reduce all datapoints to a singular TPR value.
 def reduce_C_function_TPR(predictions, threshold):
     #We can calculate Recall or True Positive Rate
     TP_count, FN_count = 0, 0
@@ -511,10 +543,10 @@ sources_unnormalized   = load_normalize_img(params.data_type, are_sources=True, 
 
 
 # 6.0 - Create mock lenses based on the sample
-noise_fac = 2.0
 
-# mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
-mock_lenses, pos_y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses_unnormalized, sources_unnormalized, noise_fac=noise_fac)
+# mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+noise_fac = 2.0
+mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses_unnormalized, sources_unnormalized, noise_fac=noise_fac)
 
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
@@ -546,63 +578,57 @@ predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
 
-# 11.0 - Lets make a plot of feature area size versus network certainty.
+# 11.0 - Make a plot of feature area size versus network certainty.
 # 12.0 - Make a plot of einstein radius and network certainty
 if binary_dialog("Do you want to plot feature versus prediction?"):
-    plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
+    plot_feature_versus_prediction(predictions, SNRs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
     plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
 
 # 13.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
-# For each data-point based on these features, assign a color based on the model prediction.
-# SCATTER - PLOT 1
-fig, ax = plt.subplots()
-plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
-plt.xlabel("Einstein Radius")
-plt.ylabel("Source Brighness Scaling")
-plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
-cbar = plt.colorbar()
-cbar.ax.get_yaxis().labelpad = 15
-cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+if binary_dialog("Do scatter plot and hexbin plot?"):
+    # For each data-point based on these features, assign a color based on the model prediction.
+    # SCATTER - PLOT 1
+    fig, ax = plt.subplots()
+    plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Brighness Scaling")
+    plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
+    cbar = plt.colorbar()
+    cbar.ax.get_yaxis().labelpad = 15
+    cbar.ax.set_ylabel('Prediction value Model', rotation=270)
 
-# HEXBIN - PLOT 2
-# Firstly, ask the user for a threshold:
-threshold = float(input("\n\nWhat hexbin threshold should be used? (float): "))
-# Define a partial function so that we can pass parameters to the reduce_C_function.
-reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
-fig, ax = plt.subplots()
-plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
-plt.xlabel("Einstein Radius")
-plt.ylabel("Source Brighness Scaling")
-plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
-cbar = plt.colorbar()
-cbar.ax.get_yaxis().labelpad = 15
-cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
-plt.show()
+    # HEXBIN - PLOT 2
+    # Firstly, ask the user for a threshold:
+    threshold = float(input("\n\nWhat should the model threshold be? (float): "))
+    # Define a partial function so that we can pass parameters to the reduce_C_function.
+    reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
+    fig, ax = plt.subplots()
+    plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Brighness Scaling")
+    plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
+    cbar = plt.colorbar()
+    cbar.ax.get_yaxis().labelpad = 15
+    cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
+    plt.show()
 
 
-# HEXBIN - PLOT 3
-# Define a partial function so that we can pass parameters to the reduce_C_function.
-reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
-fig, ax = plt.subplots()
-plt.hexbin(x=features_areas_fracs, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
-plt.xlabel("Signal to Noise Ratio")
-plt.ylabel("Source Brighness Scaling")
-plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
-cbar = plt.colorbar()
-cbar.ax.get_yaxis().labelpad = 15
-cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
-plt.show()
+# Plot a binned SNR on the x-axis versus TPR on the y-axis.
+if binary_dialog("Do SNR vs TPR plot?"):
+    threshold = float(input("\n\nWhat model threshold should be used? (float): "))
+    plot_SNR_vs_TPR(predictions, SNRs, threshold=threshold, num_bins=50)
 
 
 # 14.0 - Lets try to make a 3D plot, with:
 # x-axis is Einstein Radius, # y-axis is alpha_scaling, # z-axis is prediction of model.
-from mpl_toolkits.mplot3d import Axes3D
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+if binary_dialog("Make 3D plot of Einstein Radii vs Brighness Scaling vs Model Certainty?"):
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
 
-ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
-plt.xlabel("Einstein Radius")
-plt.ylabel("Source Intensity Scaling")
-plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
-plt.show()
+    ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Intensity Scaling")
+    plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+    plt.show()
