@@ -28,6 +28,41 @@ session = InteractiveSession(config=config)
 import cv2
 
 
+def hexbin_plot(con_fea1, con_fea2, predictions, gridsize=10, calc_TPR=True):
+    if calc_TPR:
+        threshold = float(input("\n\nWhat should the model threshold be? (float): "))
+    # Define a partial function so that we can pass parameters to the reduce_C_function.
+    fig, ax = plt.subplots()
+    if calc_TPR:
+        reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
+        plt.hexbin(x=con_fea1, y=con_fea2, C=predictions, gridsize=gridsize, cmap='copper', reduce_C_function=reduce_function)
+    else:
+        plt.hexbin(x=con_fea1, y=con_fea2, C=predictions, gridsize=gridsize, cmap='copper')
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Brighness Scaling")
+    cbar = plt.colorbar()
+    cbar.ax.get_yaxis().labelpad = 15
+    if calc_TPR:
+        plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
+        cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
+    else:
+        plt.title("Einstein Radius versus Brighness Scaling of Source and Model Certainty")
+        cbar.ax.set_ylabel('Model Prediction', rotation=270)
+    plt.show()
+
+
+# Based on Einstein Radius and pixel intensity, assign a color based on the model prediction.
+def show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scalings, predictions):
+    fig, ax = plt.subplots()
+    plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Brighness Scaling")
+    plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
+    cbar = plt.colorbar()
+    cbar.ax.get_yaxis().labelpad = 15
+    cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+
+
 # Plot Signal to Noise Ratio (binned) versus the true positive rate of that bin.
 def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
     
@@ -587,32 +622,10 @@ if binary_dialog("Do you want to plot feature versus prediction?"):
 
 # 13.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
 if binary_dialog("Do scatter plot and hexbin plot?"):
-    # For each data-point based on these features, assign a color based on the model prediction.
-    # SCATTER - PLOT 1
-    fig, ax = plt.subplots()
-    plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
-    plt.xlabel("Einstein Radius")
-    plt.ylabel("Source Brighness Scaling")
-    plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
-    cbar = plt.colorbar()
-    cbar.ax.get_yaxis().labelpad = 15
-    cbar.ax.set_ylabel('Prediction value Model', rotation=270)
-
-    # HEXBIN - PLOT 2
-    # Firstly, ask the user for a threshold:
-    threshold = float(input("\n\nWhat should the model threshold be? (float): "))
-    # Define a partial function so that we can pass parameters to the reduce_C_function.
-    reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
-    fig, ax = plt.subplots()
-    plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=10, cmap='copper', reduce_C_function=reduce_function)
-    plt.xlabel("Einstein Radius")
-    plt.ylabel("Source Brighness Scaling")
-    plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
-    cbar = plt.colorbar()
-    cbar.ax.get_yaxis().labelpad = 15
-    cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
-    plt.show()
-
+    show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scalings, predictions)
+    hexbin_plot(einstein_radii, alpha_scalings, predictions, gridsize=10, calc_TPR=False)
+    hexbin_plot(einstein_radii, alpha_scalings, predictions, gridsize=10, calc_TPR=True)
+    
 
 # Plot a binned SNR on the x-axis versus TPR on the y-axis.
 if binary_dialog("Do SNR vs TPR plot?"):
