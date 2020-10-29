@@ -1,10 +1,175 @@
+from astropy.io import fits
+import glob
 import random
 import numpy as np
 import os
+from skimage import exposure
 from datetime import datetime
 import matplotlib.pyplot as plt
-import yaml
 import psutil
+import pyfits
+import yaml
+import scipy
+
+
+# If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
+# There is also a check on whether the loaded data already has a color channel dimension, if not create it.
+def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
+    data_array = np.zeros((len(filenames), 101, 101, 1))
+
+    for idx, filename in enumerate(filenames):
+        if idx % 100 == 0:
+            print("loaded {} images".format(idx), flush=True)
+        if are_sources:
+            img = fits.getdata(filename).astype(data_type)
+            img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                                # Convolve with psf_r, has to do with camara point spread function.
+            img = np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)       # Expand color channel and normalize
+        else:
+            img = fits.getdata(filename).astype(data_type)
+            if img.ndim == 3:                                                                      # Some images are stored with color channel
+                img = normalize_function(img, normalize_dat, data_type)
+            elif img.ndim == 2:                                                                    # Some images are stored without color channel
+                img = np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)
+        data_array[idx] = img
+    return data_array
+
+
+# Simple case function to reduce line count in other function
+def normalize_function(img, norm_type, data_type):
+    if norm_type == "per_image":
+        img = normalize_img(img)
+    if norm_type == "adapt_hist_eq":
+        # img = normalize_img(img)
+        img = exposure.equalize_adapthist(img).astype(data_type)
+    if norm_type == "None":
+        return img
+    return img
+
+
+# Calculate Point Spread Function for the sources.
+def compute_PSF_r():
+        ## This piece of code is needed for some reason that i will try to find out later.
+        nx = 101
+        ny = 101
+        f1 = pyfits.open("data/PSF_KIDS_175.0_-0.5_r.fits")  # PSF
+        d1 = f1[0].data
+        d1 = np.asarray(d1)
+        nx_, ny_ = np.shape(d1)
+        PSF_r = np.zeros((nx, ny))  # output
+        dx = (nx - nx_) // 2  # shift in x
+        dy = (ny - ny_) // 2  # shift in y
+        for ii in range(nx_):  # iterating over input array
+            for jj in range(ny_):
+                PSF_r[ii + dx][jj + dy] = d1[ii][jj]
+
+        return PSF_r
+
+
+# Select a random sample with replacement from all files.
+def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"):
+    lenses_path_train    = os.path.join("data", type_data, "lenses")
+    sources_path_train   = os.path.join("data", type_data, "sources")
+    negatives_path_train = os.path.join("data", type_data, "negatives")
+
+    # Try to glob files in the given path
+    sources_fnames      = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
+    lenses_fnames       = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
+    negatives_fnames    = glob.glob(os.path.join(negatives_path_train, "*_r_*.fits"))
+
+    print("\nsources count {}".format(len(sources_fnames)))
+    print("lenses count {}".format(len(lenses_fnames)))
+    print("negatives count {}".format(len(negatives_fnames)))
+
+    if deterministic:
+        random.seed(seed)
+    sources_fnames   = random.sample(sources_fnames, size)
+    lenses_fnames    = random.sample(lenses_fnames, size)
+    negatives_fnames = random.sample(negatives_fnames, size)
+    return sources_fnames, lenses_fnames, negatives_fnames
+
+
+# Normalizationp per image
+def normalize_img(numpy_img):
+    numpy_img = ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
+    return numpy_img
+
+
+# Prompt the user which models to compare against each other in the given experiment folder
+def set_models_folders(experiment_folder):
+    print("------------------------------")
+    print("\n\nRoot folder this experiment: {}".format(experiment_folder))
+
+    cwd = os.path.join(os.getcwd(), experiment_folder)
+    folders = sorted(os.listdir(cwd))
+    local_folders = [x for x in folders if os.path.isdir(os.path.join(cwd, x))]
+
+    print("\nSet model folders:")
+    for idx, folder in enumerate(local_folders):
+        print("\t{} - {}".format(idx, folder))
+    folder_idxs = input("Set indexes model folder(s)\n(integer)\nOr comma seperated ints: ")
+    
+    str_indexes = folder_idxs.split(',')
+    chosen_models = [local_folders[int(string_idx)] for string_idx in str_indexes]
+    
+    print("\nUser Choices: ")
+    for chosen_model in chosen_models:
+        print(chosen_model)
+
+    full_paths = [os.path.join(cwd, m) for m in chosen_models]
+    return full_paths
+
+
+# Prompt the user to fill in which experiment folder to run.
+def set_experiment_folder(root_folder):
+    print("------------------------------")
+    print("\n\nRoot folder of experiment: {}".format(root_folder))
+
+
+    cwd = os.path.join(os.getcwd(), root_folder)
+    folders = sorted(os.listdir(cwd))
+    local_folders = [x for x in folders if os.path.isdir(os.path.join(cwd, x))]
+
+    print("\nSet experiment folder:")
+    for idx, exp_folder in enumerate(local_folders):
+        print("\t{} - {}".format(idx, exp_folder))
+    exp_idx = int(input("Set number experiment folder (integer): "))
+    print("Choose index: {}, {}".format(exp_idx, os.path.join(root_folder, local_folders[exp_idx])))
+
+    return os.path.join(root_folder, local_folders[exp_idx])
+
+
+def binary_dialog(question_string):
+    print("\nType 'y' or '1' for yes, '0' or 'n' for no")
+    ans = input(question_string + ": ")
+    if ans in ["1", "y", "Y", "Yes", "yes"]:
+        ans = True
+    else:
+        ans = False
+    return ans
+
+
+def get_h5_path_dialog(model_paths):
+    h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
+    if h5_choice == 1:
+        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*loss.h5"))
+    elif h5_choice == 2:
+        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*metric.h5"))
+    else:
+        h5_paths = glob.glob(os.path.join(model_paths[0], "*.h5"))
+
+    print("Choice h5 path: {}".format(h5_paths[0]))
+    return h5_paths[0]
+
+
+# Opens dialog with the user to select a folder that contains models.
+def get_model_paths(root_dir="models"):
+
+    #Select which experiment path to take in directory structure
+    experiment_folder = set_experiment_folder(root_folder=root_dir)
+
+    # Can select 1 or multiple models.
+    models_paths = set_models_folders(experiment_folder)
+    return models_paths
 
 
 # Calculate the Root-Mean-Square of a 4d numpy array. Considering only the negative one sided gaussian.
@@ -192,7 +357,6 @@ def bytes2gigabyes(num_bytes):
     return gbs
 
 
-
 def print_stats_program():
     # gives a single float value
     print("\nCPU usage: {}%".format(psutil.cpu_percent()))
@@ -220,31 +384,3 @@ def smooth_curve(points, factor=0.9):
         else:
             smoothed_points.append(point)
     return smoothed_points
-
-
-###################################3
-# Piece of code that might be usefull for later:
-###### Step 4.1 - Sanity check of the train and test chunk
-# 1: Are both positive and negative examples within the same brightness ranges?
-# 2: I have added a per image normalization, because a couple of outliers ruin the normalization per data array (That is my hypothesis at least.)
-# if params.verbatim:
-#     print(y_train_chunk)
-#     idxs_pos = np.where(y_train_chunk == 1.0)
-#     idxs_neg = np.where(y_train_chunk == 0.0)
-
-#     for i in range(25):
-#         pos_img = X_train_chunk[random.choice(list(idxs_pos[0]))]
-#         neg_img = X_train_chunk[random.choice(list(idxs_neg[0]))]
-#         show2Imgs(pos_img, neg_img, "pos max pixel: {0:.3f}".format(np.amax(pos_img)), "neg max pixel: {0:.3f}".format(np.amax(neg_img)))
-#####################################3
-
-#####################################3
-# fig=plt.figure(figsize=(8,8))
-# columns = 2
-# rows = 1
-# for j in range(1, columns*rows +1):
-#     fig.add_subplot(rows, columns, j)
-#     plt.imshow(imgs[j-1], cmap='Greys_r')
-# plt.title("label = {}\nimage index={}".format(y[i], i))
-# plt.show()
-# #####################################3

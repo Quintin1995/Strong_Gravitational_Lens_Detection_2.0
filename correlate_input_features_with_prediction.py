@@ -1,6 +1,5 @@
 from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
-from compare_results import set_experiment_folder, set_models_folders, load_settings_yaml
 import cv2
 from DataGenerator import DataGenerator
 from functools import reduce, partial
@@ -16,12 +15,11 @@ import pyfits
 import pandas as pd
 import random
 import scipy
-from skimage import exposure
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
-from utils import show2Imgs, calc_RMS
+from utils import show2Imgs, calc_RMS, get_model_paths, get_h5_path_dialog, binary_dialog, set_experiment_folder, set_models_folders, load_settings_yaml, normalize_img, get_samples, normalize_function, compute_PSF_r
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
@@ -123,29 +121,6 @@ def reduce_C_function_TPR(predictions, threshold):
     TPR = TP_count / (TP_count + FN_count)
     print("TPR = {}, sample size={}".format(TPR, len(predictions)))
     return TPR
-
-
-def binary_dialog(question_string):
-    print("\nType 'y' or '1' for yes, '0' or 'n' for no")
-    ans = input(question_string + ": ")
-    if ans in ["1", "y", "Y", "Yes", "yes"]:
-        ans = True
-    else:
-        ans = False
-    return ans
-
-
-def get_h5_path_dialog(model_paths):
-    h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
-    if h5_choice == 1:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*loss.h5"))
-    elif h5_choice == 2:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*metric.h5"))
-    else:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "*.h5"))
-
-    print("Choice h5 path: {}".format(h5_paths[0]))
-    return h5_paths[0]
 
 
 def get_empty_dataframe():
@@ -282,7 +257,6 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
         # plt.show()
         # plt.imshow(s, cmap='Greys_r')
         # plt.title("source")
-        # plt.xlabel("jemoeder")
         # plt.show()
         # plt.imshow(m, cmap='Greys_r')
         # plt.title("mock lens")
@@ -292,76 +266,6 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
         feature_areas_fracs.append(feature_area_frac)
 
     return X_train_positive, Y_train_positive, alpha_scalings, feature_areas_fracs
-
-
-def compute_PSF_r():
-        ## This piece of code is needed for some reason that i will try to find out later.
-        nx = 101
-        ny = 101
-        f1 = pyfits.open("data/PSF_KIDS_175.0_-0.5_r.fits")  # PSF
-        d1 = f1[0].data
-        d1 = np.asarray(d1)
-        nx_, ny_ = np.shape(d1)
-        PSF_r = np.zeros((nx, ny))  # output
-        dx = (nx - nx_) // 2  # shift in x
-        dy = (ny - ny_) // 2  # shift in y
-        for ii in range(nx_):  # iterating over input array
-            for jj in range(ny_):
-                PSF_r[ii + dx][jj + dy] = d1[ii][jj]
-
-        return PSF_r
-
-
-# Opens dialog with the user to select a folder that contains models.
-def get_model_paths(root_dir="models"):
-
-    #Select which experiment path to take in directory structure
-    experiment_folder = set_experiment_folder(root_folder=root_dir)
-
-    # Can select 1 or multiple models.
-    models_paths = set_models_folders(experiment_folder)
-    return models_paths
-
-
-# Select a random sample with replacement from all files.
-def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"):
-    lenses_path_train    = os.path.join("data", type_data, "lenses")
-    sources_path_train   = os.path.join("data", type_data, "sources")
-    negatives_path_train = os.path.join("data", type_data, "negatives")
-
-    # Try to glob files in the given path
-    sources_fnames      = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
-    lenses_fnames       = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
-    negatives_fnames    = glob.glob(os.path.join(negatives_path_train, "*_r_*.fits"))
-
-    print("\nsources count {}".format(len(sources_fnames)))
-    print("lenses count {}".format(len(lenses_fnames)))
-    print("negatives count {}".format(len(negatives_fnames)))
-
-    if deterministic:
-        random.seed(seed)
-    sources_fnames   = random.sample(sources_fnames, size)
-    lenses_fnames    = random.sample(lenses_fnames, size)
-    negatives_fnames = random.sample(negatives_fnames, size)
-    return sources_fnames, lenses_fnames, negatives_fnames
-
-
-# Normalizationp per image
-def normalize_img(numpy_img):
-    numpy_img = ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
-    return numpy_img
-
-
-# Simple case function to reduce line count in other function
-def normalize_function(img, norm_type, data_type):
-    if norm_type == "per_image":
-        img = normalize_img(img)
-    if norm_type == "adapt_hist_eq":
-        # img = normalize_img(img)
-        img = exposure.equalize_adapthist(img).astype(data_type)
-    if norm_type == "None":
-        return img
-    return img
 
 
 # If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
@@ -419,138 +323,6 @@ def plot_feature_versus_prediction(predictions, feature_list, threshold=None, ti
     plt.show()
 
 
-# Plot an image grid given a list of images.
-def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
-
-    subplot_titles = list()
-    for layer_name in layer_names:
-        subplot_titles.append( ["Input Image", "Grad-CAM Layer: {}".format(layer_name), "Superimposed Heatmap"] )
-    
-    all_imgs = reduce(lambda l1, l2: l1+l2, list_of_rows)
-    all_titles = reduce(lambda l1, l2: l1+l2, subplot_titles)
-
-    rows, cols, axes = len(layer_names), len(list_of_rows[0]), []
-    fig=plt.figure(figsize=(10,3))
-    for a in range(rows*cols):
-        axes.append( fig.add_subplot(rows, cols, a+1) )
-        axes[-1].set_title(all_titles[a], fontsize=8)
-        if a%3 == 0:
-            plt.imshow(np.squeeze(all_imgs[a]), cmap='Greys_r')
-        else:
-            plt.imshow(np.squeeze(all_imgs[a]))
-        axes[-1].axis('off')
-    # fig.tight_layout()
-    fig.suptitle("Grad-CAM\n{}".format(plot_title), fontsize=9)
-    plt.show()
-
-
-def _normalize_heatmap(heatmap):
-    # Normalize the heatmap - Do not normalize if the maximum of the heatmap is less than zero,
-    # otherwise with Relu we would get NaN, since we would devide by zero.
-    if np.max(heatmap) < 0.0:
-        heatmap = np.ones((heatmap.shape[0], heatmap.shape[1])) * 0.0000001
-    else:
-        heatmap = np.maximum(heatmap, 0.0)      # Relu operation
-        heatmap /= np.max(heatmap)              # Normalization
-    return heatmap
-
-
-# Create a color image from a greyscale image a heatmap and an empty color channel.
-def _construct_color_img(inp_img, heatmap):
-    inp_img = np.squeeze(inp_img)
-    color_img = np.zeros((inp_img.shape[0], inp_img.shape[1], 3))
-    color_img[:,:,2] = heatmap
-    color_img[:,:,1] = np.zeros((inp_img.shape[0], inp_img.shape[1]))
-    color_img[:,:,0] = np.squeeze(inp_img)
-    return color_img
-
-
-# Construct a Gradient based Class Activation Map of a given input image,
-# for a given model and layer
-def Grad_CAM(inp_img, model, layer_name):
-    # Add batch dimension to the image so that we can feed it into the model
-    inp_img = np.expand_dims(inp_img, axis=0)
-
-    # Mock lens output index of the model, in the prediction vector.
-    # It is still a vector, only it has one scaler. Therefore we still index
-    # it, as if it is a vector(array).
-    mock_lens_output = model.output[:, 0]
-
-    # Output feature map of the block 'layer_name' layer, the last convolutional layer.
-    last_conv_layer = model.get_layer(layer_name) # "add_5", "layer_name" are pretty good
-
-    # Gradient of the mock lens class with regard to the output feature map of "layer_name
-    grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
-
-    # Vector of shape (num_featuresmaps,) where each entry is the mean intensity of the
-    # gradient over a specidfic feature map channel 
-    pooled_grads = K.mean(grads, axis=(0,1,2))
-
-    # Lets you access the values of the quantities you just defined. (keras doesnt
-    # calculate them, until told so.): pooled_grads and the output feature map of
-    # layer_name given the sample image
-    iterate = K.function([model.input],
-                        [pooled_grads, last_conv_layer.output[0]])
-
-    # Values of these two quantities as Numpy arrays, given the sample mock lens
-    pooled_grads_value, conv_layer_output_value = iterate([inp_img])
-
-    # Multiplies each channel in the feature-map array by "how important this channel is"
-    # with regard to the "mock_lens" class.
-    for i in range(model.get_layer(layer_name).output.shape[-1]):
-        conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
-
-    #The channel-wise mean of the resulting feature map is the heat map of the class activation.
-    heatmap = np.mean(conv_layer_output_value, axis=-1)
-
-    # Normalize to bring values between 0.0 and 1.0
-    return _normalize_heatmap(heatmap)
-
-
-# Shows input images to the user and heatmaps of where the model looks.
-def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
-
-    list_of_rows = list()
-
-    for i in range(image_set.shape[0]):
-        
-        # Set input image
-        inp_img = image_set[i]
-        
-        # Predict input image for figure title
-        prediction = model.predict(np.expand_dims(inp_img, axis=0))[0][0]
-
-        # Finding false negatives and false positives in the sample data
-        if False:   
-            threshold = 0.5
-            if prediction < threshold:
-                continue
-
-        # Title for plot
-        plot_string = "Model Prediction: {:.3f}\n{}".format(prediction, plot_title)      
-
-        for layer_name in layer_list:
-
-            # Perform the Gradient Class Activation Map algorithm
-            heatmap = Grad_CAM(inp_img, model, layer_name)
-            
-            # Show the heatmap
-            low_res_heatmap = np.copy(heatmap)
-            
-            # Resize heatmap for sumperimposing with input image
-            heatmap = cv2.resize(heatmap, (inp_img.shape[0], inp_img.shape[1]))  
-
-            # Construct a color image, with heatmap as one channel and input image another. The third channel are zeros
-            color_img = _construct_color_img(inp_img, heatmap)
-
-            # Collect all three images into a list and their respective plot titles
-            images = [inp_img, low_res_heatmap, color_img]
-            list_of_rows.append(images)
-            
-        # Format Plotting
-        _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_string)
-        list_of_rows = list()
-        plt.close()
 
 
 ############################################################ script ############################################################
