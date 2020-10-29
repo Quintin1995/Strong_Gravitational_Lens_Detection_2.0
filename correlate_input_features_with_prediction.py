@@ -1,8 +1,6 @@
-from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
-import cv2
 from DataGenerator import DataGenerator
-from functools import reduce, partial
+from functools import partial
 import glob
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -10,16 +8,13 @@ from Network import Network
 import numpy as np
 import os
 from Parameters import Parameters
-from photutils import make_source_mask
-import pyfits
 import pandas as pd
 import random
-import scipy
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
-from utils import show2Imgs, calc_RMS, get_model_paths, get_h5_path_dialog, binary_dialog, set_experiment_folder, set_models_folders, load_settings_yaml, normalize_img, get_samples, normalize_function, compute_PSF_r
+from utils import show2Imgs, calc_RMS, get_model_paths, get_h5_path_dialog, binary_dialog, set_experiment_folder, set_models_folders, load_settings_yaml, normalize_img, get_samples, normalize_function, compute_PSF_r, load_normalize_img
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
@@ -268,28 +263,6 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
     return X_train_positive, Y_train_positive, alpha_scalings, feature_areas_fracs
 
 
-# If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
-# There is also a check on whether the loaded data already has a color channel dimension, if not create it.
-def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
-    data_array = np.zeros((len(filenames), 101, 101, 1))
-
-    for idx, filename in enumerate(filenames):
-        if idx % 100 == 0:
-            print("loaded {} images".format(idx), flush=True)
-        if are_sources:
-            img = fits.getdata(filename).astype(data_type)
-            img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                                # Convolve with psf_r, has to do with camara point spread function.
-            img = np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)       # Expand color channel and normalize
-        else:
-            img = fits.getdata(filename).astype(data_type)
-            if img.ndim == 3:                                                                      # Some images are stored with color channel
-                img = normalize_function(img, normalize_dat, data_type)
-            elif img.ndim == 2:                                                                    # Some images are stored without color channel
-                img = np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)
-        data_array[idx] = img
-    return data_array
-
-
 # Makes a plot of a feature versus model prediction in a 2D plot. The plot is seperated into
 # two classes, positive and negative, based on a given threshold.
 def plot_feature_versus_prediction(predictions, feature_list, threshold=None, title=""):
@@ -379,15 +352,6 @@ dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_val
 # 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
-
-
-# 9.5 - Create a heatmap - Gradient Class Activation Map (Grad_CAM) of a given a positive image.
-if binary_dialog("Do Grad-CAM?"):
-    another_list = ["batch_normalization_16", "activation_12", "activation_8"]
-    another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
-    Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
-    negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
-    Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0)
 
 
 # 10.0 - Use the network to predict on the sample

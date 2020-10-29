@@ -11,6 +11,10 @@ from utils import show2Imgs, get_model_paths, get_h5_path_dialog, load_settings_
 import tensorflow as tf
 from tensorflow.keras import backend as K
 
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
+
 ############################################################ Functions ############################################################
 
 # Plot an image grid given a list of images.
