@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import load_settings_yaml, smooth_curve
+from utils import load_settings_yaml, smooth_curve, set_experiment_folder
 from Parameters import Parameters
 from DataGenerator import DataGenerator
 from Network import Network
@@ -294,23 +294,6 @@ def plot_losses_avg(models, dfs, jsons,  smooth_fac=0.9, do_diff_loss=False):
     plt.show()
 
 
-# Prompt the user to fill in which experiment folder to run.
-def set_experiment_folder(root_folder):
-    print("------------------------------")
-    print("\n\nRoot folder of experiment: {}".format(root_folder))
-
-
-    cwd = os.path.join(os.getcwd(), root_folder)
-    folders = sorted(os.listdir(cwd))
-    local_folders = [x for x in folders if os.path.isdir(os.path.join(cwd, x))]
-
-    print("\nSet experiment folder:")
-    for idx, exp_folder in enumerate(local_folders):
-        print("\t{} - {}".format(idx, exp_folder))
-    exp_idx = int(input("Set number experiment folder (integer): "))
-    print("Choose index: {}, {}".format(exp_idx, os.path.join(root_folder, local_folders[exp_idx])))
-
-    return os.path.join(root_folder, local_folders[exp_idx])
 
 
 # Prompt the user which models to compare against each other in the given experiment folder
