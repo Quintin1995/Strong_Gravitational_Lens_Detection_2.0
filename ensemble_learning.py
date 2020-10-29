@@ -140,19 +140,21 @@ model_paths = choose_ensemble_members()
 # 3.0 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
 h5_paths = get_h5_path_dialog(model_paths)
 
+
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = 25
 # sample_size = int(input("How many samples do you want to create and run (int): "))
 sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
 
 
-# 5.1 - Load unnormalized data in order to calculate the amount of noise in a lens.
+# 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
 # Create a chunk of data that each neural network understands (preprocessed quite identically)
 PSF_r = compute_PSF_r()  # Used for sources only
 lenses      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
 sources     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 negatives   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
 
+# Load a 50/50 positive/negative chunk into memory
 X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
 
 print(lenses.shape)
@@ -181,57 +183,43 @@ if False:
         plt.show()
 
 
-model_names     = list()
-all_predictions = list()
-# 4.0 - Load params - used for normalization etc -
+# 6.0 - Construct a matrix that holds a prediction value for each image and each model in the ensemble
+prediction_matrix = np.zeros((X_chunk.shape[0], len(model_paths)))
+print("prediction matrix shape: {}".format(prediction_matrix.shape))
+model_names       = list()      # Keep track of model names
+
+
+# 7.0 - Load params - used for normalization etc
 for model_idx, model_path in enumerate(model_paths):
 
-    # 5.0 - Set model parameters
+    # 8.0 - Set model parameters
     yaml_path = glob.glob(os.path.join(model_paths[model_idx], "run.yaml"))[0]              
     settings_yaml = load_settings_yaml(yaml_path, verbatim=False)                                           # Returns a dictionary object.
     params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
     params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
     
-    # keep track of model name
-    model_names.append(params.model_name)
-
-    # 6.0 - Create a dataGenerator object, because the network class wants it
+    # 9.0 - Create a dataGenerator object, because the network class wants it
     dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
 
-    # 7.0 - Construct a Network object that has a model as property.
+    # 10.0 - Construct a Network object that has a model as property.
     network = Network(params, dg, training=False, verbatim=False)
     network.model.load_weights(h5_paths[model_idx])
 
-    # 8.0 - Evaluate on validation chunk
+    model_names.append(network.params.model_name)
+
+    # 11.0 - Evaluate on validation chunk
     results = network.model.evaluate(X_chunk, y_chunk, verbose=0)
     for met_idx in range(len(results)):
         print("\n{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
 
-    # 9.0 - Predict on validation chunk
+    # 12.0 - Predict on validation chunk
     predictions = network.model.predict(X_chunk)
-    all_predictions.append(predictions)
+    prediction_matrix[:,model_idx] = np.squeeze(predictions)
 
-# 10.0 - 
-prediction_matrix = np.zeros((all_predictions[0].shape[0], len(model_names)))
-# Loop over all images
-for img_idx in range(X_chunk.shape[0]):
+
+# View Values in the prediction matrix in a nice way.
+for img_idx in range(prediction_matrix.shape[0]):
     print("\nImage #{}".format(img_idx))
-
-    # Construct a vector that holds a prediction value of each model of a single input image.
-    pred_vec = np.zeros((len(model_names), ))
-
     # Loop over all models, given an image
-    for model_idx, model_name in enumerate(model_names):
-
-        model_preds = all_predictions[model_idx]    # All predictions of a model (on all images)
-        y_hat       = model_preds[img_idx][0]       # Prediction on a single image
-        y           = y_chunk[img_idx]              # Ground Truth
-
-        # Fill the vector with prediction values
-        pred_vec[model_idx] = y_hat
-
-        print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_name, y_hat, y))
-    # Add the prediction vector to the matrix as a row.
-    prediction_matrix[img_idx, :] = pred_vec
-
-print(prediction_matrix)
+    for model_idx in range(prediction_matrix.shape[1]):
+        print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_names[model_idx], prediction_matrix[img_idx,model_idx], y_chunk[img_idx]))
