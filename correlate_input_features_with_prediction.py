@@ -296,8 +296,6 @@ def plot_feature_versus_prediction(predictions, feature_list, threshold=None, ti
     plt.show()
 
 
-
-
 ############################################################ script ############################################################
 
 # 1.0 - Fix memory leaks if running on tensorflow 2

@@ -195,7 +195,6 @@ def calc_RMS(unnormalized_3d_numpy_array):
     return rms_two_sided
 
 
-
 def plot_first_last_stats(X, y):
     num_imgs = int(input("\nAmount of images to show to the user? integer value: "))
     columns = 2
@@ -220,7 +219,6 @@ def plot_first_last_stats(X, y):
         plt.show()
 
 
-
 # Show the user some random images of the given numpy array, numpy array structured like: [num_imgs, width, height, num_channels]
 def show_random_img_plt_and_stats(data_array, num_imgs=1, title="title", do_plot=True, do_seed=False, seed=7846):
     for _ in range(num_imgs):
@@ -239,8 +237,6 @@ def show_random_img_plt_and_stats(data_array, num_imgs=1, title="title", do_plot
         plt.imshow(img, origin='lower', interpolation='none', cmap='Greys_r')
         if do_plot:
             plt.show()
-
-
 
 
 # Show 2 images next to each other. Squeeze out the color channel if it exist and it is equal to 1.

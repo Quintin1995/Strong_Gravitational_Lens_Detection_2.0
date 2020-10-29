@@ -10,10 +10,13 @@ from Parameters import Parameters
 from utils import show2Imgs, get_model_paths, get_h5_path_dialog, load_settings_yaml, get_samples, compute_PSF_r, load_normalize_img, normalize_img, calc_RMS
 import tensorflow as tf
 from tensorflow.keras import backend as K
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
 
 config = ConfigProto()
 config.gpu_options.allow_growth = True
 session = InteractiveSession(config=config)
+
 
 ############################################################ Functions ############################################################
 
