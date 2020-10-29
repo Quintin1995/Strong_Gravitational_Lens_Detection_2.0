@@ -1,32 +1,121 @@
-from compare_results import set_experiment_folder, set_models_folders, load_settings_yaml
+from astropy.io import fits
 from DataGenerator import DataGenerator
+from functools import partial
 import glob
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from Network import Network
 import numpy as np
-import tensorflow as tf
-import matplotlib.pyplot as plt
-from astropy.io import fits
-from skimage import exposure
 import os
-import scipy
-import pyfits
-import random
 from Parameters import Parameters
 import pandas as pd
-from utils import show2Imgs
+import random
+import tensorflow as tf
+from tensorflow.keras import backend as K
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+from utils import show2Imgs, calc_RMS, get_model_paths, get_h5_path_dialog, binary_dialog, set_experiment_folder, set_models_folders, load_settings_yaml, normalize_img, get_samples, normalize_function, compute_PSF_r, load_normalize_img
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
 
 
-def get_h5_path_dialog(model_paths):
-    h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
-    if h5_choice == 1:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*loss.h5"))
-    elif h5_choice == 2:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*metric.h5"))
+# Make a simple 3D plot based on 3 continuous variables/features.
+def plot_3D(con_fea1, con_fea2, con_fea3):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Intensity Scaling")
+    plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+    plt.show()
+
+
+
+# This plot approximates a 3D plot. A 2D plane gets hexogonal tesselation.
+# A datapoint in a 2D space (so based on 2 continuous variables/features)
+# Gets assigned a color based on model average model certainty in that tile, or
+# assigned a color based on the True Positive Rate in that tile.
+def hexbin_plot(con_fea1, con_fea2, predictions, gridsize=10, calc_TPR=True):
+    if calc_TPR:
+        threshold = float(input("\n\nWhat should the model threshold be? (float): "))
+    # Define a partial function so that we can pass parameters to the reduce_C_function.
+    fig, ax = plt.subplots()
+    if calc_TPR:
+        reduce_function = partial(reduce_C_function_TPR, threshold=threshold)
+        plt.hexbin(x=con_fea1, y=con_fea2, C=predictions, gridsize=gridsize, cmap='copper', reduce_C_function=reduce_function)
     else:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "*.h5"))
+        plt.hexbin(x=con_fea1, y=con_fea2, C=predictions, gridsize=gridsize, cmap='copper')
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Brighness Scaling")
+    cbar = plt.colorbar()
+    cbar.ax.get_yaxis().labelpad = 15
+    if calc_TPR:
+        plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
+        cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
+    else:
+        plt.title("Einstein Radius versus Brighness Scaling of Source and Model Certainty")
+        cbar.ax.set_ylabel('Model Prediction', rotation=270)
+    plt.show()
 
-    print("Choice h5 path: {}".format(h5_paths[0]))
-    return h5_paths[0]
+
+# Based on Einstein Radius and pixel intensity, assign a color based on the model prediction.
+def show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scalings, predictions):
+    fig, ax = plt.subplots()
+    plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
+    plt.xlabel("Einstein Radius")
+    plt.ylabel("Source Brighness Scaling")
+    plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
+    cbar = plt.colorbar()
+    cbar.ax.get_yaxis().labelpad = 15
+    cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+
+
+# Plot Signal to Noise Ratio (binned) versus the true positive rate of that bin.
+def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
+    
+    # Define the bins as an array with floats.
+    bins = np.arange(0.0, 1.0, 1.0/num_bins)
+
+    # Array that keeps track of the count of True Positives per bin.
+    TPs = np.zeros((num_bins))
+    # Array that keeps track of the count of False Negatives per bin.
+    FNs = np.zeros((num_bins))
+    
+    # The SNRs and predictions are still in the same order.
+    for pred, SNR in zip(predictions, SNRs):
+        if pred < threshold:
+            FNs[int(SNR*num_bins)] += 1.0       # The max of SNR = 1.0, therefore the SNR decides in which bin it ends up.
+        else:
+            TPs[int(SNR*num_bins)] += 1.0
+
+    # Calculate the True Positive Rate per bin, set it to zero, if we divide by 0.
+    TPRs = [tp/(tp+fn) if (tp+fn) != 0 else 0 for tp, fn in zip(list(TPs), list(FNs))]
+
+    # Plot the results
+    plt.clf()
+    plt.plot(bins, TPRs)
+    plt.title("SNR versus TPR")
+    plt.xlabel("SNR")
+    plt.ylabel("TPR")
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.show()
+
+
+
+# Function used by hexbin in order to reduce all datapoints to a singular TPR value.
+def reduce_C_function_TPR(predictions, threshold):
+    #We can calculate Recall or True Positive Rate
+    TP_count, FN_count = 0, 0
+    for pred in predictions:
+        if pred >= threshold:
+            TP_count += 1
+        else:
+            FN_count += 1
+    TPR = TP_count / (TP_count + FN_count)
+    print("TPR = {}, sample size={}".format(TPR, len(predictions)))
+    return TPR
 
 
 def get_empty_dataframe():
@@ -94,12 +183,13 @@ def fill_dataframe(df, paths):
 
 # Merge a single lens and source together into a mock lens.
 def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False, do_plot=False, noise_fac=2.0):
+    
+    # Keep a copy of the lens end source normalized.
+    lens_norm   = normalize_img(np.copy(lens))
+    source_norm = normalize_img(np.copy(source))
 
-    # Set a noise factor - 2.0 meaning that any pixel value higher than 2 times the noise level will be counted
-    # noise_fac = 1.5
-
-    # Determine noise level of lens - First the naive approach
-    noise_lens = np.mean(lens)
+    # Determine the noise level of the lens before merging it with the source
+    rms_lens = calc_RMS(lens)
 
     # Determine alpha scaling drawn from the interval [0.02,0.3]
     alpha_scaling = np.random.uniform(mock_lens_alpha_scaling[0], mock_lens_alpha_scaling[1])
@@ -108,18 +198,18 @@ def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), 
     source = source / np.amax(source) * np.amax(lens) * alpha_scaling
     
     # Get indexes where lensing features have pixel values below: noise_factor*noise
-    idxs = np.where(source < (noise_fac * noise_lens))
+    idxs = np.where(source < (noise_fac * rms_lens))
 
     # Make a copy of the source and set all below noise_factor*noise to 0.0
     trimmed_source = np.copy(source)
     trimmed_source[idxs] = 0.0
 
     # Calculate surface area of visual features that are stronger than noise_fac*noise
-    (x_idxs,_,_) = np.where(source >= (noise_fac * noise_lens))
+    (x_idxs,_,_) = np.where(source >= (noise_fac * rms_lens))
     feature_area_frac = len(x_idxs) / (source.shape[0] * source.shape[1])
     
     # Add lens and source together 
-    mock_lens = lens + source
+    mock_lens = lens_norm + source_norm / np.amax(source_norm) * np.amax(lens_norm) * alpha_scaling
     
     # Perform a square root stretch to emphesize lower luminosity features.
     mock_lens = np.sqrt(mock_lens)
@@ -154,20 +244,18 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
         mock_lens, alpha_scaling, feature_area_frac = merge_lens_and_source(lens, source, mock_lens_alpha_scaling, noise_fac=noise_fac)
 
         # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
-        # import matplotlib.pyplot as plt
-        # l = np.squeeze(lens)
-        # s = np.squeeze(source)
-        # m = np.squeeze(mock_lens)
-        # plt.imshow(l, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # l = np.squeeze(normalize_img(lens))
+        # s = np.squeeze(normalize_img(source))
+        # m = np.squeeze(normalize_img(mock_lens))
+        # plt.imshow(l, cmap='Greys_r')
         # plt.title("lens")
         # plt.show()
-        # plt.imshow(s, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.imshow(s, cmap='Greys_r')
         # plt.title("source")
         # plt.show()
-        # plt.imshow(m, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
+        # plt.imshow(m, cmap='Greys_r')
         # plt.title("mock lens")
         # plt.show()
-
         X_train_positive[i] = mock_lens
         alpha_scalings.append(alpha_scaling)
         feature_areas_fracs.append(feature_area_frac)
@@ -175,90 +263,8 @@ def merge_lenses_and_sources(lenses_array, sources_array, mock_lens_alpha_scalin
     return X_train_positive, Y_train_positive, alpha_scalings, feature_areas_fracs
 
 
-def compute_PSF_r():
-        ## This piece of code is needed for some reason that i will try to find out later.
-        nx = 101
-        ny = 101
-        f1 = pyfits.open("data/PSF_KIDS_175.0_-0.5_r.fits")  # PSF
-        d1 = f1[0].data
-        d1 = np.asarray(d1)
-        nx_, ny_ = np.shape(d1)
-        PSF_r = np.zeros((nx, ny))  # output
-        dx = (nx - nx_) // 2  # shift in x
-        dy = (ny - ny_) // 2  # shift in y
-        for ii in range(nx_):  # iterating over input array
-            for jj in range(ny_):
-                PSF_r[ii + dx][jj + dy] = d1[ii][jj]
-
-        return PSF_r
-
-
-# Opens dialog with the user to select a folder that contains models.
-def get_model_paths(root_dir="models"):
-
-    #Select which experiment path to take in directory structure
-    experiment_folder = set_experiment_folder(root_folder=root_dir)
-
-    # Can select 1 or multiple models.
-    models_paths = set_models_folders(experiment_folder)
-    return models_paths
-
-
-# Select a random sample with replacement from all files.
-def get_sample_lenses_and_sources(size=1000, type_data="validation"):
-    lenses_path_train    = os.path.join("data", type_data, "lenses")
-    sources_path_train   = os.path.join("data", type_data, "sources")
-    # negatives_path_train = os.path.join("data", "train", "negatives")
-
-    # Try to glob files in the given path
-    sources_fnames = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
-    lenses_fnames  = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
-    print("\nsources count {}".format(len(sources_fnames)))
-    print("lenses count {}".format(len(lenses_fnames)))
-
-    sources_fnames = random.sample(sources_fnames, size)
-    lenses_fnames  = random.sample(lenses_fnames, size)
-    return sources_fnames, lenses_fnames
-
-
-# Normalizationp per image
-def normalize_img(numpy_img):
-    return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
-
-
-# Simple case function to reduce line count in other function
-def normalize_function(img, norm_type, data_type):
-    if norm_type == "per_image":
-        img = normalize_img(img)
-    if norm_type == "adapt_hist_eq":
-        img = normalize_img(img)
-        img = exposure.equalize_adapthist(img).astype(data_type)
-    return img
-
-
-# If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
-# There is also a check on whether the loaded data already has a color channel dimension, if not create it.
-def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
-    data_array = np.zeros((len(filenames), 101, 101, 1))
-
-    for idx, filename in enumerate(filenames):
-        if idx % 100 == 0:
-            print("loaded {} images".format(idx), flush=True)
-        if are_sources:
-            img = fits.getdata(filename).astype(data_type)
-            img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                                # Convolve with psf_r, has to do with camara point spread function.
-            img = np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)       # Expand color channel and normalize
-        else:
-            img = fits.getdata(filename).astype(data_type)
-            if img.ndim == 3:                                                                      # Some images are stored with color channel
-                img = normalize_function(img, normalize_dat, data_type)
-            elif img.ndim == 2:                                                                    # Some images are stored without color channel
-                img = np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)
-        data_array[idx] = img
-    return data_array
-
-
-
+# Makes a plot of a feature versus model prediction in a 2D plot. The plot is seperated into
+# two classes, positive and negative, based on a given threshold.
 def plot_feature_versus_prediction(predictions, feature_list, threshold=None, title=""):
     if threshold == None:
         threshold = float(input("What model threshold do you want to set (float): "))
@@ -289,16 +295,20 @@ def plot_feature_versus_prediction(predictions, feature_list, threshold=None, ti
     plt.legend()
     plt.show()
 
+
 ############################################################ script ############################################################
 
 # 1.0 - Fix memory leaks if running on tensorflow 2
 tf.compat.v1.disable_eager_execution()
 
+
 # 2.0 - Model Selection from directory
 model_paths = get_model_paths()
 
+
 # 2.1 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
 h5_path = get_h5_path_dialog(model_paths)
+
 
 # 3.0 - Load params - used for normalization etc -
 yaml_path = glob.glob(os.path.join(model_paths[0], "run.yaml"))[0]                      # Only choose the first one for now
@@ -306,30 +316,41 @@ settings_yaml = load_settings_yaml(yaml_path)                                   
 params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
 params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
 
+
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames = get_sample_lenses_and_sources(size=sample_size)
+sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
-PSF_r = compute_PSF_r()  # Used for sources
-lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
-sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
+PSF_r = compute_PSF_r()  # Used for sources only
+# lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
+# sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
+
+# 5.1 - Load unnormalized data in order to calculate the amount of noise in a lens. 
+lenses_unnormalized    = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=lenses_fnames)
+sources_unnormalized   = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
+
 
 # 6.0 - Create mock lenses based on the sample
 noise_fac = 2.0
-mock_lenses, y, alpha_scalings, features_areas_fracs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+# mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses, sources, noise_fac=noise_fac)
+mock_lenses, pos_y, alpha_scalings, SNRs = merge_lenses_and_sources(lenses_unnormalized, sources_unnormalized, noise_fac=noise_fac)
+
 
 # 7.0 - Initialize and fill a pandas dataframe to store Source parameters
 df = get_empty_dataframe()
 df = fill_dataframe(df, sources_fnames)
-print(df.head())
+
 
 # 8.0 - Create a dataGenerator object, because the network class wants it
 dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_validation=False)
 
+
 # 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
 network.model.load_weights(h5_path)
+
 
 # 10.0 - Use the network to predict on the sample
 einstein_radii = list(df["LENSER"])
@@ -337,49 +358,30 @@ predictions = network.model.predict(mock_lenses)
 predictions = list(np.squeeze(predictions))
 
 
-# 10.5 - Lets make a plot of feature area size versus prediction value of a given model.
-plot_feature_versus_prediction(predictions, features_areas_fracs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
+# 11.0 - Make a plot of feature area size versus network certainty.
+if binary_dialog("Do you want to plot SNR versus prediction?"):
+    plot_feature_versus_prediction(predictions, SNRs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
 
 
-# 11.0 - Make a plot of einstein radius and network certainty
-plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
+# 12.0 - Make a plot of einstein radius and network certainty
+if binary_dialog("Do you want to plot Einstein Radii versus prediction?"):
+    plot_feature_versus_prediction(predictions, einstein_radii, threshold=0.5, title="Einstein Radii")
 
 
-# 12.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
-# For each data-point based on these features, assign a color based on the model prediction.
-# PLOT1
-fig, ax = plt.subplots()
-plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
-plt.xlabel("Einstein Radius")
-plt.ylabel("Source Intensity Scaling")
-plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
-cbar = plt.colorbar()
-cbar.ax.get_yaxis().labelpad = 15
-cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+# 13.0 - Lets create a 2D matrix with x-axis and y-axis being Einstein radius and alpha scaling.
+if binary_dialog("Do scatter plot and hexbin plot?"):
+    show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scalings, predictions)
+    hexbin_plot(einstein_radii, alpha_scalings, predictions, gridsize=10, calc_TPR=False)
+    hexbin_plot(einstein_radii, alpha_scalings, predictions, gridsize=10, calc_TPR=True)
+    
 
-# PLOT2
-fig, ax = plt.subplots()
-plt.hexbin(x=einstein_radii, y=alpha_scalings, C=predictions, gridsize=15, cmap='copper')
-plt.xlabel("Einstein Radius")
-plt.ylabel("Source Intensity Scaling")
-plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
-cbar = plt.colorbar()
-cbar.ax.get_yaxis().labelpad = 15
-cbar.ax.set_ylabel('Prediction value Model', rotation=270)
-plt.show()
+# Plot a binned SNR on the x-axis versus TPR on the y-axis.
+if binary_dialog("Do SNR vs TPR plot?"):
+    threshold = float(input("\n\nWhat model threshold should be used? (float): "))
+    plot_SNR_vs_TPR(predictions, SNRs, threshold=threshold, num_bins=50)
 
 
-
-# 13.0 - Lets try to make a 3D plot, with:
-# x-axis is Einstein Radius
-# y-axis is alpha_scaling
-# z-axis is prediction of model.
-from mpl_toolkits.mplot3d import Axes3D
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-
-ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
-plt.xlabel("Einstein Radius")
-plt.ylabel("Source Intensity Scaling")
-plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
-plt.show()
+# 14.0 - Lets try to make a 3D plot, with:
+# x-axis is Einstein Radius, # y-axis is alpha_scaling, # z-axis is prediction of model.
+if binary_dialog("Make 3D plot?"):
+    plot_3D(con_fea1 = einstein_radii, con_fea2 = alpha_scalings, con_fea3 = predictions)
