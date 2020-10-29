@@ -281,23 +281,25 @@ def hms(seconds):
 
 
 # Create target directory & all intermediate directories if don't exists
-def create_dir_if_not_exists(dirName):
+def create_dir_if_not_exists(dirName, verbatim=False):
     try:
-        os.makedirs(dirName)    
+        os.makedirs(dirName)
         print("Directory " , dirName ,  " Created ", flush=True)
     except FileExistsError:
-        print("Directory " , dirName ,  " already exists", flush=True)
+        if verbatim:
+            print("Directory " , dirName ,  " already exists", flush=True)
 
 
 # Load all settings from a yaml file and stores it in a settings dictionary.
-def load_settings_yaml(yaml_run_path):
+def load_settings_yaml(yaml_run_path, verbatim=True):
     #opens run.yaml and load all the settings into a dictionary.
     with open(yaml_run_path) as file:
         settings = yaml.load(file)
-        print("\nSettings: {}".format(yaml_run_path), flush=True)
-        for i in settings:
-            print(str(i) + ": " + str(settings[i]), flush=True)
-        print("\nAll settings loaded.\n\n", flush=True)
+        if verbatim:
+            print("\nSettings: {}".format(yaml_run_path), flush=True)
+            for i in settings:
+                print(str(i) + ": " + str(settings[i]), flush=True)
+            print("\nAll settings loaded.\n\n", flush=True)
         return settings
 
 

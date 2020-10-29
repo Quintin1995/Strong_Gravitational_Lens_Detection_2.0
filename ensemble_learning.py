@@ -78,9 +78,8 @@ def merge_lenses_and_sources(lenses_array, sources_array, num_mock_lenses, data_
     return X_train_positive, Y_train_positive
 
 
-
 # Loading a valiation chunk into memory
-def load_chunk_val(mock_lens_alpha_scaling):
+def _load_chunk_val(Xlenses_validation, Xsources_validation, Xnegatives_validation, mock_lens_alpha_scaling):
     start_time = time.time()
     num_positive = Xlenses_validation.shape[0]
     # num_negative = Xnegatives_validation.shape[0] + Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
@@ -153,12 +152,13 @@ PSF_r = compute_PSF_r()  # Used for sources only
 lenses      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
 sources     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 negatives   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
-mock_lenses, pos_y = merge_lenses_and_sources(lenses, sources, sample_size, np.float32)
+
+X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
 
 print(lenses.shape)
 print(sources.shape)
 print(negatives.shape)
-print(mock_lenses.shape)
+print(X_chunk.shape)
 
 if False:
     for i in range(3):
@@ -171,7 +171,7 @@ if False:
         plt.title("source")
 
         plt.figure()
-        plt.imshow(np.squeeze(mock_lenses[i]), cmap='Greys_r')
+        plt.imshow(np.squeeze(X_chunk[i]), cmap='Greys_r')
         plt.title("mock lens")
 
         plt.figure()
@@ -181,18 +181,34 @@ if False:
         plt.show()
 
 
+model_names = list()
+all_predictions = list()
 # 4.0 - Load params - used for normalization etc -
 for model_idx, model_path in enumerate(model_paths):
 
     # 5.0 - Set model parameters
     yaml_path = glob.glob(os.path.join(model_paths[model_idx], "run.yaml"))[0]              
-    settings_yaml = load_settings_yaml(yaml_path)                                           # Returns a dictionary object.
+    settings_yaml = load_settings_yaml(yaml_path, verbatim=False)                                           # Returns a dictionary object.
     params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
     params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
+    
+    # keep track of model name
+    model_names.append(params.model_name)
 
     # 6.0 - Create a dataGenerator object, because the network class wants it
     dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
 
     # 7.0 - Construct a Network object that has a model as property.
-    network = Network(params, dg, training=False)
+    network = Network(params, dg, training=False, verbatim=False)
     network.model.load_weights(h5_paths[model_idx])
+
+    # 8.0 - Evaluate on validation chunk
+    results = network.model.evaluate(X_chunk, y_chunk, verbose=0)
+    for met_idx in range(len(results)):
+        print("\n\n{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
+
+    # 9.0 - Predict on validation chunk
+    predictions = network.model.predict(X_chunk)
+    all_predictions.append(predictions)
+
+    # input("press enter:...")
