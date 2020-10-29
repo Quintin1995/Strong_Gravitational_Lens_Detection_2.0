@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import load_settings_yaml, smooth_curve, set_experiment_folder
+from utils import load_settings_yaml, smooth_curve, set_experiment_folder, set_models_folders
 from Parameters import Parameters
 from DataGenerator import DataGenerator
 from Network import Network
