@@ -205,10 +205,15 @@ for model_idx, model_path in enumerate(model_paths):
     # 8.0 - Evaluate on validation chunk
     results = network.model.evaluate(X_chunk, y_chunk, verbose=0)
     for met_idx in range(len(results)):
-        print("\n\n{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
+        print("\n{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
 
     # 9.0 - Predict on validation chunk
     predictions = network.model.predict(X_chunk)
     all_predictions.append(predictions)
 
-    # input("press enter:...")
+
+for img_idx in range(X_chunk.shape[0]):
+    print("\nImage #{}".format(img_idx))
+    for model_idx, model_name in enumerate(model_names):
+        model_preds = all_predictions[model_idx]
+        print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_name, model_preds[img_idx][0], y_chunk[img_idx]))
