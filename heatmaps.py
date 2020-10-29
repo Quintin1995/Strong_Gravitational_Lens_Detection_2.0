@@ -251,7 +251,7 @@ model_paths = get_model_paths()
 
 
 # 2.1 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
-h5_path = get_h5_path_dialog(model_paths)
+h5_paths = get_h5_path_dialog(model_paths)
 
 
 # 3.0 - Load params - used for normalization etc -
@@ -287,7 +287,7 @@ dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_val
 
 # 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
-network.model.load_weights(h5_path)
+network.model.load_weights(h5_paths[0])
 
 
 # Perform Grad-CAM

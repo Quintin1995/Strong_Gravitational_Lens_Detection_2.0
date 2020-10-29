@@ -149,16 +149,20 @@ def binary_dialog(question_string):
 
 
 def get_h5_path_dialog(model_paths):
-    h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
-    if h5_choice == 1:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*loss.h5"))
-    elif h5_choice == 2:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*metric.h5"))
-    else:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "*.h5"))
+    weights_paths = list()
+    for model_path in model_paths:
+        print("Choosing for model: {}".format(model_path))
+        h5_choice = int(input("Which model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
+        if h5_choice == 1:
+            h5_paths = glob.glob(os.path.join(model_path, "checkpoints/*loss.h5"))
+        elif h5_choice == 2:
+            h5_paths = glob.glob(os.path.join(model_path, "checkpoints/*metric.h5"))
+        else:
+            h5_paths = glob.glob(os.path.join(model_path, "*.h5"))
 
-    print("Choice h5 path: {}".format(h5_paths[0]))
-    return h5_paths[0]
+        print("Choice h5 path: {}".format(h5_paths[0]))
+        weights_paths.append(h5_paths[0])
+    return weights_paths
 
 
 # Opens dialog with the user to select a folder that contains models.

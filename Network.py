@@ -71,7 +71,6 @@ class Network:
                                                                 loss_function=self.loss_function,
                                                                 metrics_list=self.metrics)
 
-
         # Parameters used when training the model
         self.loss        = []              # Store loss of the model
         self.score       = []              # Store score, such as (binary accuracy or f1-macro scores) of the model     or it holds other metric values such as f1-softloss (scores)
