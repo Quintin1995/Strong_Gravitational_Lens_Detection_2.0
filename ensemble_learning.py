@@ -181,7 +181,7 @@ if False:
         plt.show()
 
 
-model_names = list()
+model_names     = list()
 all_predictions = list()
 # 4.0 - Load params - used for normalization etc -
 for model_idx, model_path in enumerate(model_paths):
@@ -211,9 +211,27 @@ for model_idx, model_path in enumerate(model_paths):
     predictions = network.model.predict(X_chunk)
     all_predictions.append(predictions)
 
-
+# 10.0 - 
+prediction_matrix = np.zeros((all_predictions[0].shape[0], len(model_names)))
+# Loop over all images
 for img_idx in range(X_chunk.shape[0]):
     print("\nImage #{}".format(img_idx))
+
+    # Construct a vector that holds a prediction value of each model of a single input image.
+    pred_vec = np.zeros((len(model_names), ))
+
+    # Loop over all models, given an image
     for model_idx, model_name in enumerate(model_names):
-        model_preds = all_predictions[model_idx]
-        print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_name, model_preds[img_idx][0], y_chunk[img_idx]))
+
+        model_preds = all_predictions[model_idx]    # All predictions of a model (on all images)
+        y_hat       = model_preds[img_idx][0]       # Prediction on a single image
+        y           = y_chunk[img_idx]              # Ground Truth
+
+        # Fill the vector with prediction values
+        pred_vec[model_idx] = y_hat
+
+        print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_name, y_hat, y))
+    # Add the prediction vector to the matrix as a row.
+    prediction_matrix[img_idx, :] = pred_vec
+
+print(prediction_matrix)
