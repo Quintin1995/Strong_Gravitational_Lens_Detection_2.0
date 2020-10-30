@@ -5,14 +5,26 @@ import numpy as np
 import os
 from Parameters import Parameters
 import tensorflow as tf
-from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r
+from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img
 import matplotlib.pyplot as plt
 import time
 import random
-
+from scipy.optimize import minimize
+from scipy.special import softmax
+from functools import partial
 
 ############################################################ Functions ############################################################
-    
+
+
+# We need to minimize a new loss function
+# Given an example and a weight matrix what is the output of the given example, and its corresponding loss?
+# Define a function that returns loss per example
+def summed_squared_error(y, Xs, w0):
+    y_hat = np.dot(Xs, w0)
+    error = np.square(y - y_hat)
+    sum_error = np.sum(error)
+    return sum_error
+
     
 # Merge a single lens and source together into a mock lens.
 def merge_lens_and_source(lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
@@ -142,7 +154,7 @@ h5_paths = get_h5_path_dialog(model_paths)
 
 
 # 4.0 - Select random sample from the data (with replacement)
-sample_size = 25
+sample_size = 551
 # sample_size = int(input("How many samples do you want to create and run (int): "))
 sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
 
@@ -189,6 +201,7 @@ print("prediction matrix shape: {}".format(prediction_matrix.shape))
 model_names       = list()      # Keep track of model names
 
 
+
 # 7.0 - Load params - used for normalization etc
 for model_idx, model_path in enumerate(model_paths):
 
@@ -217,9 +230,39 @@ for model_idx, model_path in enumerate(model_paths):
     prediction_matrix[:,model_idx] = np.squeeze(predictions)
 
 
+
 # View Values in the prediction matrix in a nice way.
 for img_idx in range(prediction_matrix.shape[0]):
     print("\nImage #{}".format(img_idx))
     # Loop over all models, given an image
     for model_idx in range(prediction_matrix.shape[1]):
         print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_names[model_idx], prediction_matrix[img_idx,model_idx], y_chunk[img_idx]))
+
+
+
+# Optimize the sum squared difference.
+# We want to find weights per model.
+nelder_mead_experiment_count = 2
+for i in range(nelder_mead_experiment_count):
+    print("\n\nNelder-mead try #{}".format(i))
+
+    # Randomly initialize the weight vector
+    w0 = np.random.random_sample((len(model_names),))
+
+    # We want to pass arguments to the minimization function. This is done with a partial function.
+    f_partial = partial(summed_squared_error, y_chunk, prediction_matrix)
+
+    #Perform the minimization
+    res = minimize(f_partial, w0, method='Nelder-Mead', tol=1e-6, options={'disp' : True})
+
+    model_weights = res.x
+    model_weights = softmax(model_weights)
+    print("model weights\t = {}".format(model_weights))
+    print("Weights sum\t = {}".format(np.sum(model_weights)))
+    print("Model names\t = {}".format(model_names))
+
+
+# Now that we have the weights of each model,
+# we an calculate the evaluation and compare
+# it with individual model evalution.
+
