@@ -145,25 +145,88 @@ def choose_ensemble_members():
     return model_paths
 
 
+
+# Given 4D numpy image data and corresponding labels, model paths and weights,
+# this function will return a prediction matrix, containing a prediction on each 
+# example for each model. It will also return names of the models.
+def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
+
+    # Construct a matrix that holds a prediction value for each image and each model in the ensemble
+    prediction_matrix = np.zeros((X_chunk.shape[0], len(model_paths)))
+    model_names       = list()      # Keep track of model names
+    
+    # Load each model and perform prediction with it.
+    for model_idx, model_path in enumerate(model_paths):
+
+        # 1.0 - Set model parameters
+        yaml_path = glob.glob(os.path.join(model_path, "run.yaml"))[0]              
+        settings_yaml = load_settings_yaml(yaml_path, verbatim=False)                           # Returns a dictionary object.
+        params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
+        params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
+        
+        # 2.0 - Create a dataGenerator object, because the network class wants it
+        dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
+
+        # 3.0 - Construct a Network object that has a model as property.
+        network = Network(params, dg, training=False, verbatim=False)
+        network.model.load_weights(h5_paths[model_idx])
+
+        # Keep track of model name
+        model_names.append(network.params.model_name)
+
+        # 4.0 - Evaluate on validation chunk
+        evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
+        print("\n\nIndividual Evaluations:")
+        print("Model name: {}".format(network.params.model_name))
+        for met_idx in range(len(evals)):
+            print("{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
+        print("")
+
+        # 5.0 - Predict on validation chunk
+        predictions = network.model.predict(X_chunk)
+        prediction_matrix[:,model_idx] = np.squeeze(predictions)
+    # Networks are also need later on, therefore we need to add them to a list
+    return prediction_matrix, model_names
+
+
+# Given a prediction matrix it will try to find weights for each model.
+# Via a minimization problem.
+def find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelder-Mead", verbatim=False):
+    
+    # Randomly initialize the initial weight vector
+    w0 = np.random.random_sample((len(model_names),))
+
+    # We want to pass arguments to the minimization function. This is done with a partial function.
+    f_partial = partial(mean_square_error, y_chunk, prediction_matrix)
+
+    # Perform the minimization with the scipy package
+    res = minimize(f_partial, w0, method='Nelder-Mead', tol=1e-6, options={'disp' : True})
+
+    # Collect model weights and print to user. (Softmax the weights so that they sum to 1.)
+    model_weights = res.x
+    model_weights = softmax(model_weights)
+    if verbatim:
+        print("Model weights\t = {}".format(model_weights))
+        print("Weights Sum\t = {}".format(np.sum(model_weights)))
+        print("Model names\t = {}".format(model_names))
+    return model_weights
+
+
 ############################################################ Script ############################################################
 
 # 1.0 - Fix memory leaks if running on tensorflow 2
 tf.compat.v1.disable_eager_execution()
 
-
 # 2.0 - Model Selection from directory - Select multiple models
 model_paths = choose_ensemble_members()
 
-
 # 3.0 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
 h5_paths = get_h5_path_dialog(model_paths)
-
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = 551
 # sample_size = int(input("How many samples do you want to create and run (int): "))
 sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
-
 
 # 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
 # Create a chunk of data that each neural network understands (preprocessed quite identically)
@@ -172,104 +235,15 @@ lenses      = load_normalize_img(np.float32, are_sources=False, normalize_dat="p
 sources     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 negatives   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
 
-# Load a 50/50 positive/negative chunk into memory
+# 6.0 - Load a 50/50 positive/negative chunk into memory
 X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
 
-print(lenses.shape)
-print(sources.shape)
-print(negatives.shape)
-print(X_chunk.shape)
+# 7.0 - Load ensemble members and perform prediction with it.
+prediction_matrix, model_names = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
 
-if False:
-    for i in range(3):
-        plt.figure()
-        plt.imshow(np.squeeze(lenses[i]), cmap='Greys_r')
-        plt.title("lens")
+# 8.0 - Find ensemble model weights as a vector
+model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelder-Mead", verbatim=True)
 
-        plt.figure()
-        plt.imshow(np.squeeze(sources[i]), cmap='Greys_r')
-        plt.title("source")
-
-        plt.figure()
-        plt.imshow(np.squeeze(X_chunk[i]), cmap='Greys_r')
-        plt.title("mock lens")
-
-        plt.figure()
-        plt.imshow(np.squeeze(negatives[i]), cmap='Greys_r')
-        plt.title("negative")
-
-        plt.show()
-
-
-# 6.0 - Construct a matrix that holds a prediction value for each image and each model in the ensemble
-prediction_matrix = np.zeros((X_chunk.shape[0], len(model_paths)))
-print("prediction matrix shape: {}".format(prediction_matrix.shape))
-model_names       = list()      # Keep track of model names
-
-
-
-# 7.0 - Load params - used for normalization etc
-model_evaluations = list()
-for model_idx, model_path in enumerate(model_paths):
-
-    # 8.0 - Set model parameters
-    yaml_path = glob.glob(os.path.join(model_paths[model_idx], "run.yaml"))[0]              
-    settings_yaml = load_settings_yaml(yaml_path, verbatim=False)                                           # Returns a dictionary object.
-    params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
-    params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
-    
-    # 9.0 - Create a dataGenerator object, because the network class wants it
-    dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
-
-    # 10.0 - Construct a Network object that has a model as property.
-    network = Network(params, dg, training=False, verbatim=False)
-    network.model.load_weights(h5_paths[model_idx])
-
-    model_names.append(network.params.model_name)
-
-    # 11.0 - Evaluate on validation chunk
-    evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
-    model_evaluations.append(evals)
-    for met_idx in range(len(evals)):
-        print("\n{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
-
-    # 12.0 - Predict on validation chunk
-    predictions = network.model.predict(X_chunk)
-    prediction_matrix[:,model_idx] = np.squeeze(predictions)
-
-
-# 14.0 - Optimize the sum squared difference.
-# We want to find weights per model.
-nelder_mead_experiment_count = 2
-for i in range(nelder_mead_experiment_count):
-    print("\n\nNelder-mead try #{}".format(i))
-
-    # Randomly initialize the initial weight vector
-    w0 = np.random.random_sample((len(model_names),))
-
-    # We want to pass arguments to the minimization function. This is done with a partial function.
-    f_partial = partial(mean_square_error, y_chunk, prediction_matrix)
-
-    #Perform the minimization
-    res = minimize(f_partial, w0, method='Nelder-Mead', tol=1e-6, options={'disp' : True})
-
-    # Collect model weights and print to user. (Softmax the weights so that they sum to 1.)
-    model_weights = res.x
-    model_weights = softmax(model_weights)
-    print("model weights\t = {}".format(model_weights))
-    print("Weights sum\t = {}".format(np.sum(model_weights)))
-    print("Model names\t = {}".format(model_names))
-
-
-# Now that we have the weights of each model,
-# we an calculate the evaluation and compare
-# it with individual model evalution.
-print("\n\nIndividual Evaluations:")
-for idx, eval in enumerate(model_evaluations):
-    print("Model name: {}".format(model_names[idx]))
-    for met_idx in range(len(model_evaluations[idx])):
-        print("{} = {}".format(network.model.metrics_names[met_idx], model_evaluations[idx][met_idx]))
-    print("")
 
 # Ensemble Evaluation
 print("\n\nEnsemble Evaluation:")
