@@ -212,6 +212,29 @@ def find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelde
     return model_weights
 
 
+# Evaluating an ensemble is done by performing a dot product of the prediction matrix
+# with the model weight vector. Followed by determining error, and returning accuracy.
+def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
+    print("\n\n===================\nEnsemble Evaluation:")
+
+    # In order to get ensemble prediction we need to do a dot product
+    # of prediction vector with model weight vector.
+    y_hat = np.dot(prediction_matrix, model_weights)
+
+    # Count TP, TN, FP, FN
+    y_hat[y_hat < threshold] = 0.0
+    y_hat[y_hat >= threshold] = 1.0
+
+    # Count mistakes
+    error_count = np.sum(np.absolute(y - y_hat))
+    print("mistakes count: {}".format(error_count))
+
+    # Calculate accuracy
+    error_percentage = error_count/y_hat.shape[0]
+    acc = 1.0 - error_percentage
+    return acc
+
+
 ############################################################ Script ############################################################
 
 # 1.0 - Fix memory leaks if running on tensorflow 2
@@ -244,18 +267,8 @@ prediction_matrix, model_names = load_models_and_predict(X_chunk, y_chunk, model
 # 8.0 - Find ensemble model weights as a vector
 model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelder-Mead", verbatim=True)
 
-
-# Ensemble Evaluation
-print("\n\nEnsemble Evaluation:")
-y_hat = np.dot(prediction_matrix, model_weights)
-print(y_hat)
-threshold = 0.5
-y_hat_copy = np.copy(y_hat)
-y_hat_copy[y_hat < threshold] = 0.0
-y_hat_copy[y_hat >= threshold] = 1.0
-error_count = np.sum(np.absolute(y_chunk - y_hat_copy))
-print("mistakes count: {}".format(error_count))
-error_percentage = error_count/y_hat_copy.shape[0]
-acc = 1.0 - error_percentage
-print(acc)
-x=4
+# 9.0 - Ensemble Evaluation
+acc = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=0.5)
+print("\n\nAccuracy of Ensemble\t{:.3f}".format(acc))
+print("Model names:\t\t{}".format(model_names))
+print("Model Weight Vector:\t{}".format(model_weights))
