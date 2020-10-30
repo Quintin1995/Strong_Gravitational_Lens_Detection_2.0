@@ -5,7 +5,7 @@ import numpy as np
 import os
 from Parameters import Parameters
 import tensorflow as tf
-from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img
+from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists
 import matplotlib.pyplot as plt
 import time
 import random
@@ -13,6 +13,7 @@ from scipy.optimize import minimize
 from scipy.special import softmax
 from functools import partial
 from sklearn.metrics import confusion_matrix
+import argparse
 
 ############################################################ Functions ############################################################
 
@@ -237,38 +238,62 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
 
 ############################################################ Script ############################################################
 
-# 1.0 - Fix memory leaks if running on tensorflow 2
-tf.compat.v1.disable_eager_execution()
+def main():
 
-# 2.0 - Model Selection from directory - Select multiple models
-model_paths = choose_ensemble_members()
+    # Deal with input arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=True)
+    parser.add_argument("--sample_size", help="The amount of images used in the validation set to optimize ensemble model weights. A maximum of 551 can be used.", default=551, required=False)
+    args = parser.parse_args()
 
-# 3.0 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
-h5_paths = get_h5_path_dialog(model_paths)
+    ###
+    root_dir_ensembles = "ensembles"
 
-# 4.0 - Select random sample from the data (with replacement)
-sample_size = 551
-# sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+    # 0.0 - Create folder that holds Ensembles
+    create_dir_if_not_exists(root_dir_ensembles, verbatim=False)
 
-# 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
-# Create a chunk of data that each neural network understands (preprocessed quite identically)
-PSF_r = compute_PSF_r()  # Used for sources only
-lenses      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
-sources     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
-negatives   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
+    # 1.0 - Fix memory leaks if running on tensorflow 2
+    tf.compat.v1.disable_eager_execution()
 
-# 6.0 - Load a 50/50 positive/negative chunk into memory
-X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
+    # 2.0 - Model Selection from directory - Select multiple models
+    model_paths = choose_ensemble_members()
 
-# 7.0 - Load ensemble members and perform prediction with it.
-prediction_matrix, model_names = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
+    # 2.5 - Define Ensemble name and create a folder for it
+    name = args.ensemble_name + "_samples_" + str(args.sample_size)
+    ensemble_dir = os.path.join(root_dir_ensembles, name)
+    create_dir_if_not_exists(ensemble_dir)
 
-# 8.0 - Find ensemble model weights as a vector
-model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelder-Mead", verbatim=True)
+    # 3.0 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
+    h5_paths = get_h5_path_dialog(model_paths)
 
-# 9.0 - Ensemble Evaluation
-acc = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=0.5)
-print("\n\nAccuracy of Ensemble\t{:.3f}".format(acc))
-print("Model names:\t\t{}".format(model_names))
-print("Model Weight Vector:\t{}".format(model_weights))
+    # 4.0 - Select random sample from the data (with replacement)
+    sample_size = 551
+    sample_size = int(args.sample_size)
+    # sample_size = int(input("How many samples do you want to create and run (int): "))
+    sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+
+    # 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
+    # Create a chunk of data that each neural network understands (preprocessed quite identically)
+    PSF_r = compute_PSF_r()  # Used for sources only
+    lenses      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
+    sources     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
+    negatives   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
+
+    # 6.0 - Load a 50/50 positive/negative chunk into memory
+    X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
+
+    # 7.0 - Load ensemble members and perform prediction with it.
+    prediction_matrix, model_names = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
+
+    # 8.0 - Find ensemble model weights as a vector
+    model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelder-Mead", verbatim=True)
+
+    # 9.0 - Ensemble Evaluation
+    threshold = 0.5
+    acc = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=threshold)
+    print("\n\nAccuracy of Ensemble\t{:.3f} at threshold: {}".format(acc, threshold))
+    print("Model names:\t\t{}".format(model_names))
+    print("Model Weight Vector:\t{}".format(model_weights))
+
+if __name__ == "__main__":
+    main()
