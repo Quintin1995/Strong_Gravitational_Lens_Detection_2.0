@@ -12,18 +12,24 @@ import random
 from scipy.optimize import minimize
 from scipy.special import softmax
 from functools import partial
+from sklearn.metrics import confusion_matrix
 
 ############################################################ Functions ############################################################
 
 
-# We need to minimize a new loss function
-# Given an example and a weight matrix what is the output of the given example, and its corresponding loss?
-# Define a function that returns loss per example
-def summed_squared_error(y, Xs, w0):
+# Calculate the Mean Square Error for a matrix of datapoints given a ground truth label
+# and weight vector.
+def mean_square_error(y, Xs, w0):
+
+    # Prediction of the ensemble.
     y_hat = np.dot(Xs, w0)
+
+    # Square the error in order to get rid of negative values (common practice)
     error = np.square(y - y_hat)
-    sum_error = np.sum(error)
-    return sum_error
+
+    # Take average error
+    mean = np.mean(error)
+    return mean
 
     
 # Merge a single lens and source together into a mock lens.
@@ -203,6 +209,7 @@ model_names       = list()      # Keep track of model names
 
 
 # 7.0 - Load params - used for normalization etc
+model_evaluations = list()
 for model_idx, model_path in enumerate(model_paths):
 
     # 8.0 - Set model parameters
@@ -221,40 +228,32 @@ for model_idx, model_path in enumerate(model_paths):
     model_names.append(network.params.model_name)
 
     # 11.0 - Evaluate on validation chunk
-    results = network.model.evaluate(X_chunk, y_chunk, verbose=0)
-    for met_idx in range(len(results)):
-        print("\n{} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
+    evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
+    model_evaluations.append(evals)
+    for met_idx in range(len(evals)):
+        print("\n{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
 
     # 12.0 - Predict on validation chunk
     predictions = network.model.predict(X_chunk)
     prediction_matrix[:,model_idx] = np.squeeze(predictions)
 
 
-
-# View Values in the prediction matrix in a nice way.
-for img_idx in range(prediction_matrix.shape[0]):
-    print("\nImage #{}".format(img_idx))
-    # Loop over all models, given an image
-    for model_idx in range(prediction_matrix.shape[1]):
-        print("Model({0})\tpredicts: {1:.3f}, truth = {2}".format(model_names[model_idx], prediction_matrix[img_idx,model_idx], y_chunk[img_idx]))
-
-
-
-# Optimize the sum squared difference.
+# 14.0 - Optimize the sum squared difference.
 # We want to find weights per model.
 nelder_mead_experiment_count = 2
 for i in range(nelder_mead_experiment_count):
     print("\n\nNelder-mead try #{}".format(i))
 
-    # Randomly initialize the weight vector
+    # Randomly initialize the initial weight vector
     w0 = np.random.random_sample((len(model_names),))
 
     # We want to pass arguments to the minimization function. This is done with a partial function.
-    f_partial = partial(summed_squared_error, y_chunk, prediction_matrix)
+    f_partial = partial(mean_square_error, y_chunk, prediction_matrix)
 
     #Perform the minimization
     res = minimize(f_partial, w0, method='Nelder-Mead', tol=1e-6, options={'disp' : True})
 
+    # Collect model weights and print to user. (Softmax the weights so that they sum to 1.)
     model_weights = res.x
     model_weights = softmax(model_weights)
     print("model weights\t = {}".format(model_weights))
@@ -265,4 +264,24 @@ for i in range(nelder_mead_experiment_count):
 # Now that we have the weights of each model,
 # we an calculate the evaluation and compare
 # it with individual model evalution.
+print("\n\nIndividual Evaluations:")
+for idx, eval in enumerate(model_evaluations):
+    print("Model name: {}".format(model_names[idx]))
+    for met_idx in range(len(model_evaluations[idx])):
+        print("{} = {}".format(network.model.metrics_names[met_idx], model_evaluations[idx][met_idx]))
+    print("")
 
+# Ensemble Evaluation
+print("\n\nEnsemble Evaluation:")
+y_hat = np.dot(prediction_matrix, model_weights)
+print(y_hat)
+threshold = 0.5
+y_hat_copy = np.copy(y_hat)
+y_hat_copy[y_hat < threshold] = 0.0
+y_hat_copy[y_hat >= threshold] = 1.0
+error_count = np.sum(np.absolute(y_chunk - y_hat_copy))
+print("mistakes count: {}".format(error_count))
+error_percentage = error_count/y_hat_copy.shape[0]
+acc = 1.0 - error_percentage
+print(acc)
+x=4
