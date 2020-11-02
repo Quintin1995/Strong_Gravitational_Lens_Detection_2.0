@@ -72,26 +72,15 @@ def show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scaling
     cbar.ax.set_ylabel('Prediction value Model', rotation=270)
 
 
-def autolabel(rects, ax):
-    """Attach a text label above each bar in *rects*, displaying its height."""
-    for rect in rects:
-        height = rect.get_height()
-        ax.annotate('{}'.format(height),
-                    xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords="offset points",
-                    ha='center', va='bottom')
-    return ax
-
-
 # Plot Signal to Noise Ratio (binned) versus the true positive rate of that bin.
 def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
+    
+    # Define range for x-axis
     max_snr = np.amax(SNRs)+0.01
 
-    # Define the bins as an array with floats.
+    # Define the bins as an array with floats. (and bin names as labels)
     bins = np.arange(0.0, max_snr, max_snr/num_bins)
     labels = ["{0:.3f}".format(x) for x in bins]
-    print(labels)
 
     # Array that keeps track of the count of True Positives per bin.
     TPs = np.zeros((num_bins))
@@ -99,49 +88,38 @@ def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
     FNs = np.zeros((num_bins))
     
     # The SNRs and predictions are still in the same order.
+    # We can index the correct bin by multiplying with num_bins/max_snr
     for pred, SNR in zip(predictions, SNRs):
         if pred < threshold:
             FNs[int(SNR*num_bins*(1/max_snr))] += 1.0       # The max of SNR = 1.0, therefore the SNR decides in which bin it ends up.
         else:
             TPs[int(SNR*num_bins*(1/max_snr))] += 1.0
 
-    # Calculate the True Positive Rate per bin, set it to zero, if we divide by 0.
-    TPRs = [tp/(tp+fn) if (tp+fn) != 0 else 0 for tp, fn in zip(list(TPs), list(FNs))]
+    # Store the raw data in a dictionary
+    raw_data = {'TPs': TPs, 'FNs': FNs}
+    df = pd.DataFrame(raw_data)
 
-    # # Plot the results
-    # plt.clf()
-    # plt.plot(bins, TPRs)
-    # plt.title("SNR versus TPR")
-    # plt.xlabel("SNR")
-    # plt.ylabel("TPR")
-    # plt.grid(color='grey', linestyle='dashed', linewidth=1)
-    # plt.show()
-    # plt.clf()
+    # From raw value to percentage
+    totals = [i+j for i,j in zip(df['TPs'], df['FNs'])]
+    TPBars = [i / j * 100 if j!=0 else 0 for i,j in zip(df['TPs'], totals)]
+    FNBars = [i / j * 100 if j!=0 else 0 for i,j in zip(df['FNs'], totals)]
 
-    # Make a better barplot
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x-axis locations
+    r = np.arange(len(labels))
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x - width/2, list(TPs), width, label='TPs')
-    rects2 = ax.bar(x + width/2, list(FNs), width, label='FNs')
-
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('Count')
-    ax.set_title('Counts of True Positives and False Negatives grouped per SNR bin')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
-
-    ax = autolabel(rects1, ax)
-    ax = autolabel(rects2, ax)
-
-    fig.tight_layout()
+    # plot
+    barWidth = 0.85
+    plt.bar(r, TPBars, color='olive', edgecolor='white', width=barWidth, label='True Positive')
+    plt.bar(r, FNBars, bottom=TPBars, color='#f9bc86', edgecolor='white', width=barWidth, label='False Negative')
+    
+    plt.xticks(r, labels)
+    plt.xlabel("SNR bin groups (Percentage of Signal above 2x average noise for the entire image)")
+    plt.ylabel("Percentage")
+    plt.legend()
+    plt.title("Percentage of True Positives and False Negatives per binned SNR interval")
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
 
     plt.show()
-
-
-
 
 
 # Function used by hexbin in order to reduce all datapoints to a singular TPR value.
