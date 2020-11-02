@@ -19,7 +19,6 @@ import os
 from ModelCheckpointYaml import *
 from f_beta_metric import FBetaMetric
 from f_beta_soft_metric import SoftFBeta
-from resnetX_no_downscaling import build_resnet18_no_downscaling
 
 
 class Network:
@@ -64,13 +63,6 @@ class Network:
             self.model          = self.build_resnet50(input_shape = self.input_shape, num_outputs = self.num_outputs)
         elif self.params.net_name == "simple_test_net":
             self.model          = self.build_simple_test_net(input_shape = self.input_shape, num_outputs = self.num_outputs)
-        elif self.params.net_name == "resnet18_no_downscaling":
-            self.model          = build_resnet18_no_downscaling(input_shape=self.input_shape,
-                                                                num_outputs=self.num_outputs,
-                                                                params=self.params,
-                                                                optimizer=self.optimizer,
-                                                                loss_function=self.loss_function,
-                                                                metrics_list=self.metrics)
 
         # Parameters used when training the model
         self.loss        = []              # Store loss of the model

@@ -35,7 +35,7 @@ def normalize_function(img, norm_type, data_type):
     if norm_type == "per_image":
         img = normalize_img(img)
     if norm_type == "adapt_hist_eq":
-        # img = normalize_img(img)
+        img = normalize_img(img)
         img = exposure.equalize_adapthist(img).astype(data_type)
     return img
 
