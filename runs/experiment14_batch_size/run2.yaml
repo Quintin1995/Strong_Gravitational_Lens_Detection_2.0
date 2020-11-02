@@ -2,7 +2,7 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "MT_s0_Gaus3x3_v2"    # String
+model_name: "batch_size 64"    # String
 # Development parameters
 show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 
@@ -19,8 +19,8 @@ fraction_to_load_lenses_vali   : 1.0      #float # range = [0,1]   validation
 normalize: "per_image"                    #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
-num_chunks: 500                           #int # Number of chunks to be generated 
-chunksize : 65536                         #int # The number of images that will fit into one chunk
+num_chunks: 1000                           #int # Number of chunks to be generated 
+chunksize : 32768                         #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 100                  #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
@@ -33,7 +33,7 @@ validation_chunksize: 128
 use_avg_pooling_2D: True                  #boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Segmentation Parameters - default values are emperically determined.
-do_max_tree_seg : True            #Boolean, Whether to perform max_tree_segmenation or not.
+do_max_tree_seg : False            #Boolean, Whether to perform max_tree_segmenation or not.
 # define kernel type and size
 conv_method     : "gaussian"      #string# options= {"gaussian", "boxcar"}
 ksize           : 3               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
@@ -43,7 +43,7 @@ do_circular_crop: True            #Boolean, Whether to perform a circular croppi
 crop_size       : 74              #int, size of the square/circular crop if enabled. (74,74) for example
 # Define scaling factor
 do_scale        : True            #Boolean, Whether to perform brighness scaling of a pixel based on the distance from the centre of the image. The furter away the object the closer to zero its value will become.
-x_scale         : 20              #int # Scale brightness of pixel based on the distance from centre of the image   # According to the following formula e^(-distance/x_scale), which is exponential decay
+x_scale         : 30              #int # Scale brightness of pixel based on the distance from centre of the image   # According to the following formula e^(-distance/x_scale), which is exponential decay
 # Define floodfill tolerance
 do_floodfill    : True            #Boolean, to perform the floodfill operation after brightness distance scaling
 tolerance       : 20              #int, The allowed range of pixel intensity/brighness difference. The higher the value the more pixels will be floodfilled, and the smaller the segments will become.
@@ -58,8 +58,8 @@ net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy",
 net_loss_function: "binary_crossentropy"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1"}
 net_num_outputs  : 1                        #int# How many output neurons does the network need?
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
-net_batch_size   : 512                      #int#
-es_patience      : 75                       #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
+net_batch_size   : 64                      #int#
+es_patience      : 150                       #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
 
 ##### Paths to data
 lenses_path_train   : "data/train/lenses/"
