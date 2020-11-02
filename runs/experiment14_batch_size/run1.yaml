@@ -19,8 +19,8 @@ fraction_to_load_lenses_vali   : 1.0      #float # range = [0,1]   validation
 normalize: "per_image"                    #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
-num_chunks: 1000                           #int # Number of chunks to be generated 
-chunksize : 32768                         #int # The number of images that will fit into one chunk
+num_chunks: 8000                           #int # Number of chunks to be generated 
+chunksize : 4096                         #int # The number of images that will fit into one chunk
 
 # Storing results parameters.
 chunk_plot_interval: 100                  #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
