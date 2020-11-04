@@ -27,21 +27,6 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
     for layer_name in layer_names:
         subplot_titles.append( ["Input Image", "Grad-CAM Layer: {}".format(layer_name), "Superimposed Heatmap"] )
     
-    # all_imgs = reduce(lambda l1, l2: l1+l2, list_of_rows)
-    # all_titles = reduce(lambda l1, l2: l1+l2, subplot_titles)
-
-    # rows, cols, axes = len(layer_names), len(list_of_rows[0]), []
-    # fig=plt.figure(figsize=(10,3))
-    # for a in range(rows*cols):
-    #     axes.append( fig.add_subplot(rows, cols, a+1) )
-    #     axes[-1].set_title(all_titles[a], fontsize=8)
-    #     if a%3 == 0:
-    #         plt.imshow(np.squeeze(all_imgs[a]), cmap='Greys_r')
-    #     else:
-    #         plt.imshow(np.squeeze(all_imgs[a]))
-    #     axes[-1].axis('off')
-    # # fig.tight_layout()
-    # fig.suptitle("Grad-CAM\n{}".format(plot_title), fontsize=9)
     img_h = list_of_rows[0][0].shape[1]
     img_w = list_of_rows[0][0].shape[0]
 
@@ -66,7 +51,7 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
         else:
             comb_img = np.concatenate((comb_img, comb_row), axis = 0)
 
-    plt.title("Grad-CAM\n{}".format(plot_title), fontsize=9)
+    plt.title("Grad-CAM\n{}\n{}".format(plot_title, "Layers: " + ', '.join(layer_names)), fontsize=9)
     plt.xlabel("(a) Input Image        (b) Grad-CAM         (c) SuperImposed")
     plt.imshow(comb_img)
     plt.show()
@@ -75,7 +60,7 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
 def _normalize_heatmap(heatmap):
     # Normalize the heatmap - Do not normalize if the maximum of the heatmap is less than zero,
     # otherwise with Relu we would get NaN, since we would devide by zero.
-    if np.max(heatmap) < 0.0:
+    if np.max(heatmap) <= 0.0:
         heatmap = np.ones((heatmap.shape[0], heatmap.shape[1])) * 0.0000001
     else:
         heatmap = np.maximum(heatmap, 0.0)      # Relu operation
@@ -95,7 +80,7 @@ def Grad_CAM(inp_img, model, layer_name):
     mock_lens_output = model.output[:, 0]
 
     # Output feature map of the block 'layer_name' layer, the last convolutional layer.
-    last_conv_layer = model.get_layer(layer_name) # "add_5", "layer_name" are pretty good
+    last_conv_layer = model.get_layer(layer_name) 
 
     # Gradient of the mock lens class with regard to the output feature map of "layer_name
     grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
@@ -120,6 +105,16 @@ def Grad_CAM(inp_img, model, layer_name):
 
     #The channel-wise mean of the resulting feature map is the heat map of the class activation.
     heatmap = np.mean(conv_layer_output_value, axis=-1)
+
+    # For debugging purposes
+    if False:
+        print("mean heatmap before norm: {}".format(np.mean(heatmap)))
+        print("min heatmap before norm: {}".format(np.amin(heatmap)))
+        print("max heatmap before norm: {}".format(np.amax(heatmap)))
+
+        if np.mean(heatmap) == 0:
+            plt.imshow(heatmap, cmap='Greys_r')
+            plt.show()
 
     # Normalize to bring values between 0.0 and 1.0
     return _normalize_heatmap(heatmap)
