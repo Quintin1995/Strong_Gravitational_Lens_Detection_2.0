@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import load_settings_yaml, smooth_curve, set_experiment_folder, set_models_folders
+from utils import load_settings_yaml, smooth_curve, set_experiment_folder, set_models_folders, dstack_data
 from Parameters import Parameters
 from DataGenerator import DataGenerator
 from Network import Network
@@ -111,15 +111,6 @@ def get_h5s_paths(models):
             h5_path = glob.glob(model + "/*.h5")[0]
         paths_h5s.append(h5_path)
     return paths_h5s
-
-
-# dstack the data to three channels instead of one
-def dstack_data(data):
-    dstack_data = np.empty((data.shape[0], data.shape[1], data.shape[2], 3), dtype=np.float32)
-    for i in range(data.shape[0]):
-        img = data[i]
-        dstack_data[i] = np.dstack((img,img,img))
-    return dstack_data
 
 
 # Average predictions of the neural network over a 'avg_iter_counter' amount of times

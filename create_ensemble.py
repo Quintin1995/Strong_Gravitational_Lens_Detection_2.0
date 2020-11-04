@@ -1,3 +1,4 @@
+import argparse
 from DataGenerator import DataGenerator
 import glob
 from Network import Network
@@ -5,7 +6,7 @@ import numpy as np
 import os
 from Parameters import Parameters
 import tensorflow as tf
-from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists
+from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists, dstack_data
 import matplotlib.pyplot as plt
 import time
 import random
@@ -13,9 +14,26 @@ from scipy.optimize import minimize
 from scipy.special import softmax
 from functools import partial
 from sklearn.metrics import confusion_matrix
-import argparse
+import yaml
 
 ############################################################ Functions ############################################################
+
+
+# Dump ensemble parameters to a yaml file as a dictionary
+def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores):
+    ensemble_dict = {
+        "model_names":       model_names,
+        "model_weights":     [float(str(x)) for x in model_weights],
+        "ensemble_size":     len(model_names),
+        "ensemble_method":   args.method,
+        "accuracy":          acc,
+        "threshold":         threshold,
+        "sample_size":       sample_size,
+        "individual_scores": ["{} {:.3f}".format(str(met), float(str(score))) for met, score in individual_scores]
+    }
+    ensemble_params_fname = os.path.join(ensemble_dir, "ensemble_parameters.yaml")
+    with open(ensemble_params_fname, 'w') as outfile:
+        yaml.dump(ensemble_dict, outfile, default_flow_style=False)
 
 
 # Calculate the Mean Square Error for a matrix of datapoints given a ground truth label
@@ -155,6 +173,7 @@ def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
     # Construct a matrix that holds a prediction value for each image and each model in the ensemble
     prediction_matrix = np.zeros((X_chunk.shape[0], len(model_paths)))
     model_names       = list()      # Keep track of model names
+    individual_scores = list()      # Keep track of model acc on an individual basis
     
     # Load each model and perform prediction with it.
     for model_idx, model_path in enumerate(model_paths):
@@ -176,18 +195,21 @@ def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
         model_names.append(network.params.model_name)
 
         # 4.0 - Evaluate on validation chunk
+        if "resnet_single_newtr_last_last_weights_only" in model_path:
+            X_chunk = dstack_data(X_chunk)
         evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
         print("\n\nIndividual Evaluations:")
         print("Model name: {}".format(network.params.model_name))
         for met_idx in range(len(evals)):
             print("{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
+            individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
         print("")
 
         # 5.0 - Predict on validation chunk
         predictions = network.model.predict(X_chunk)
         prediction_matrix[:,model_idx] = np.squeeze(predictions)
     # Networks are also need later on, therefore we need to add them to a list
-    return prediction_matrix, model_names
+    return prediction_matrix, model_names, individual_scores
 
 
 # Given a prediction matrix it will try to find weights for each model.
@@ -210,6 +232,7 @@ def find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelde
         print("Model weights\t = {}".format(model_weights))
         print("Weights Sum\t = {}".format(np.sum(model_weights)))
         print("Model names\t = {}".format(model_names))
+        print("Model weights data type\t = {}".format(type(model_weights)))
     return model_weights
 
 
@@ -228,28 +251,29 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
 
     # Count mistakes
     error_count = np.sum(np.absolute(y - y_hat))
-    print("mistakes count: {}".format(error_count))
+    print("mistakes count: {} out of {}".format(error_count, y_hat.shape[0]))
 
     # Calculate accuracy
     error_percentage = error_count/y_hat.shape[0]
     acc = 1.0 - error_percentage
     return acc
-
+    
 
 ############################################################ Script ############################################################
 
 def main():
 
-    # Deal with input arguments
+    # 0.0 - Deal with input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=True)
+    parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
     parser.add_argument("--sample_size", help="The amount of images used in the validation set to optimize ensemble model weights. A maximum of 551 can be used.", default=551, required=False)
+    parser.add_argument("--method", help="What ensemble method should be used? To determine model weights? For example: Nelder-Mead.", default="Nelder-Mead", required=False)
     args = parser.parse_args()
 
     ###
     root_dir_ensembles = "ensembles"
 
-    # 0.0 - Create folder that holds Ensembles
+    # 0.1 - Create folder that holds Ensembles
     create_dir_if_not_exists(root_dir_ensembles, verbatim=False)
 
     # 1.0 - Fix memory leaks if running on tensorflow 2
@@ -283,17 +307,21 @@ def main():
     X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
 
     # 7.0 - Load ensemble members and perform prediction with it.
-    prediction_matrix, model_names = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
+    prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
 
-    # 8.0 - Find ensemble model weights as a vector
-    model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method="Nelder-Mead", verbatim=True)
-
+    # 8.0 - Find ensemble model weights as a vector and store on disk
+    model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method=args.method, verbatim=True)
+    
     # 9.0 - Ensemble Evaluation
     threshold = 0.5
     acc = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=threshold)
     print("\n\nAccuracy of Ensemble\t{:.3f} at threshold: {}".format(acc, threshold))
     print("Model names:\t\t{}".format(model_names))
     print("Model Weight Vector:\t{}".format(model_weights))
+
+    # 10.0 - Create a dictionary that will hold Ensemble parameters
+    acc = float("{:.03f}".format(acc))
+    _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores)
 
 if __name__ == "__main__":
     main()
