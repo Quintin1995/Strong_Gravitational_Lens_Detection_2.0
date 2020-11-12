@@ -54,8 +54,8 @@ use_seg_imgs    : False           #boolean #(if False, then the segmentated imag
 # Network Paramters
 net_name         : "resnet18"               #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
 net_learning_rate: 0.0001                   #float#
-net_model_metrics: "macro_f1"               #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
-net_loss_function: "macro_double_soft_f1"          #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
+net_model_metrics: "f_beta_soft"               #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
+net_loss_function: "f_beta_soft_loss"          #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
 net_num_outputs  : 1                        #int# How many output neurons does the network need?
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
 net_batch_size   : 32                       #int#
