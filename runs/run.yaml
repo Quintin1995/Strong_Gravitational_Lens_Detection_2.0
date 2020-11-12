@@ -2,9 +2,9 @@
 # This file contains all settings for a model to run.
 
 # Model Name
-model_name: "test"    # String
+model_name: "test_beta"    # String
 # Development parameters
-show_plot_of_data_before_training: True   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
+show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 
 # Loading the input data
 fraction_to_load_sources_train  : 0.01     #float # range = [0,1]  train
@@ -16,7 +16,7 @@ fraction_to_load_negatives_vali: 0.5     #float # range = [0,1]   validation
 fraction_to_load_lenses_vali   : 0.5     #float # range = [0,1]   validation
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
-normalize: "adapt_hist_eq"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
+normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
 
 # Chunk Parameters
 num_chunks: 100                      #int # Number of chunks to be generated 
@@ -52,9 +52,9 @@ area_th         : 45              #int, Allowed minimum size of a node in the ma
 use_seg_imgs    : False           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
 
 # Network Paramters
-net_name         : "resnet50"        #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net", "resnet18_no_downscaling"}
+net_name         : "resnet18"        #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
 net_learning_rate: 0.0001                   #float#
-net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
+net_model_metrics: "f_beta"        #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
 net_loss_function: "binary_crossentropy"    #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
 net_num_outputs  : 1                        #int# How many output neurons does the network need?
 net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.

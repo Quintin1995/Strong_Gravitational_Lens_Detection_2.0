@@ -97,18 +97,16 @@ def merge_lenses_and_sources(lenses_array, sources_array, num_mock_lenses, data_
 
         # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
         # import matplotlib.pyplot as plt
-        # l = np.squeeze(lens)
-        # s = np.squeeze(source)
-        # m = np.squeeze(mock_lens)
-        # plt.imshow(l, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
-        # plt.title("lens")
-        # plt.show()
-        # plt.imshow(s, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
-        # plt.title("source")
-        # plt.show()
-        # plt.imshow(m, origin='lower', interpolation='none', cmap='gray', vmin=0.0, vmax=1.0)
-        # plt.title("mock lens")
-        # plt.show()
+        l = np.squeeze(lens)
+        s = np.squeeze(source)
+        m = np.squeeze(mock_lens)
+        plt.clf()
+        plt.imshow(l, cmap='gray')
+        plt.show()
+        plt.imshow(s, cmap='gray')
+        plt.show()
+        plt.imshow(m, cmap='gray')
+        plt.show()
 
         X_train_positive[i] = mock_lens
 
@@ -305,6 +303,14 @@ def main():
 
     # 6.0 - Load a 50/50 positive/negative chunk into memory
     X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
+
+    # chunk of code that can be used to visualize some images of the given set:
+    # for i in range(X_chunk.shape[0]):
+    #     img = np.squeeze(negatives[i])
+    #     plt.imshow(img, cmap='gray')
+    #     plt.axis('off')
+    #     plt.show()
+
 
     # 7.0 - Load ensemble members and perform prediction with it.
     prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
