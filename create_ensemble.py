@@ -97,16 +97,16 @@ def merge_lenses_and_sources(lenses_array, sources_array, num_mock_lenses, data_
 
         # Uncomment this code if you want to inspect how a lens, source and mock lens look before they are merged.
         # import matplotlib.pyplot as plt
-        l = np.squeeze(lens)
-        s = np.squeeze(source)
-        m = np.squeeze(mock_lens)
-        plt.clf()
-        plt.imshow(l, cmap='gray')
-        plt.show()
-        plt.imshow(s, cmap='gray')
-        plt.show()
-        plt.imshow(m, cmap='gray')
-        plt.show()
+        # l = np.squeeze(lens)
+        # s = np.squeeze(source)
+        # m = np.squeeze(mock_lens)
+        # plt.clf()
+        # plt.imshow(l, cmap='gray')
+        # plt.show()
+        # plt.imshow(s, cmap='gray')
+        # plt.show()
+        # plt.imshow(m, cmap='gray')
+        # plt.show()
 
         X_train_positive[i] = mock_lens
 
