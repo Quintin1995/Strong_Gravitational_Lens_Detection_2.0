@@ -297,7 +297,7 @@ class DataGenerator:
         if self.params.do_max_tree_seg:
             X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
 
-        print("Creating chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
+        print("Creating training chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
         return X_chunk, y_chunk
 
 
@@ -305,7 +305,6 @@ class DataGenerator:
     def load_chunk_val(self, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
         num_positive = self.Xlenses_validation.shape[0]
-        # num_negative = self.Xnegatives_validation.shape[0] + self.Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
         
         # Lets create a balanced validation set.
         num_negative = num_positive
@@ -317,17 +316,13 @@ class DataGenerator:
         X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)    
         y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
 
-        # Negatives consist of the negatives set and the unmerged lenses set. A lens unmerged with a source is basically a negative.
-        n = int(num_negative // 2)  # number samples to take from lenses-, and negatives set.
-        
-        indexes_lenses = np.random.choice(self.Xlenses_validation.shape[0], n, replace=False)  
-        X_neg[0:int(num_negative//2)] = self.Xlenses_validation[indexes_lenses] # first half of negative chunk is a random selection from lenses without replacement
-
-        indexes_negatives = np.random.choice(self.Xlenses_validation.shape[0], n+1, replace=False)  
-        X_neg[int(num_negative//2):num_negative] = self.Xnegatives_validation[indexes_negatives] # second half of negatives are a random selection from the negatives without replacement
-        
-        # The negatives need a square root stretch, just like the positives.
-        X_neg = np.sqrt(X_neg)
+        # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
+        negative_sample_contaminant_prob = 0.8
+        for i in range(num_negative):
+            if random.random() <= negative_sample_contaminant_prob:
+                X_neg[i] = np.sqrt(self.Xnegatives_validation[random.randint(0, self.Xnegatives_validation.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
+            else:
+                X_neg[i] = np.sqrt(self.Xlenses_validation[random.randint(0, self.Xlenses_validation.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
 
         # Concatenate the positive and negative examples into one chunk (also the labels)
         X_chunk = np.concatenate((X_pos, X_neg))
@@ -344,7 +339,6 @@ class DataGenerator:
     def load_chunk_test(self, data_type, mock_lens_alpha_scaling):
         start_time = time.time()
         num_positive = self.Xlenses_test.shape[0]
-        # num_negative = self.Xnegatives_test.shape[0] + self.Xlenses_test.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
         
         # Lets create a balanced test set.
         num_negative = num_positive
@@ -356,17 +350,13 @@ class DataGenerator:
         X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)    
         y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
 
-        # Negatives consist of the negatives set and the unmerged lenses set. A lens unmerged with a source is basically a negative.
-        n = int(num_negative // 2)  # number samples to take from lenses-, and negatives set.
-        
-        indexes_lenses = np.random.choice(self.Xlenses_test.shape[0], n, replace=False)  
-        X_neg[0:int(num_negative//2)] = self.Xlenses_test[indexes_lenses] # first half of negative chunk is a random selection from lenses without replacement
-
-        indexes_negatives = np.random.choice(self.Xlenses_test.shape[0], n+1, replace=False)  
-        X_neg[int(num_negative//2):num_negative] = self.Xnegatives_test[indexes_negatives] # second half of negatives are a random selection from the negatives without replacement
-        
-        # The negatives need a square root stretch, just like the positives.
-        X_neg = np.sqrt(X_neg)
+        # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
+        negative_sample_contaminant_prob = 0.8
+        for i in range(num_negative):
+            if random.random() <= negative_sample_contaminant_prob:
+                X_neg[i] = np.sqrt(self.Xnegatives_test[random.randint(0, self.Xnegatives_test.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
+            else:
+                X_neg[i] = np.sqrt(self.Xlenses_test[random.randint(0, self.Xlenses_test.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
 
         # Concatenate the positive and negative examples into one chunk (also the labels)
         X_chunk = np.concatenate((X_pos, X_neg))
@@ -375,8 +365,9 @@ class DataGenerator:
         if self.params.do_max_tree_seg:
             X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
 
-        print("Creating validation chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
+        print("Creating test chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
         return X_chunk, y_chunk
+
 
     # Merge a single lens and source together into a mock lens.
     def merge_lens_and_source(self, lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):

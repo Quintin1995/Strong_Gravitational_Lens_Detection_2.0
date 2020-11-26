@@ -12,45 +12,6 @@ import csv
 import math
 
 
-# Count the number of true positive, true negative, false positive and false negative in for a prediction vector relative to the label vector.
-def count_TP_TN_FP_FN_and_FB(prediction_vector, y_test, threshold, beta_squarred, verbatim = False):
-    TP = 0 #true positive
-    TN = 0 #true negative
-    FP = 0 #false positive
-    FN = 0 #false negative
-
-    for idx, pred in enumerate(prediction_vector):
-        if pred >= threshold and y_test[idx] >= threshold:
-            TP += 1
-        if pred < threshold and y_test[idx] < threshold:
-            TN += 1
-        if pred >= threshold and y_test[idx] < threshold:
-            FP += 1
-        if pred < threshold and y_test[idx] >= threshold:
-            FN += 1
-
-    tot_count = TP + TN + FP + FN
-    
-    precision = TP/(TP + FP) if TP + FP != 0 else 0
-    recall    = TP/(TP + FN) if TP + FN != 0 else 0
-    fp_rate   = FP/(FP + TN) if FP + TN != 0 else 0
-    accuracy  = (TP + TN) / len(prediction_vector) if len(prediction_vector) != 0 else 0
-    F_beta    = (1+beta_squarred) * ((precision * recall) / ((beta_squarred * precision) + recall)) if ((beta_squarred * precision) + recall) else 0
-    
-    if verbatim:
-        if tot_count != len(prediction_vector):
-            print("Total count {} of (TP, TN, FP, FN) is not equal to the length of the prediction vector: {}".format(tot_count, len(prediction_vector)), flush=True)
-
-        print("Total Count {}\n\tTP: {}, TN: {}, FP: {}, FN: {}".format(tot_count, TP, TN, FP, FN), flush=True)
-        print("precision = {}".format(precision), flush=True)
-        print("recall    = {}".format(recall), flush=True)
-        print("fp_rate   = {}".format(fp_rate), flush=True)
-        print("accuracy  = {}".format(accuracy), flush=True)
-        print("F beta    = {}".format(F_beta), flush=True)
-
-    return TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta
-
-
 # Construct dataframes of csv files in the given model folders. 
 # This will be used for plotting data about the model
 # csv - Output Dump
@@ -434,7 +395,6 @@ ytop                    = 100.0    # Error plot y upper-limit in percentage
 ybottom                 = 0.00    # Error plot y bottom-limit in percentage
 
 ### f_beta graph and its paramters
-# Shows a f_beta plot of the given models (can be time consuming)
 f_beta_avg_count        = 3                                    # How many chunks should be evaluated, over which the mean and standard deviation will be calculated
 beta_squarred           = 0.03                                  # For f-beta calculation
 stepsize                = 0.01                                  # For f-beta calculation

@@ -12,6 +12,48 @@ import yaml
 import scipy
 
 
+
+
+# Count the number of true positive, true negative, false positive and false negative in for a prediction vector relative to the label vector.
+def count_TP_TN_FP_FN_and_FB(prediction_vector, y_test, threshold, beta_squarred, verbatim = False):
+    TP = 0 #true positive
+    TN = 0 #true negative
+    FP = 0 #false positive
+    FN = 0 #false negative
+
+    for idx, pred in enumerate(prediction_vector):
+        if pred >= threshold and y_test[idx] >= threshold:
+            TP += 1
+        if pred < threshold and y_test[idx] < threshold:
+            TN += 1
+        if pred >= threshold and y_test[idx] < threshold:
+            FP += 1
+        if pred < threshold and y_test[idx] >= threshold:
+            FN += 1
+
+    tot_count = TP + TN + FP + FN
+    
+    precision = TP/(TP + FP) if TP + FP != 0 else 0
+    recall    = TP/(TP + FN) if TP + FN != 0 else 0
+    fp_rate   = FP/(FP + TN) if FP + TN != 0 else 0
+    accuracy  = (TP + TN) / len(prediction_vector) if len(prediction_vector) != 0 else 0
+    F_beta    = (1+beta_squarred) * ((precision * recall) / ((beta_squarred * precision) + recall)) if ((beta_squarred * precision) + recall) else 0
+    
+    if verbatim:
+        if tot_count != len(prediction_vector):
+            print("Total count {} of (TP, TN, FP, FN) is not equal to the length of the prediction vector: {}".format(tot_count, len(prediction_vector)), flush=True)
+
+        print("Total Count {}\n\tTP: {}, TN: {}, FP: {}, FN: {}".format(tot_count, TP, TN, FP, FN), flush=True)
+        print("precision = {}".format(precision), flush=True)
+        print("recall    = {}".format(recall), flush=True)
+        print("fp_rate   = {}".format(fp_rate), flush=True)
+        print("accuracy  = {}".format(accuracy), flush=True)
+        print("F beta    = {}".format(F_beta), flush=True)
+
+    return TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta
+
+
+
 # dstack the data to three channels instead of one
 def dstack_data(data):
     dstack_data = np.empty((data.shape[0], data.shape[1], data.shape[2], 3), dtype=np.float32)
