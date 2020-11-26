@@ -75,8 +75,12 @@ def show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scaling
 # Plot Signal to Noise Ratio (binned) versus the true positive rate of that bin.
 def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
     
-    # Define the bins as an array with floats.
-    bins = np.arange(0.0, 1.0, 1.0/num_bins)
+    # Define range for x-axis
+    max_snr = np.amax(SNRs)+0.01
+
+    # Define the bins as an array with floats. (and bin names as labels)
+    bins = np.arange(0.0, max_snr, max_snr/num_bins)
+    labels = ["{0:.3f}".format(x) for x in bins]
 
     # Array that keeps track of the count of True Positives per bin.
     TPs = np.zeros((num_bins))
@@ -84,24 +88,38 @@ def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
     FNs = np.zeros((num_bins))
     
     # The SNRs and predictions are still in the same order.
+    # We can index the correct bin by multiplying with num_bins/max_snr
     for pred, SNR in zip(predictions, SNRs):
         if pred < threshold:
-            FNs[int(SNR*num_bins)] += 1.0       # The max of SNR = 1.0, therefore the SNR decides in which bin it ends up.
+            FNs[int(SNR*num_bins*(1/max_snr))] += 1.0       # The max of SNR = 1.0, therefore the SNR decides in which bin it ends up.
         else:
-            TPs[int(SNR*num_bins)] += 1.0
+            TPs[int(SNR*num_bins*(1/max_snr))] += 1.0
 
-    # Calculate the True Positive Rate per bin, set it to zero, if we divide by 0.
-    TPRs = [tp/(tp+fn) if (tp+fn) != 0 else 0 for tp, fn in zip(list(TPs), list(FNs))]
+    # Store the raw data in a dictionary
+    raw_data = {'TPs': TPs, 'FNs': FNs}
+    df = pd.DataFrame(raw_data)
 
-    # Plot the results
-    plt.clf()
-    plt.plot(bins, TPRs)
-    plt.title("SNR versus TPR")
-    plt.xlabel("SNR")
-    plt.ylabel("TPR")
+    # From raw value to percentage
+    totals = [i+j for i,j in zip(df['TPs'], df['FNs'])]
+    TPBars = [i / j * 100 if j!=0 else 0 for i,j in zip(df['TPs'], totals)]
+    FNBars = [i / j * 100 if j!=0 else 0 for i,j in zip(df['FNs'], totals)]
+
+    # x-axis locations
+    r = np.arange(len(labels))
+
+    # plot
+    barWidth = 0.85
+    plt.bar(r, TPBars, color='olive', edgecolor='white', width=barWidth, label='True Positive')
+    plt.bar(r, FNBars, bottom=TPBars, color='#f9bc86', edgecolor='white', width=barWidth, label='False Negative')
+    
+    plt.xticks(r, labels)
+    plt.xlabel("SNR bin groups (Percentage of Signal above 2x average noise for the entire image)")
+    plt.ylabel("Percentage")
+    plt.legend()
+    plt.title("Percentage of True Positives and False Negatives per binned SNR interval")
     plt.grid(color='grey', linestyle='dashed', linewidth=1)
-    plt.show()
 
+    plt.show()
 
 
 # Function used by hexbin in order to reduce all datapoints to a singular TPR value.
@@ -307,7 +325,7 @@ model_paths = get_model_paths()
 
 
 # 2.1 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
-h5_path = get_h5_path_dialog(model_paths)
+h5_paths = get_h5_path_dialog(model_paths)
 
 
 # 3.0 - Load params - used for normalization etc -
@@ -349,7 +367,7 @@ dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_val
 
 # 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
-network.model.load_weights(h5_path)
+network.model.load_weights(h5_paths[0])
 
 
 # 10.0 - Use the network to predict on the sample
@@ -378,7 +396,7 @@ if binary_dialog("Do scatter plot and hexbin plot?"):
 # Plot a binned SNR on the x-axis versus TPR on the y-axis.
 if binary_dialog("Do SNR vs TPR plot?"):
     threshold = float(input("\n\nWhat model threshold should be used? (float): "))
-    plot_SNR_vs_TPR(predictions, SNRs, threshold=threshold, num_bins=50)
+    plot_SNR_vs_TPR(predictions, SNRs, threshold=threshold, num_bins=30)
 
 
 # 14.0 - Lets try to make a 3D plot, with:

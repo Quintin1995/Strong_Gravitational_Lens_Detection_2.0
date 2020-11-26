@@ -27,28 +27,40 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
     for layer_name in layer_names:
         subplot_titles.append( ["Input Image", "Grad-CAM Layer: {}".format(layer_name), "Superimposed Heatmap"] )
     
-    all_imgs = reduce(lambda l1, l2: l1+l2, list_of_rows)
-    all_titles = reduce(lambda l1, l2: l1+l2, subplot_titles)
+    img_h = list_of_rows[0][0].shape[1]
+    img_w = list_of_rows[0][0].shape[0]
 
-    rows, cols, axes = len(layer_names), len(list_of_rows[0]), []
-    fig=plt.figure(figsize=(10,3))
-    for a in range(rows*cols):
-        axes.append( fig.add_subplot(rows, cols, a+1) )
-        axes[-1].set_title(all_titles[a], fontsize=8)
-        if a%3 == 0:
-            plt.imshow(np.squeeze(all_imgs[a]), cmap='Greys_r')
+    for idx, img_row_list in enumerate(list_of_rows):
+
+        # Needed for empty color channels
+        empty_img = np.zeros((img_w, img_h, 1))
+
+        # Color channel input image needs color
+        img_row_list[0] = np.concatenate((img_row_list[0], img_row_list[0], empty_img), axis=2)
+
+        # heatmap needs color and resizing
+        img_row_list[1] = cv2.resize(img_row_list[1], (img_w, img_h), interpolation=cv2.INTER_NEAREST)
+        img_row_list[1] = np.expand_dims(img_row_list[1], axis=2)
+        img_row_list[1] = np.concatenate((img_row_list[1], img_row_list[1], empty_img), axis=2)
+        
+        comb_row = np.concatenate((img_row_list[0], img_row_list[1], img_row_list[2]), axis=1)
+
+        # We need a beginning image row to concatenate with later on.
+        if idx == 0:
+            comb_img = comb_row
         else:
-            plt.imshow(np.squeeze(all_imgs[a]))
-        axes[-1].axis('off')
-    # fig.tight_layout()
-    fig.suptitle("Grad-CAM\n{}".format(plot_title), fontsize=9)
+            comb_img = np.concatenate((comb_img, comb_row), axis = 0)
+
+    plt.title("Grad-CAM\n{}\n{}".format(plot_title, "Layers: " + ', '.join(layer_names)), fontsize=9)
+    plt.xlabel("(a) Input Image        (b) Grad-CAM         (c) SuperImposed")
+    plt.imshow(comb_img)
     plt.show()
 
 
 def _normalize_heatmap(heatmap):
     # Normalize the heatmap - Do not normalize if the maximum of the heatmap is less than zero,
     # otherwise with Relu we would get NaN, since we would devide by zero.
-    if np.max(heatmap) < 0.0:
+    if np.max(heatmap) <= 0.0:
         heatmap = np.ones((heatmap.shape[0], heatmap.shape[1])) * 0.0000001
     else:
         heatmap = np.maximum(heatmap, 0.0)      # Relu operation
@@ -68,7 +80,7 @@ def Grad_CAM(inp_img, model, layer_name):
     mock_lens_output = model.output[:, 0]
 
     # Output feature map of the block 'layer_name' layer, the last convolutional layer.
-    last_conv_layer = model.get_layer(layer_name) # "add_5", "layer_name" are pretty good
+    last_conv_layer = model.get_layer(layer_name) 
 
     # Gradient of the mock lens class with regard to the output feature map of "layer_name
     grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
@@ -93,6 +105,16 @@ def Grad_CAM(inp_img, model, layer_name):
 
     #The channel-wise mean of the resulting feature map is the heat map of the class activation.
     heatmap = np.mean(conv_layer_output_value, axis=-1)
+
+    # For debugging purposes
+    if False:
+        print("mean heatmap before norm: {}".format(np.mean(heatmap)))
+        print("min heatmap before norm: {}".format(np.amin(heatmap)))
+        print("max heatmap before norm: {}".format(np.amax(heatmap)))
+
+        if np.mean(heatmap) == 0:
+            plt.imshow(heatmap, cmap='Greys_r')
+            plt.show()
 
     # Normalize to bring values between 0.0 and 1.0
     return _normalize_heatmap(heatmap)
@@ -152,7 +174,6 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
         _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_string)
         list_of_rows = list()
         plt.close()
-
 
 
 # Merge a single lens and source together into a mock lens.
@@ -251,7 +272,7 @@ model_paths = get_model_paths()
 
 
 # 2.1 - Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
-h5_path = get_h5_path_dialog(model_paths)
+h5_paths = get_h5_path_dialog(model_paths)
 
 
 # 3.0 - Load params - used for normalization etc -
@@ -287,12 +308,13 @@ dg = DataGenerator(params, mode="no_training", do_shuffle_data=True, do_load_val
 
 # 9.0 - Construct a Network object that has a model as property.
 network = Network(params, dg, training=False)
-network.model.load_weights(h5_path)
+network.model.load_weights(h5_paths[0])
 
 
 # Perform Grad-CAM
 another_list = ["batch_normalization_16", "activation_12", "activation_8"]
-another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]
+another_list = ["conv2d_2", "conv2d_4", "conv2d_6", "conv2d_9", "conv2d_11", "conv2d_14", "conv2d_16", "conv2d_19"]     # This one is poor.
+another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]                                   # This one works well
 Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
 Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0)
 

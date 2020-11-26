@@ -1,0 +1,94 @@
+# settings.yaml file
+# This file contains all settings for a model to run.
+
+# Model Name
+model_name: "f_beta_softloss"    # String
+
+# Loading the input data
+fraction_to_load_sources_train  : 1.0     #float # range = [0,1]  train
+fraction_to_load_negatives_train: 1.0     #float # range = [0,1]  train
+fraction_to_load_lenses_train   : 1.0     #float # range = [0,1]  train
+
+fraction_to_load_sources_vali  : 1.0      #float # range = [0,1]   validation
+fraction_to_load_negatives_vali: 1.0      #float # range = [0,1]   validation
+fraction_to_load_lenses_vali   : 1.0      #float # range = [0,1]   validation
+
+# Whether to normalize (normalize per data array and not per image) the data during the image loading process.s
+normalize: "per_image"                    #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
+
+# Chunk Parameters
+num_chunks: 8000                           #int # Number of chunks to be generated 
+chunksize : 4096                         #int # The number of images that will fit into one chunk
+
+# Storing results parameters.
+chunk_plot_interval: 100                  #int # Determines at which training interval a plot of the loss and binary accuracy is generated and stored to a file.
+chunk_save_interval: 50                   #int # After this amount of chunks the model will be saved.
+
+# Validation Params
+validation_chunksize: 128
+
+## EXPERIMENT PARAMETERS
+use_avg_pooling_2D: True                  #boolean, # Whether the resnet contains GLOBAL AVG POOLING
+
+# Segmentation Parameters - default values are emperically determined.
+do_max_tree_seg : False            #Boolean, Whether to perform max_tree_segmenation or not.
+# define kernel type and size
+conv_method     : "gaussian"      #string# options= {"gaussian", "boxcar"}
+ksize           : 3               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
+# Define cropping type and size
+do_square_crop  : True            #Boolean, Whether to take a centered square crop
+do_circular_crop: True            #Boolean, Whether to perform a circular cropping around the centre of the image
+crop_size       : 74              #int, size of the square/circular crop if enabled. (74,74) for example
+# Define scaling factor
+do_scale        : True            #Boolean, Whether to perform brighness scaling of a pixel based on the distance from the centre of the image. The furter away the object the closer to zero its value will become.
+x_scale         : 30              #int # Scale brightness of pixel based on the distance from centre of the image   # According to the following formula e^(-distance/x_scale), which is exponential decay
+# Define floodfill tolerance
+do_floodfill    : True            #Boolean, to perform the floodfill operation after brightness distance scaling
+tolerance       : 20              #int, The allowed range of pixel intensity/brighness difference. The higher the value the more pixels will be floodfilled, and the smaller the segments will become.
+# Filter max-tree based on node area size.
+area_th         : 45              #int, Allowed minimum size of a node in the max-tree datastructure. If a certain structure in a max-tree-node has a smaller size, it is discarted.
+use_seg_imgs    : False           #boolean #(if False, then the segmentated image will be used as mask and the original image will be used.) (If True, then the segmented images are used instead of the original images. (so, this means no masking))
+
+# Network Paramters
+net_name         : "resnet18"               #string# Determines which model will be loaded options={"resnet18", "resnet50", "simple_test_net"}
+net_learning_rate: 0.0001                   #float#
+net_model_metrics: "binary_accuracy"        #string# Options {"binary_accuracy", "macro_f1", "f_beta", "f_beta_soft"}
+net_loss_function: "f_beta_soft_loss"       #string # Which loss function should be used during training? Options {"binary_crossentropy", "macro_soft_f1", "macro_double_soft_f1", "f_beta_soft_loss"}
+net_num_outputs  : 1                        #int# How many output neurons does the network need?
+net_epochs       : 1                        #int# How many epochs are done. Set to 1, because we generate infinite data. Therefore you should look at the parameter num_chunks.
+net_batch_size   : 64                       #int#
+es_patience      : 1200                     #int# Early Stopping Patience if the validation metric does not improve over this amount of train chunks, then stop training.
+
+##### Paths to data
+lenses_path_train   : "data/train/lenses/"
+negatives_path_train: "data/train/negatives/"
+sources_path_train  : "data/train/sources/"
+
+lenses_path_validation   : "data/validation/lenses/"
+negatives_path_validation: "data/validation/negatives/"
+sources_path_validation  : "data/validation/sources/"
+
+root_dir_models: models         # string
+
+# Data type of images in the numpy array
+data_type: "np.float32"
+
+# Image dimensionality
+img_width: 101
+img_height: 101
+img_channels: 1
+
+# Alpha scaling, randomly drawn from this uniform distribution. Because the lensing features usually are of a lower luminosity than the LRG. Source scaling factor.
+mock_lens_alpha_scaling_min: 0.02     #float
+mock_lens_alpha_scaling_max: 0.30     #float
+
+# Whether you want to see plots and extra print output
+verbatim: False
+
+# Augmenation Parameters:
+aug_zoom_range_min: 1.0             #float# This range will be sampled from uniformly.
+aug_zoom_range_max: 1.05            #float# This range will be sampled from uniformly.
+aug_num_pixels_shift_allowed: 4     #int# In Pixels
+aug_rotation_range    : 360         #int# In Degrees
+aug_do_horizontal_flip: True        #boolean# 50% of the time do a horizontal flip)  
+aug_default_fill_mode : 'nearest'   #string# Interpolation method, for data augmentation.

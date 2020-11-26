@@ -4,7 +4,7 @@ import glob
 import os
 import pandas as pd
 import json
-from utils import load_settings_yaml, smooth_curve, set_experiment_folder
+from utils import load_settings_yaml, smooth_curve, set_experiment_folder, set_models_folders, dstack_data
 from Parameters import Parameters
 from DataGenerator import DataGenerator
 from Network import Network
@@ -111,15 +111,6 @@ def get_h5s_paths(models):
             h5_path = glob.glob(model + "/*.h5")[0]
         paths_h5s.append(h5_path)
     return paths_h5s
-
-
-# dstack the data to three channels instead of one
-def dstack_data(data):
-    dstack_data = np.empty((data.shape[0], data.shape[1], data.shape[2], 3), dtype=np.float32)
-    for i in range(data.shape[0]):
-        img = data[i]
-        dstack_data[i] = np.dstack((img,img,img))
-    return dstack_data
 
 
 # Average predictions of the neural network over a 'avg_iter_counter' amount of times
@@ -294,33 +285,6 @@ def plot_losses_avg(models, dfs, jsons,  smooth_fac=0.9, do_diff_loss=False):
     plt.show()
 
 
-
-
-# Prompt the user which models to compare against each other in the given experiment folder
-def set_models_folders(experiment_folder):
-    print("------------------------------")
-    print("\n\nRoot folder this experiment: {}".format(experiment_folder))
-
-    cwd = os.path.join(os.getcwd(), experiment_folder)
-    folders = sorted(os.listdir(cwd))
-    local_folders = [x for x in folders if os.path.isdir(os.path.join(cwd, x))]
-
-    print("\nSet model folders:")
-    for idx, folder in enumerate(local_folders):
-        print("\t{} - {}".format(idx, folder))
-    folder_idxs = input("Set indexes model folder(s)\n(integer)\nOr comma seperated ints: ")
-    
-    str_indexes = folder_idxs.split(',')
-    chosen_models = [local_folders[int(string_idx)] for string_idx in str_indexes]
-    
-    print("\nUser Choices: ")
-    for chosen_model in chosen_models:
-        print(chosen_model)
-
-    full_paths = [os.path.join(cwd, m) for m in chosen_models]
-    return full_paths
-
-
 # Plot the Exponential Moving Average error (in percentage) of the given models over time/chunks
 def plot_errors(models, dfs, jsons, json_comp_key, smooth_fac=0.9, ylim_top = 1.0, ylim_bottom=0.0):
     print("------------------------------")
@@ -463,7 +427,7 @@ json_comp_key           = "model_name"              # is the label in generated 
 verbatim                = False
 
 #Exponential Moving Average factor range=<0.0, 1.0>, the higher the factor the more smoothing wilload
-smooth_fac = 0.5
+smooth_fac = 0.9
 
 ### Error Plot of given Models
 ytop                    = 100.0    # Error plot y upper-limit in percentage

@@ -134,6 +134,7 @@ data_old/
 slurms/
 models/
 weights_only_full_trained/
+ensembles/
 
 #stored weights files
 *.h5

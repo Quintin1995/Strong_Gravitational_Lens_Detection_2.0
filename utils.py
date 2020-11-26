@@ -12,6 +12,15 @@ import yaml
 import scipy
 
 
+# dstack the data to three channels instead of one
+def dstack_data(data):
+    dstack_data = np.empty((data.shape[0], data.shape[1], data.shape[2], 3), dtype=np.float32)
+    for i in range(data.shape[0]):
+        img = data[i]
+        dstack_data[i] = np.dstack((img,img,img))
+    return dstack_data
+
+
 # If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
 # There is also a check on whether the loaded data already has a color channel dimension, if not create it.
 def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
@@ -148,17 +157,22 @@ def binary_dialog(question_string):
     return ans
 
 
+# Obtain the neural network weights of the trained models.
 def get_h5_path_dialog(model_paths):
-    h5_choice = int(input("\n\nWhich model do you want? A model selected on validation loss (1) or validation metric (2)? (int): "))
-    if h5_choice == 1:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*loss.h5"))
-    elif h5_choice == 2:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "checkpoints/*metric.h5"))
-    else:
-        h5_paths = glob.glob(os.path.join(model_paths[0], "*.h5"))
+    weights_paths = list()
+    for model_path in model_paths:
+        print("Choosing for model: {}".format(model_path))
+        h5_choice = int(input("Which model do you want? A model selected on validation loss (1) or validation metric (2) or (3) for neither? (int): "))
+        if h5_choice == 1:
+            h5_paths = glob.glob(os.path.join(model_path, "checkpoints/*loss.h5"))
+        elif h5_choice == 2:
+            h5_paths = glob.glob(os.path.join(model_path, "checkpoints/*metric.h5"))
+        else:
+            h5_paths = glob.glob(os.path.join(model_path, "*.h5"))
 
-    print("Choice h5 path: {}".format(h5_paths[0]))
-    return h5_paths[0]
+        print("Choice h5 path: {}".format(h5_paths[0]))
+        weights_paths.append(h5_paths[0])
+    return weights_paths
 
 
 # Opens dialog with the user to select a folder that contains models.
@@ -277,23 +291,25 @@ def hms(seconds):
 
 
 # Create target directory & all intermediate directories if don't exists
-def create_dir_if_not_exists(dirName):
+def create_dir_if_not_exists(dirName, verbatim=False):
     try:
-        os.makedirs(dirName)    
+        os.makedirs(dirName)
         print("Directory " , dirName ,  " Created ", flush=True)
     except FileExistsError:
-        print("Directory " , dirName ,  " already exists", flush=True)
+        if verbatim:
+            print("Directory " , dirName ,  " already exists", flush=True)
 
 
 # Load all settings from a yaml file and stores it in a settings dictionary.
-def load_settings_yaml(yaml_run_path):
+def load_settings_yaml(yaml_run_path, verbatim=True):
     #opens run.yaml and load all the settings into a dictionary.
     with open(yaml_run_path) as file:
         settings = yaml.load(file)
-        print("\nSettings: {}".format(yaml_run_path), flush=True)
-        for i in settings:
-            print(str(i) + ": " + str(settings[i]), flush=True)
-        print("\nAll settings loaded.\n\n", flush=True)
+        if verbatim:
+            print("\nSettings: {}".format(yaml_run_path), flush=True)
+            for i in settings:
+                print(str(i) + ": " + str(settings[i]), flush=True)
+            print("\nAll settings loaded.\n\n", flush=True)
         return settings
 
 

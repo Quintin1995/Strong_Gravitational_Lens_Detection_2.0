@@ -13,6 +13,10 @@ import cv2
 from skimage.segmentation import flood, flood_fill
 import os
 
+
+# Proof of Concept Surface Brightness Contouring (poc_sbc)
+
+
 # Perform the floodfill operation on pixel (2,2) - I just picked a pixel in the corner
 def perform_floodfill(img, tolerance=0):
     filled_img = flood_fill(img, (2, 2), 0, tolerance=tolerance)
