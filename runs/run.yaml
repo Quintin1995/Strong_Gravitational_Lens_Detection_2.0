@@ -7,13 +7,13 @@ model_name: "test_beta"    # String
 show_plot_of_data_before_training: False   # if you want to observe an image of the training data right before it goes into the network (before data augmentation), set to true.
 
 # Loading the input data
-fraction_to_load_sources_train  : 0.01     #float # range = [0,1]  train
-fraction_to_load_negatives_train: 0.1     #float # range = [0,1]  train
-fraction_to_load_lenses_train   : 0.1     #float # range = [0,1]  train
+fraction_to_load_sources_train  : 0.1     #float # range = [0,1]  train
+fraction_to_load_negatives_train: 1.0     #float # range = [0,1]  train
+fraction_to_load_lenses_train   : 1.0     #float # range = [0,1]  train
 
-fraction_to_load_sources_vali  : 0.1     #float # range = [0,1]   validation
-fraction_to_load_negatives_vali: 0.5     #float # range = [0,1]   validation
-fraction_to_load_lenses_vali   : 0.5     #float # range = [0,1]   validation
+fraction_to_load_sources_vali  : 0.25    #float # range = [0,1]   validation
+fraction_to_load_negatives_vali: 1.0     #float # range = [0,1]   validation
+fraction_to_load_lenses_vali   : 1.0     #float # range = [0,1]   validation
 
 # Whether to normalize (normalize per data array and not per image) the data during the image loading process.
 normalize: "per_image"        #options = {"None", "per_image", "per_array", "adapt_hist_eq"}
