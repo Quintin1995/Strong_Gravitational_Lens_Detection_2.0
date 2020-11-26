@@ -59,7 +59,7 @@ def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fil
 
 
 class DataGenerator:
-    def __init__(self, params, mode="training", do_shuffle_data=True, do_load_validation=True, *args, **kwargs):
+    def __init__(self, params, mode="training", do_shuffle_data=True, do_load_validation=True, do_load_test_data=False, *args, **kwargs):
         self.params = params
         self.PSF_r = self._compute_PSF_r()
 
@@ -105,6 +105,27 @@ class DataGenerator:
                                                             pool=p)
                 self.Xlenses_validation    = self.get_data_array(path=self.params.lenses_path_validation,
                                                             fraction_to_load=self.params.fraction_to_load_lenses_vali,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+            if do_load_test_data:
+                # Load all validation data.
+                print("\n\n\nLoading Test Data", flush=True)
+                self.Xsources_test = self.get_data_array(path=self.params.sources_path_test,
+                                                            fraction_to_load=self.params.fraction_to_load_sources_test,
+                                                            are_sources=True,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+                self.Xnegatives_test = self.get_data_array(path=self.params.negatives_path_test,
+                                                            fraction_to_load=self.params.fraction_to_load_negatives_test,
+                                                            are_sources=False,
+                                                            normalize_dat=self.params.normalize,
+                                                            do_shuffle=do_shuffle_data,
+                                                            pool=p)
+                self.Xlenses_test    = self.get_data_array(path=self.params.lenses_path_test,
+                                                            fraction_to_load=self.params.fraction_to_load_lenses_test,
                                                             are_sources=False,
                                                             normalize_dat=self.params.normalize,
                                                             do_shuffle=do_shuffle_data,
@@ -317,7 +338,45 @@ class DataGenerator:
 
         print("Creating validation chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
         return X_chunk, y_chunk
-    
+
+
+    # Loading a valiation chunk into memory
+    def load_chunk_test(self, data_type, mock_lens_alpha_scaling):
+        start_time = time.time()
+        num_positive = self.Xlenses_test.shape[0]
+        # num_negative = self.Xnegatives_test.shape[0] + self.Xlenses_test.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
+        
+        # Lets create a balanced test set.
+        num_negative = num_positive
+
+        # Get mock lenses data and labels
+        X_pos, y_pos = self.merge_lenses_and_sources(self.Xlenses_test, self.Xsources_test, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=True)
+            
+        # Store Negative data in numpy array and create label vector
+        X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)    
+        y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
+
+        # Negatives consist of the negatives set and the unmerged lenses set. A lens unmerged with a source is basically a negative.
+        n = int(num_negative // 2)  # number samples to take from lenses-, and negatives set.
+        
+        indexes_lenses = np.random.choice(self.Xlenses_test.shape[0], n, replace=False)  
+        X_neg[0:int(num_negative//2)] = self.Xlenses_test[indexes_lenses] # first half of negative chunk is a random selection from lenses without replacement
+
+        indexes_negatives = np.random.choice(self.Xlenses_test.shape[0], n+1, replace=False)  
+        X_neg[int(num_negative//2):num_negative] = self.Xnegatives_test[indexes_negatives] # second half of negatives are a random selection from the negatives without replacement
+        
+        # The negatives need a square root stretch, just like the positives.
+        X_neg = np.sqrt(X_neg)
+
+        # Concatenate the positive and negative examples into one chunk (also the labels)
+        X_chunk = np.concatenate((X_pos, X_neg))
+        y_chunk = np.concatenate((y_pos, y_neg))
+
+        if self.params.do_max_tree_seg:
+            X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
+
+        print("Creating validation chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
+        return X_chunk, y_chunk
 
     # Merge a single lens and source together into a mock lens.
     def merge_lens_and_source(self, lens, source, mock_lens_alpha_scaling = (0.02, 0.30), show_imgs = False):
