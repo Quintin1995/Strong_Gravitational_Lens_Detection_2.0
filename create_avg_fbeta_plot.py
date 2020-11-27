@@ -14,7 +14,7 @@ from Network import *
 
 ########################################## Params ##########################################
 names               = ["binary_crossentropy", "f_beta"]
-metric_interests    = ["loss", "metric"]
+metric_interests    = ["loss", "loss"]
 do_eval             = True
 fraction_to_load_sources_test = 0.5
 
@@ -23,8 +23,9 @@ beta_squarred           = 0.03                                  # For f-beta cal
 stepsize                = 0.01                                  # For f-beta calculation
 threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
 
-
 root = os.path.join("models", "test_exp")
+
+colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 ########################################## Script ##########################################
 # pre-checks
 assert len(names) == len(metric_interests)
@@ -102,8 +103,36 @@ for collection_idx, model_collection in enumerate(model_collections):
         precision_data_vectors.append(precision_data)
         recall_data_vectors.append(recall_data)
 
-        f_beta_matrix = np.asarray(f_beta_vectors)
-        mu_fbeta = np.mean(f_beta_matrix, axis=0)
-        std_fbeta = np.std(f_beta_matrix, axis=0)
+    # transform to 2d numpy array
+    f_beta_matrix = np.asarray(f_beta_vectors)
+    precision_matrix = np.asarray(f_beta_vectors)
+    recall_matrix = np.asarray(f_beta_vectors)
 
-        
+    # calculate mean, std, recall en precision per model
+    mu_fbeta    = np.mean(f_beta_matrix, axis=0)
+    stds_fbeta  = np.std(f_beta_matrix, axis=0)
+    precisions  = np.mean(precision_matrix, axis=0)
+    recalls     = np.mean(recall_matrix, axis=0) 
+
+    # step 7.1 - define upper and lower limits
+    upline  = np.add(mu_fbeta, stds_fbeta)
+    lowline = np.subtract(mu_fbeta, stds_fbeta)
+
+    # step 7.2 - Plotting all lines
+    plt.plot(list(threshold_range), precisions, ":", color=colors[collection_idx], label="precision mean", alpha=0.9, linewidth=3)
+    plt.plot(list(threshold_range), recalls, "--", color=colors[collection_idx], label="recall mean", alpha=0.9, linewidth=3)
+    plt.plot(list(threshold_range), upline, colors[collection_idx])
+    plt.plot(list(threshold_range), mu_fbeta, colors[collection_idx], label = dg.params.model_name)
+    plt.plot(list(threshold_range), lowline, colors[collection_idx])
+    plt.fill_between(list(threshold_range), upline, lowline, color=colors[collection_idx], alpha=0.5) 
+
+plt.xlabel("p threshold")
+plt.ylabel("F")
+plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+figure = plt.gcf() # get current figure
+figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+
+plt.grid(color='grey', linestyle='dashed', linewidth=1)
+plt.legend()
+plt.show()
+    
