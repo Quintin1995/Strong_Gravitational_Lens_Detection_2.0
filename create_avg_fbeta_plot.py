@@ -5,18 +5,19 @@ from Parameters import *
 import numpy as np
 from DataGenerator import *
 from Network import *
-
-
 ########################################## Functions ##########################################
 
 
-
+def show_acc_matrix():
+    print()
+    for idx, name in enumerate(names):
+        print("{0} --> acc: {1:.3f} +- {2:.3f}".format(name, collection_accs[idx], collection_stds[idx]))
 
 ########################################## Params ##########################################
-names               = ["binary_crossentropy", "f_beta"]
-metric_interests    = ["loss", "loss"]
+names               = ["f_beta_metric", "binary_crossentropy" ]
+metric_interests    = ["metric", "loss"]
 do_eval             = True
-fraction_to_load_sources_test = 0.5
+fraction_to_load_sources_test = 1.0
 
 ### f_beta graph and its paramters
 beta_squarred           = 0.03                                  # For f-beta calculation
@@ -30,22 +31,25 @@ colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise'
 # pre-checks
 assert len(names) == len(metric_interests)
 
-
-# for each member in the experiment keep a list of models that are of the same type and hyper-params
+# For each member in the experiment keep a list of models that are of the same type and hyper-params
 model_collections = list()
+collection_accs   = list()
+collection_stds   = list()
 
-# create collections of models - models are grouped in lists
+# Create collections of models - models are grouped in lists
 for name in names:
     model_list = glob.glob(root + "/*{}".format(name))
     model_collections.append(model_list)
 
-
+# Loop over model collections - These should have 10 identical models with different weight initializations.
+# Each collection should have approximately 10 models, to average over.
 for collection_idx, model_collection in enumerate(model_collections):
 
-    # Keep track of results per model
-    f_beta_vectors = []
-    precision_data_vectors = []
-    recall_data_vectors = []
+    # Keep track of results per model collection
+    f_beta_vectors          = list()
+    precision_data_vectors  = list()
+    recall_data_vectors     = list()
+    test_accs                = list()
 
     # loop over each model - 1. Initialize, 2. Predict, 3. Store results
     for model_folder in model_collection:
@@ -70,6 +74,7 @@ for collection_idx, model_collection in enumerate(model_collections):
         network.model.trainable = False
 
         # Step 5.0 - Load weights of the neural network
+        print(model_folder + "/checkpoints/*{}.h5".format(metric_interests[collection_idx]))
         h5_path = glob.glob(model_folder + "/checkpoints/*{}.h5".format(metric_interests[collection_idx]))[0]
         network.model.load_weights(h5_path)
 
@@ -88,7 +93,10 @@ for collection_idx, model_collection in enumerate(model_collections):
             results = network.model.evaluate(X_test_chunk, y_test_chunk, verbose=0)
             print("\n\n" + model_folder)
             for met_idx in range(len(results)):
-                print("Test {} = {}".format(network.model.metrics_names[met_idx], results[met_idx]))
+                current_metric = network.model.metrics_names[met_idx]
+                print("Test {} = {}".format(current_metric, results[met_idx]))
+                if current_metric == "binary_accuracy":
+                    test_accs.append(results[met_idx])
 
         # Step 6.4 - Begin f-beta calculation
         f_betas = []
@@ -124,7 +132,13 @@ for collection_idx, model_collection in enumerate(model_collections):
     plt.plot(list(threshold_range), upline, colors[collection_idx])
     plt.plot(list(threshold_range), mu_fbeta, colors[collection_idx], label = dg.params.model_name)
     plt.plot(list(threshold_range), lowline, colors[collection_idx])
-    plt.fill_between(list(threshold_range), upline, lowline, color=colors[collection_idx], alpha=0.5) 
+    plt.fill_between(list(threshold_range), upline, lowline, color=colors[collection_idx], alpha=0.5)
+
+    # Calculate mean binary accuracy and standard deviation of the collection of models
+    test_accs = np.asarray(test_accs)
+    collection_accs.append(np.mean(test_accs))
+    collection_stds.append(np.std(test_accs))
+    
 
 plt.xlabel("p threshold")
 plt.ylabel("F")
@@ -134,5 +148,6 @@ figure.set_size_inches(12, 8)       # (12,8), seems quite fine
 
 plt.grid(color='grey', linestyle='dashed', linewidth=1)
 plt.legend()
+show_acc_matrix()
 plt.show()
-    
+
