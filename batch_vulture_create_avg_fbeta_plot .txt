@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --time=4:30:00
+#SBATCH --mem=64000
+#SBATCH --nodes=1
+#SBATCH --partition=vulture
+#SBATCH --job-name=make_plot_vulture
+
+module load TensorFlow/2.1.0-fosscuda-2019b-Python-3.7.4
+module load matplotlib/3.1.1-fosscuda-2019b-Python-3.7.4
+module load scikit-image/0.16.2-fosscuda-2019b-Python-3.7.4
+
+python3 create_avg_fbeta_plot.py
