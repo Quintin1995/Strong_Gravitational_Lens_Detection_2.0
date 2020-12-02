@@ -131,8 +131,6 @@ class Parameters(object):
         self.fraction_to_load_sources_test   = self.fraction_to_load_lenses_vali              # range = [0,1]
 
 
-
-
     def _set_network_params(self, settings):
         self.net_name          = settings["net_name"]
         self.net_learning_rate = settings["net_learning_rate"]
