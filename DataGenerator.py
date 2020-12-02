@@ -67,7 +67,7 @@ class DataGenerator:
         self.negative_sample_contaminant_prob = 0.8
 
         #p = Pool(8)
-        with Pool(8) as p:
+        with Pool(24) as p:
             if mode == "training":
                 # Load all training data
                 print("\n\n\nLoading Training Data", flush=True)
