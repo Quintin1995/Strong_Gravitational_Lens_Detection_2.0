@@ -336,7 +336,12 @@ class DataGenerator:
 
 
     # Loading a valiation chunk into memory
-    def load_chunk_test(self, data_type, mock_lens_alpha_scaling):
+    def load_chunk_test(self, data_type, mock_lens_alpha_scaling, seed=4321):
+
+        # set seed for reproducibility
+        random.seed(seed)
+        np.random.seed(seed)
+
         start_time = time.time()
         num_positive = self.Xlenses_test.shape[0]
         

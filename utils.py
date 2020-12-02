@@ -53,7 +53,6 @@ def count_TP_TN_FP_FN_and_FB(prediction_vector, y_test, threshold, beta_squarred
     return TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta
 
 
-
 # dstack the data to three channels instead of one
 def dstack_data(data):
     dstack_data = np.empty((data.shape[0], data.shape[1], data.shape[2], 3), dtype=np.float32)
@@ -252,7 +251,7 @@ def calc_RMS(unnormalized_3d_numpy_array):
 
 
 def plot_first_last_stats(X, y):
-    num_imgs = int(input("\nAmount of images to show to the user? integer value: "))
+    num_imgs = int(input("\nUtils function: \n    Amount of images to show to the user? integer value: "))
     columns = 2
     rows = 1
     for img_num in range(num_imgs):
