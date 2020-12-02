@@ -66,7 +66,8 @@ class DataGenerator:
         # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
         self.negative_sample_contaminant_prob = 0.8
 
-        with Pool(24) as p:
+        #p = Pool(8)
+        with Pool(8) as p:
             if mode == "training":
                 # Load all training data
                 print("\n\n\nLoading Training Data", flush=True)
@@ -130,7 +131,8 @@ class DataGenerator:
                                                             normalize_dat=self.params.normalize,
                                                             do_shuffle=do_shuffle_data,
                                                             pool=p)
-        p.join()
+            p.terminate()
+            p.join()
 
         ###### Step 5.0 - Data Augmentation - Data Generator Keras - Training Generator is based on train data array.
         self.train_generator = ImageDataGenerator(

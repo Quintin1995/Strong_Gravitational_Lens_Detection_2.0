@@ -114,6 +114,7 @@ class Parameters(object):
         else:
             self.show_plot_of_data_before_training = settings["show_plot_of_data_before_training"]
 
+
     def _set_data_fractions(self, settings):
         self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]
         self.fraction_to_load_negatives_train = settings["fraction_to_load_negatives_train"]  # range = [0,1]

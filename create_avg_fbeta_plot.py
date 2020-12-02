@@ -5,6 +5,7 @@ from Parameters import *
 import numpy as np
 from DataGenerator import *
 from Network import *
+import tensorflow as tf
 ########################################## Functions ##########################################
 
 
@@ -28,11 +29,11 @@ def AUC_discrete(xs, ys):
 
 
 ########################################## Params ##########################################
+
 names               = ["binary_crossentropy", "f_beta_metric"  , "f_beta_soft_metric", "macro_softloss_f1", "macro_double_softloss_f1", "f_beta_softloss"]
 metric_interests    = ["loss"               ,"metric"          , "metric"            , "loss"             , "loss"                    , "loss"]
 do_eval             = True
 fraction_to_load_sources_test = 1.0
-
 
 ### f_beta graph and its paramters
 beta_squarred           = 0.03                                  # For f-beta calculation
@@ -67,7 +68,9 @@ for collection_idx, model_collection in enumerate(model_collections):
     test_accs               = list()
 
     # loop over each model - 1. Initialize, 2. Predict, 3. Store results
-    for model_folder in model_collection:
+    for model_idx, model_folder in enumerate(model_collection):
+        tf.keras.backend.clear_session()
+        print("Collection index #{}, model index #{}".format(collection_idx, model_idx))
 
         # Step 1.0 - Load settings of the model
         yaml_path = glob.glob(os.path.join(model_folder) + "/*.yaml")[0]
@@ -160,14 +163,28 @@ for collection_idx, model_collection in enumerate(model_collections):
     # TEST CALUCLATION OF AUC - not usefull yet, because infinite slopes are still a thing.
     mu_fbeta_AUC = AUC_discrete(threshold_range, mu_fbeta)
 
+    # with open('intermediate.csv', 'a+') as f:
+    #     f.write(','.join('%f' % x for x in mu_fbeta) + '\n')
+    #     f.write(','.join('%f' % x for x in stds_fbeta) + '\n')
+    #     f.write(','.join('%f' % x for x in precisions) + '\n')
+    #     f.write(','.join('%f' % x for x in recalls) + '\n')
+    #     f.write(','.join('%f' % x for x in upline) + '\n')
+    #     f.write(','.join('%f' % x for x in lowline) + '\n')
+
+    #     f.write(','.join('%f' % x for x in test_accs) + '\n')
+    #     f.write(','.join('%f' % x for x in collection_accs) + '\n')
+    #     f.write(','.join('%f' % x for x in collection_stds) + '\n')
+    #     f.write(','.join('%f' % x for x in mu_fbeta_AUC) + '\n')
+
 plt.xlabel("p threshold")
 plt.ylabel("F")
-plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+plt.title("F beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
 figure = plt.gcf() # get current figure
 figure.set_size_inches(12, 8)       # (12,8), seems quite fine
 
 plt.grid(color='grey', linestyle='dashed', linewidth=1)
 plt.legend()
 show_acc_matrix()
-plt.show()
+# plt.show()
+plt.savefig("f_beta_graph_loss_functions.png", dpi=100)
 

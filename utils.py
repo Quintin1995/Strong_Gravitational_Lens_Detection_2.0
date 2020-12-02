@@ -251,7 +251,7 @@ def calc_RMS(unnormalized_3d_numpy_array):
 
 
 def plot_first_last_stats(X, y):
-    num_imgs = int(input("\nUtils function: \n    Amount of images to show to the user? integer value: "))
+    num_imgs = int(input("\nUtils function: \n\tAmount of images to show to the user? integer value: "))
     columns = 2
     rows = 1
     for img_num in range(num_imgs):
@@ -351,7 +351,7 @@ def load_settings_yaml(yaml_run_path, verbatim=True):
             for i in settings:
                 print(str(i) + ": " + str(settings[i]), flush=True)
             print("\nAll settings loaded.\n\n", flush=True)
-        return settings
+    return settings
 
 
 # Returns a nicely formatted time string
@@ -426,6 +426,15 @@ def print_stats_program():
     # you can calculate percentage of available memory
     print("Available memory: {:.01f}%".format(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total))
 
+
+def mem_usage(f):
+    def wrapper(*args, **kwargs):
+        before = psutil.virtual_memory().total - psutil.virtual_memory().available
+        result = f(*args, **kwargs)
+        after = psutil.virtual_memory().total - psutil.virtual_memory().available
+        print("%s used %d MB of memory" % (f.__name__, (after-before)/(1024 * 1024)))
+        return result
+    return wrapper
 
 # Smooths a set of points according to an Exponential Moving Average
 def smooth_curve(points, factor=0.9):
