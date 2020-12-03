@@ -12,10 +12,10 @@ import tensorflow as tf
 def show_acc_matrix():
     print()
     for idx, name in enumerate(names):
-        print("{0} --> acc: {1:.3f} +- {2:.3f}".format(name, collection_accs[idx]*100, collection_stds[idx]*100))
+        print("{0} --> acc: {1:.3f} +- {2:.3f}".format(name, collection_accs[idx], collection_stds[idx]))
         print("{0} --> f_b: {1:.3f} +- {2:.3f}".format(name, collection_fbeta_means[idx], collection_fbeta_stds[idx]))
-        print("{0} --> pre: {1:.3f} +- {2:.3f}".format(name, collection_precision_means[idx]*100, collection_precision_stds[idx]*100))
-        print("{0} --> rec: {1:.3f} +- {2:.3f}".format(name, collection_recall_means[idx]*100, collection_recall_stds[idx]*100))
+        print("{0} --> pre: {1:.3f} +- {2:.3f}".format(name, collection_precision_means[idx], collection_precision_stds[idx]))
+        print("{0} --> rec: {1:.3f} +- {2:.3f}".format(name, collection_recall_means[idx], collection_recall_stds[idx]))
         
 
 # Calculate the AUC of a discrete graph - Where we interpolate linearly
@@ -35,8 +35,8 @@ def AUC_discrete(xs, ys):
 names               = ["binary_crossentropy", "f_beta_metric"  , "f_beta_soft_metric", "macro_softloss_f1", "macro_double_softloss_f1", "f_beta_softloss"]
 metric_interests    = ["loss"               ,"metric"          , "metric"            , "loss"             , "loss"                    , "loss"]
 ####
-names               = [ "f_beta_soft_metric"]
-metric_interests    = ["metric"]
+names               = [ "f_beta_softloss"]
+metric_interests    = ["loss"]
 ####
 do_eval             = True
 fraction_to_load_sources_test = 1.0
