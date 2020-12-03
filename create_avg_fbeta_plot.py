@@ -13,7 +13,10 @@ def show_acc_matrix():
     print()
     for idx, name in enumerate(names):
         print("{0} --> acc: {1:.3f} +- {2:.3f}".format(name, collection_accs[idx]*100, collection_stds[idx]*100))
-
+        print("{0} --> f_b: {1:.3f} +- {2:.3f}".format(name, collection_fbeta_means[idx], collection_fbeta_stds[idx]))
+        print("{0} --> pre: {1:.3f} +- {2:.3f}".format(name, collection_precision_means[idx]*100, collection_precision_stds[idx]*100))
+        print("{0} --> rec: {1:.3f} +- {2:.3f}".format(name, collection_recall_means[idx]*100, collection_recall_stds[idx]*100))
+        
 
 # Calculate the AUC of a discrete graph - Where we interpolate linearly
 def AUC_discrete(xs, ys):
@@ -29,9 +32,12 @@ def AUC_discrete(xs, ys):
 
 
 ########################################## Params ##########################################
-
 names               = ["binary_crossentropy", "f_beta_metric"  , "f_beta_soft_metric", "macro_softloss_f1", "macro_double_softloss_f1", "f_beta_softloss"]
 metric_interests    = ["loss"               ,"metric"          , "metric"            , "loss"             , "loss"                    , "loss"]
+####
+names               = [ "f_beta_soft_metric"]
+metric_interests    = ["metric"]
+####
 do_eval             = True
 fraction_to_load_sources_test = 1.0
 
@@ -51,6 +57,15 @@ assert len(names) == len(metric_interests)
 model_collections = list()
 collection_accs   = list()
 collection_stds   = list()
+
+collection_precision_means = list()
+collection_precision_stds  = list()
+
+collection_recall_means = list()
+collection_recall_stds  = list()
+
+collection_fbeta_means = list()
+collection_fbeta_stds  = list()
 
 # Create collections of models - models are grouped in lists
 for name in names:
@@ -99,9 +114,6 @@ for collection_idx, model_collection in enumerate(model_collections):
         # Step 6.0 - Load the data
         X_test_chunk, y_test_chunk = dg.load_chunk_test(params.data_type, params.mock_lens_alpha_scaling)
 
-        # test for now - delete this line later..
-        # plot_first_last_stats(X_test_chunk, y_test_chunk)
-
         # Step 6.1 - dstack images for enrico neural network
         if params.model_name == "Baseline_Enrico":
             X_test_chunk = dstack_data(X_test_chunk)
@@ -111,6 +123,12 @@ for collection_idx, model_collection in enumerate(model_collections):
 
         # Step 6.3 - Also calculate an evaluation based on the models evaluation metric
         if do_eval:
+            # Add binary_accuracy as model metric, since it was not added when compiling before training in some cases
+            if "binary_accuracy" not in network.model.metrics:
+                network.model.compile(optimizer=network.model.optimizer,
+                                    loss=network.model.loss,
+                                    metrics=network.model.metrics+["binary_accuracy"])
+
             results = network.model.evaluate(X_test_chunk, y_test_chunk, verbose=0)
             print("\n\n" + model_folder)
             for met_idx in range(len(results)):
@@ -120,9 +138,7 @@ for collection_idx, model_collection in enumerate(model_collections):
                     test_accs.append(results[met_idx])
 
         # Step 6.4 - Begin f-beta calculation
-        f_betas = []
-        precision_data = []
-        recall_data = []
+        f_betas, precision_data, recall_data = [], [], []
         for p_threshold in threshold_range:
             (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(preds, y_test_chunk, p_threshold, beta_squarred)
             f_betas.append(F_beta)
@@ -137,11 +153,15 @@ for collection_idx, model_collection in enumerate(model_collections):
     precision_matrix = np.asarray(precision_data_vectors)
     recall_matrix = np.asarray(recall_data_vectors)
 
-    # calculate mean, std, recall en precision per model
+    # Calculate mean-std, precision-std en recall_std per model collection
     mu_fbeta    = np.mean(f_beta_matrix, axis=0)
     stds_fbeta  = np.std(f_beta_matrix, axis=0)
-    precisions  = np.mean(precision_matrix, axis=0)
-    recalls     = np.mean(recall_matrix, axis=0) 
+    
+    precisions     = np.mean(precision_matrix, axis=0)
+    precision_stds = np.std(precision_matrix, axis=0)
+    
+    recalls      = np.mean(recall_matrix, axis=0)
+    recalls_stds = np.std(recall_matrix, axis=0)
 
     # step 7.1 - define upper and lower limits
     upline  = np.add(mu_fbeta, stds_fbeta)
@@ -159,22 +179,18 @@ for collection_idx, model_collection in enumerate(model_collections):
     test_accs = np.asarray(test_accs)
     collection_accs.append(np.mean(test_accs))
     collection_stds.append(np.std(test_accs))
+    
+    collection_precision_means.append(precisions[(precisions.shape[0]//2-1)])
+    collection_precision_stds.append(precision_stds[(precision_stds.shape[0]//2-1)])
+
+    collection_recall_means.append(recalls[(recalls.shape[0]//2-1)])
+    collection_recall_stds.append(recalls_stds[(recalls_stds.shape[0]//2-1)])
+
+    collection_fbeta_means.append(mu_fbeta[(mu_fbeta.shape[0]//2-1)])
+    collection_fbeta_stds.append(stds_fbeta[(stds_fbeta.shape[0]//2-1)])
 
     # TEST CALUCLATION OF AUC - not usefull yet, because infinite slopes are still a thing.
     mu_fbeta_AUC = AUC_discrete(threshold_range, mu_fbeta)
-
-    # with open('intermediate.csv', 'a+') as f:
-    #     f.write(','.join('%f' % x for x in mu_fbeta) + '\n')
-    #     f.write(','.join('%f' % x for x in stds_fbeta) + '\n')
-    #     f.write(','.join('%f' % x for x in precisions) + '\n')
-    #     f.write(','.join('%f' % x for x in recalls) + '\n')
-    #     f.write(','.join('%f' % x for x in upline) + '\n')
-    #     f.write(','.join('%f' % x for x in lowline) + '\n')
-
-    #     f.write(','.join('%f' % x for x in test_accs) + '\n')
-    #     f.write(','.join('%f' % x for x in collection_accs) + '\n')
-    #     f.write(','.join('%f' % x for x in collection_stds) + '\n')
-    #     f.write(','.join('%f' % x for x in mu_fbeta_AUC) + '\n')
 
 plt.xlabel("p threshold")
 plt.ylabel("F")
