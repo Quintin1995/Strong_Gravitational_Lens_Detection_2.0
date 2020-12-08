@@ -327,5 +327,5 @@ another_list = ["conv2d_2", "conv2d_4", "conv2d_6", "conv2d_9", "conv2d_11", "co
 another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]                                   # This one works well
 another_list = ["add_4", "add_5", "add_6", "add_7"]                                   # This one works well
 Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0, is_positive_set=False, m_path=model_paths[0])
-# Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y, is_positive_set=True, m_path=model_paths[0])
+Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y, is_positive_set=True, m_path=model_paths[0])
 
