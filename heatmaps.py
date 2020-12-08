@@ -7,7 +7,7 @@ from functools import reduce
 import matplotlib.pyplot as plt
 import os
 from Parameters import Parameters
-from utils import show2Imgs, get_model_paths, get_h5_path_dialog, load_settings_yaml, get_samples, compute_PSF_r, load_normalize_img, normalize_img, calc_RMS
+from utils import show2Imgs, get_model_paths, get_h5_path_dialog, load_settings_yaml, get_samples, compute_PSF_r, load_normalize_img, normalize_img, calc_RMS, create_dir_if_not_exists
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.compat.v1 import ConfigProto
@@ -21,7 +21,7 @@ session = InteractiveSession(config=config)
 ############################################################ Functions ############################################################
 
 # Plot an image grid given a list of images.
-def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
+def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title, fname, m_path):
 
     subplot_titles = list()
     for layer_name in layer_names:
@@ -54,7 +54,11 @@ def _plot_image_grid_GRADCAM(list_of_rows, layer_names, plot_title):
     plt.title("Grad-CAM\n{}\n{}".format(plot_title, "Layers: " + ', '.join(layer_names)), fontsize=9)
     plt.xlabel("(a) Input Image        (b) Grad-CAM         (c) SuperImposed")
     plt.imshow(comb_img)
-    plt.show()
+    create_dir_if_not_exists(os.path.join(m_path, "grad_cams"), verbatim=False)
+    figManager = plt.get_current_fig_manager()
+    figManager.window.showMaximized()
+    plt.savefig('{}.png'.format(os.path.join(m_path, "grad_cams", fname)))
+    plt.clf()
 
 
 def _normalize_heatmap(heatmap):
@@ -80,7 +84,7 @@ def Grad_CAM(inp_img, model, layer_name):
     mock_lens_output = model.output[:, 0]
 
     # Output feature map of the block 'layer_name' layer, the last convolutional layer.
-    last_conv_layer = model.get_layer(layer_name) 
+    last_conv_layer = model.get_layer(layer_name)
 
     # Gradient of the mock lens class with regard to the output feature map of "layer_name
     grads = K.gradients(mock_lens_output, last_conv_layer.output)[0]
@@ -131,7 +135,7 @@ def _construct_color_img(inp_img, heatmap):
 
 
 # Shows input images to the user and heatmaps of where the model looks.
-def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
+def Grad_CAM_plot(image_set, model, m_path, layer_list, plot_title="", labels=None, is_positive_set=True):
     list_of_rows = list()
 
     for i in range(image_set.shape[0]):
@@ -143,14 +147,20 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
         # Predict input image for figure title
         prediction = model.predict(np.expand_dims(inp_img, axis=0))[0][0]
 
-        # Finding false negatives and false positives in the sample data
-        if False:   
-            threshold = 0.5
-            if prediction < threshold:
-                continue
-
+        # Assigning filname string to an example
+        fname = ""
+        threshold = 0.5     # model.evaluate evaluates on a decision threshold of 0.5, therefore we do it to over here.
+        if (prediction < threshold) and is_positive_set:
+            fname += "FN{}".format(i)
+        elif (prediction >= threshold) and is_positive_set:
+            fname += "TP{}".format(i)
+        elif (prediction < threshold) and not is_positive_set:
+            fname += "TN{}".format(i)
+        elif (prediction >= threshold) and not is_positive_set:
+            fname += "FP{}".format(i)
+            
         # Title for plot
-        plot_string = "Model Prediction: {:.3f}\n{}".format(prediction, plot_title)      
+        plot_string = "Model Prediction: {:.3f}, {}".format(prediction, plot_title)      
 
         for layer_name in layer_list:
 
@@ -161,7 +171,7 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
             low_res_heatmap = np.copy(heatmap)
             
             # Resize heatmap for sumperimposing with input image
-            heatmap = cv2.resize(heatmap, (inp_img.shape[0], inp_img.shape[1]))  
+            heatmap = cv2.resize(heatmap, (inp_img.shape[0], inp_img.shape[1]), interpolation=cv2.INTER_NEAREST)  
 
             # Construct a color image, with heatmap as one channel and input image another. The third channel are zeros
             color_img = _construct_color_img(inp_img, heatmap)
@@ -171,9 +181,10 @@ def Grad_CAM_plot(image_set, model, layer_list, plot_title="", labels=None):
             list_of_rows.append(images)
             
         # Format Plotting
-        _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_string)
+        _plot_image_grid_GRADCAM(list_of_rows, layer_list, plot_string, fname, m_path)
         list_of_rows = list()
         plt.close()
+        plt.clf()
 
 
 # Merge a single lens and source together into a mock lens.
@@ -284,7 +295,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test", deterministic=False)
 
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
@@ -294,7 +305,6 @@ PSF_r = compute_PSF_r()  # Used for sources only
 lenses_unnormalized    = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=lenses_fnames)
 sources_unnormalized   = load_normalize_img(params.data_type, are_sources=True, normalize_dat="None", PSF_r=PSF_r, filenames=sources_fnames)
 negatives = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
-
 
 
 # 6.0 - Create mock lenses based on the sample
@@ -315,6 +325,7 @@ network.model.load_weights(h5_paths[0])
 another_list = ["batch_normalization_16", "activation_12", "activation_8"]
 another_list = ["conv2d_2", "conv2d_4", "conv2d_6", "conv2d_9", "conv2d_11", "conv2d_14", "conv2d_16", "conv2d_19"]     # This one is poor.
 another_list = ["add", "add_1", "add_2", "add_3", "add_4", "add_5", "add_6", "add_7"]                                   # This one works well
-Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y)
-Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0)
+another_list = ["add_4", "add_5", "add_6", "add_7"]                                   # This one works well
+Grad_CAM_plot(negatives, network.model, layer_list=another_list, plot_title="Negative Example", labels=pos_y*0.0, is_positive_set=False, m_path=model_paths[0])
+# Grad_CAM_plot(mock_lenses, network.model, layer_list=another_list, plot_title="Positive Example", labels=pos_y, is_positive_set=True, m_path=model_paths[0])
 
