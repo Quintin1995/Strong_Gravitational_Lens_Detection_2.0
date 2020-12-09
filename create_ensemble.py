@@ -305,11 +305,12 @@ def main():
     X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
 
     # chunk of code that can be used to visualize some images of the given set:
-    # for i in range(X_chunk.shape[0]):
-    #     img = np.squeeze(negatives[i])
-    #     plt.imshow(img, cmap='gray')
-    #     plt.axis('off')
-    #     plt.show()
+    if False:
+        for i in range(X_chunk.shape[0]):
+            img = np.squeeze(negatives[i])
+            plt.imshow(img, cmap='gray')
+            plt.axis('off')
+            plt.show()
 
 
     # 7.0 - Load ensemble members and perform prediction with it.
