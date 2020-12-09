@@ -1,14 +1,13 @@
 from tensorflow.keras import backend as K
 import tensorflow as tf
 
-class FBetaMetric():
-    """
-    Approximates the F-beta AUC with configurable number of approximation steps.
 
-    args: 
-        beta:  Desired beta for F-score curve
-        steps: Approximation quality, higher number is higher number of bins
-    """
+
+# Approximates the F-beta AUC with configurable number of approximation steps.
+# args: 
+#     beta:  Desired beta for F-score curve
+#     steps: Approximation quality, higher number is higher number of bins
+class FBetaMetric():
     def __init__(self, beta: float = 1, steps: int = 100):
         
         tf.compat.v1.disable_eager_execution()
@@ -17,15 +16,12 @@ class FBetaMetric():
         self.steps      = steps
 
 
+    # Metric that is internally used and only calculates the recall.
+    # args: 
+    #     y_true:     True classes
+    #     y_pred:     Predicted classes
+    #     cutoff:     Minimum activation required for classifying as positive
     def _recall(self, y_true, y_pred, cutoff):
-        """
-        Metric that is internally used and only calculates the recall.
-        
-        args: 
-            y_true:     True classes
-            y_pred:     Predicted classes
-            cutoff:     Minimum activation required for classifying as positive
-        """
         
         # Find all the actual positives for which the activation was higher than the specified cutoff
         true_positives = tf.cast(tf.math.count_nonzero(K.greater_equal(K.clip(y_true * y_pred, 0, 1), cutoff)), tf.float32)
@@ -38,16 +34,14 @@ class FBetaMetric():
         return recall
 
 
-    def _precision(self, y_true, y_pred, cutoff):
-        """
-        Metric that is internally used and only calculates the precision.
-        
-        args: 
-            y_true:     True classes
-            y_pred:     Predicted classes
-            cutoff:     Minimum activation required for classifying as positive
-        """
 
+    # Metric that is internally used and only calculates the precision.
+    # args: 
+    #     y_true:     True classes
+    #     y_pred:     Predicted classes
+    #     cutoff:     Minimum activation required for classifying as positive
+    def _precision(self, y_true, y_pred, cutoff):
+ 
         # Find all the actual positives for which the activation was higher than the specified cutoff
         true_positives = tf.cast(tf.math.count_nonzero(K.greater_equal(K.clip(y_true * y_pred, 0, 1), cutoff)), tf.float32)
 
@@ -59,15 +53,12 @@ class FBetaMetric():
         return precision
     
 
+    # Metric that is internally used and only calculates the recall.
+    # args: 
+    #     y_true:     True classes
+    #     y_pred:     Predicted classes
+    #     cutoff:     Minimum activation required for classifying as positive
     def f_beta(self, y_true, y_pred):
-        """
-        Metric that is internally used and only calculates the recall.
-        
-        args: 
-            y_true:     True classes
-            y_pred:     Predicted classes
-            cutoff:     Minimum activation required for classifying as positive
-        """
 
         # Initialize F-Beta as 0
         f_score = 0

@@ -114,6 +114,7 @@ class Parameters(object):
         else:
             self.show_plot_of_data_before_training = settings["show_plot_of_data_before_training"]
 
+
     def _set_data_fractions(self, settings):
         self.fraction_to_load_lenses_train    = settings["fraction_to_load_lenses_train"]     # range = [0,1]
         self.fraction_to_load_negatives_train = settings["fraction_to_load_negatives_train"]  # range = [0,1]
@@ -122,6 +123,12 @@ class Parameters(object):
         self.fraction_to_load_lenses_vali    = settings["fraction_to_load_lenses_vali"]       # range = [0,1]
         self.fraction_to_load_negatives_vali = settings["fraction_to_load_negatives_vali"]    # range = [0,1]
         self.fraction_to_load_sources_vali   = settings["fraction_to_load_sources_vali"]      # range = [0,1]
+
+        # I set it equal to the validation fraction in order to not have to add this to tons of files that already exist.
+        # I should have added this piece of code in the beginning of the project.
+        self.fraction_to_load_lenses_test    = self.fraction_to_load_lenses_vali              # range = [0,1]
+        self.fraction_to_load_negatives_test = self.fraction_to_load_lenses_vali              # range = [0,1]
+        self.fraction_to_load_sources_test   = self.fraction_to_load_lenses_vali              # range = [0,1]
 
 
     def _set_network_params(self, settings):
@@ -161,6 +168,12 @@ class Parameters(object):
         self.lenses_path_validation     = settings["lenses_path_validation"]
         self.negatives_path_validation  = settings["negatives_path_validation"]
         self.sources_path_validation    = settings["sources_path_validation"]
+
+        # Instead of putting the paths in the run.yaml I put it hardcoded here, because im running a lot of experiments. This means I would have to include this in every one of those files.
+        self.lenses_path_test     = "data/test/lenses/"
+        self.negatives_path_test  = "data/test/negatives/"
+        self.sources_path_test    = "data/test/sources/"
+        
 
     # This function ensures that older run.yaml(s) are compatible with the newer ones.
     def _set_segmentation_parameters(self, settings):
