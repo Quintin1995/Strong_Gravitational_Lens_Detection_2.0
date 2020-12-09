@@ -337,7 +337,7 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test" deterministic=False)
 
 
 # 5.0 - Load lenses and sources in 4D numpy arrays

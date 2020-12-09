@@ -292,7 +292,7 @@ def main():
     sample_size = 551
     sample_size = int(args.sample_size)
     # sample_size = int(input("How many samples do you want to create and run (int): "))
-    sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+    sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test", deterministic=False)
 
     # 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
     # Create a chunk of data that each neural network understands (preprocessed quite identically)
