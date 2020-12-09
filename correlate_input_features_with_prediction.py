@@ -113,10 +113,10 @@ def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
     plt.bar(r, FNBars, bottom=TPBars, color='#f9bc86', edgecolor='white', width=barWidth, label='False Negative')
     
     plt.xticks(r, labels)
-    plt.xlabel("SNR bin groups (Percentage of Signal above 2x average noise for the entire image)")
+    plt.xlabel("Fraction of Source Image above 2x Average Noise in Lens")
     plt.ylabel("Percentage")
     plt.legend()
-    plt.title("Percentage of True Positives and False Negatives per binned SNR interval")
+    plt.title("Percentage of True Positives and False Negatives per Bin")# per binned (Source above 2x average noise) Interval")
     plt.grid(color='grey', linestyle='dashed', linewidth=1)
 
     plt.show()
@@ -307,7 +307,7 @@ def plot_feature_versus_prediction(predictions, feature_list, threshold=None, ti
     plt.plot(positives, preds_positives, 'o', color='blue', label="positives {}".format(len(preds_positives)))
     plt.plot(negatives, preds_negatives, 'o', color='red', label="negatives {}".format(len(preds_negatives)))
 
-    plt.title("{} and network certainty. FNR: {:.2f}".format(title, len(preds_negatives)/sample_size))
+    plt.title("{} vs network certainty. FNR: {:.2f}".format(title, len(preds_negatives)/sample_size))
     plt.xlabel("{} of source".format(title))
     plt.ylabel("Model prediction")
     plt.legend()
@@ -378,7 +378,7 @@ predictions = list(np.squeeze(predictions))
 
 # 11.0 - Make a plot of feature area size versus network certainty.
 if binary_dialog("Do you want to plot SNR versus prediction?"):
-    plot_feature_versus_prediction(predictions, SNRs, threshold=0.5, title="Image Ratio of Source above {}x noise level".format(noise_fac))
+    plot_feature_versus_prediction(predictions, SNRs, threshold=0.5, title="Source Image Ratio above {}x average noise level".format(noise_fac))
 
 
 # 12.0 - Make a plot of einstein radius and network certainty
