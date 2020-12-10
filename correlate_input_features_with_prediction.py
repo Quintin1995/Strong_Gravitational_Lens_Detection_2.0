@@ -337,13 +337,11 @@ params.data_type = np.float32 if params.data_type == "np.float32" else np.float3
 
 # 4.0 - Select random sample from the data (with replacement)
 sample_size = int(input("How many samples do you want to create and run (int): "))
-sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test", deterministic=False)
 
 
 # 5.0 - Load lenses and sources in 4D numpy arrays
 PSF_r = compute_PSF_r()  # Used for sources only
-# lenses  = load_normalize_img(params.data_type, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
-# sources = load_normalize_img(params.data_type, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
 
 # 5.1 - Load unnormalized data in order to calculate the amount of noise in a lens. 
 lenses_unnormalized    = load_normalize_img(params.data_type, are_sources=False, normalize_dat="None", PSF_r=PSF_r, filenames=lenses_fnames)

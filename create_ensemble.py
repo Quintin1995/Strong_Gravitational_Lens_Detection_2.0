@@ -6,7 +6,7 @@ import numpy as np
 import os
 from Parameters import Parameters
 import tensorflow as tf
-from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists, dstack_data
+from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists, dstack_data, count_TP_TN_FP_FN_and_FB
 import matplotlib.pyplot as plt
 import time
 import random
@@ -15,12 +15,12 @@ from scipy.special import softmax
 from functools import partial
 from sklearn.metrics import confusion_matrix
 import yaml
-
+import math
 ############################################################ Functions ############################################################
 
 
 # Dump ensemble parameters to a yaml file as a dictionary
-def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores):
+def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores, precision, recall, fbeta):
     ensemble_dict = {
         "model_names":       model_names,
         "model_weights":     [float(str(x)) for x in model_weights],
@@ -29,7 +29,11 @@ def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, t
         "accuracy":          acc,
         "threshold":         threshold,
         "sample_size":       sample_size,
-        "individual_scores": ["{} {:.3f}".format(str(met), float(str(score))) for met, score in individual_scores]
+        "individual_scores": ["{} {:.3f}".format(str(met), float(str(score))) for met, score in individual_scores],
+        "precision":         precision,
+        "recall":            recall,
+        "f_beta":            fbeta
+
     }
     ensemble_params_fname = os.path.join(ensemble_dir, "ensemble_parameters.yaml")
     with open(ensemble_params_fname, 'w') as outfile:
@@ -243,6 +247,7 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
     # of prediction vector with model weight vector.
     y_hat = np.dot(prediction_matrix, model_weights)
 
+    y_hat_copy = np.copy(y_hat)
     # Count TP, TN, FP, FN
     y_hat[y_hat < threshold] = 0.0
     y_hat[y_hat >= threshold] = 1.0
@@ -254,7 +259,7 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
     # Calculate accuracy
     error_percentage = error_count/y_hat.shape[0]
     acc = 1.0 - error_percentage
-    return acc
+    return acc, y_hat_copy
     
 
 ############################################################ Script ############################################################
@@ -292,7 +297,7 @@ def main():
     sample_size = 551
     sample_size = int(args.sample_size)
     # sample_size = int(input("How many samples do you want to create and run (int): "))
-    sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, deterministic=False)
+    sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test", deterministic=False)
 
     # 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
     # Create a chunk of data that each neural network understands (preprocessed quite identically)
@@ -305,12 +310,12 @@ def main():
     X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
 
     # chunk of code that can be used to visualize some images of the given set:
-    # for i in range(X_chunk.shape[0]):
-    #     img = np.squeeze(negatives[i])
-    #     plt.imshow(img, cmap='gray')
-    #     plt.axis('off')
-    #     plt.show()
-
+    if False:
+        for i in range(X_chunk.shape[0]):
+            img = np.squeeze(negatives[i])
+            plt.imshow(img, cmap='gray')
+            plt.axis('off')
+            plt.show()
 
     # 7.0 - Load ensemble members and perform prediction with it.
     prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
@@ -320,14 +325,53 @@ def main():
     
     # 9.0 - Ensemble Evaluation
     threshold = 0.5
-    acc = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=threshold)
+    acc, y_hat = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=threshold)
     print("\n\nAccuracy of Ensemble\t{:.3f} at threshold: {}".format(acc, threshold))
     print("Model names:\t\t{}".format(model_names))
     print("Model Weight Vector:\t{}".format(model_weights))
 
+
+    ### f_beta graph and its paramters
+    beta_squarred           = 0.03                                  # For f-beta calculation
+    stepsize                = 0.01                                  # For f-beta calculation
+    threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
+    colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
+
+
+    # I would like to see an f_beta figure of the ensemble that can be compared with a single model's f_beta figure.
+    f_betas, precision_data, recall_data = [], [], []
+    for p_threshold in threshold_range:
+        (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(y_hat, y_chunk, p_threshold, beta_squarred)
+        f_betas.append(F_beta)
+        precision_data.append(precision)
+        recall_data.append(recall)
+
+    # step 7.2 - Plotting all lines
+    plt.plot(list(threshold_range), f_betas, colors[0], label = "f_beta")
+    plt.plot(list(threshold_range), precision_data, ":", color=colors[0], alpha=0.9, linewidth=3, label="Precision")
+    plt.plot(list(threshold_range), recall_data, "--", color=colors[0], alpha=0.9, linewidth=3, label="Recall")
+    
+    # set up plot aesthetics
+    plt.xlabel("p threshold")
+    plt.ylabel("F")
+    plt.title("Ensemble F_beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+    figure = plt.gcf() # get current figure
+    axes = plt.gca()
+    axes.set_ylim([0.63, 1.00])
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    plt.savefig('{}.png'.format(os.path.join(ensemble_dir, "f_beta_plot")))
+    plt.show()
+
     # 10.0 - Create a dictionary that will hold Ensemble parameters
-    acc = float("{:.03f}".format(acc))
-    _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores)
+    acc = float("{:.03f}".format(acc))   # this conversion was somehow necessary.
+    precision = precision_data[(len(threshold_range)//2) + 1]
+    recall    = recall_data[(len(threshold_range)//2) + 1]
+    fbeta     = f_betas[(len(threshold_range)//2) + 1]
+    _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores, precision, recall, fbeta)
+
+    
 
 if __name__ == "__main__":
     main()
