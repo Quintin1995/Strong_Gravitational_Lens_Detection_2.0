@@ -35,8 +35,8 @@ def AUC_discrete(xs, ys):
 names               = ["binary_crossentropy", "f_beta_metric"  , "f_beta_soft_metric", "macro_softloss_f1", "macro_double_softloss_f1", "f_beta_softloss"]
 metric_interests    = ["loss"               ,"metric"          , "metric"            , "loss"             , "loss"                    , "loss"]
 ####
-names               = ["macro_double_softloss_f1", "f_beta_softloss"]
-metric_interests    = ["loss", "loss"]
+names               = ["MT_final"]
+metric_interests    = ["loss"]
 ####
 do_eval             = True
 fraction_to_load_sources_test = 1.0
@@ -46,7 +46,7 @@ beta_squarred           = 0.03                                  # For f-beta cal
 stepsize                = 0.01                                  # For f-beta calculation
 threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
 
-root = os.path.join("models", "final_experiment1_loss_functions")
+root = os.path.join("models", "final_experiment2_max_tree")
 
 colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 ########################################## Script ##########################################
@@ -113,7 +113,7 @@ for collection_idx, model_collection in enumerate(model_collections):
 
         # Step 6.0 - Load the data
         X_test_chunk, y_test_chunk = dg.load_chunk_test(params.data_type, params.mock_lens_alpha_scaling)
-
+        
         # Step 6.1 - dstack images for enrico neural network
         if params.model_name == "Baseline_Enrico":
             X_test_chunk = dstack_data(X_test_chunk)
@@ -121,18 +121,19 @@ for collection_idx, model_collection in enumerate(model_collections):
         # Step 6.2 - Predict the labels of the test chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
         preds = network.model.predict(X_test_chunk)
 
-        # temporarily make histogram of predictions
-        n, bins, patches = plt.hist(x=list(np.squeeze(preds)), bins='auto', color='#0504aa',
-                            alpha=0.7, rwidth=0.85)
-        plt.grid(axis='y', alpha=0.75)
-        plt.xlabel('Prediction')
-        plt.ylabel('Frequency')
-        plt.title('Model Prediction Distribution')
-        # plt.text(23, 45, r'$\mu=15, b=3$')
-        maxfreq = n.max()
-        # Set a clean upper y-axis limit.
-        plt.ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
-        plt.show()
+        if False:       # used to plot historgram of prediction = prediction distribution.
+            # temporarily make histogram of predictions
+            n, bins, patches = plt.hist(x=list(np.squeeze(preds)), bins='auto', color='#0504aa',
+                                alpha=0.7, rwidth=0.85)
+            plt.grid(axis='y', alpha=0.75)
+            plt.xlabel('Prediction')
+            plt.ylabel('Frequency')
+            plt.title('Model Prediction Distribution')
+            # plt.text(23, 45, r'$\mu=15, b=3$')
+            maxfreq = n.max()
+            # Set a clean upper y-axis limit.
+            plt.ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
+            plt.show()
 
         # Step 6.3 - Also calculate an evaluation based on the models evaluation metric
         if do_eval:
