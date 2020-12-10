@@ -113,7 +113,7 @@ for collection_idx, model_collection in enumerate(model_collections):
 
         # Step 6.0 - Load the data
         X_test_chunk, y_test_chunk = dg.load_chunk_test(params.data_type, params.mock_lens_alpha_scaling)
-
+        
         # Step 6.1 - dstack images for enrico neural network
         if params.model_name == "Baseline_Enrico":
             X_test_chunk = dstack_data(X_test_chunk)
