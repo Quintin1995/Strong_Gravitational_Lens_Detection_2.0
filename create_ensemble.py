@@ -7,6 +7,9 @@ import os
 from Parameters import Parameters
 import tensorflow as tf
 from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists, dstack_data, count_TP_TN_FP_FN_and_FB
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras import optimizers
 import matplotlib.pyplot as plt
 import time
 import random
@@ -260,7 +263,40 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
     error_percentage = error_count/y_hat.shape[0]
     acc = 1.0 - error_percentage
     return acc, y_hat_copy
+
+
+# Construct a multi-layer-perceptron
+# takes as input the predictions of the ensemble and outputs the prediction made by the mlp
+def get_mlp(input_size=5, output_size=1):
+
+    # Define Architecture
+    inputs  = Input(shape=(input_size,))
+    dense   = Dense(7, activation='relu')(inputs)
+    dense   = Dense(9, activation='relu')(dense)
+    dense   = Dense(7, activation='relu')(dense)
+    outputs = Dense(output_size, activation='sigmoid')(dense)
+
+    model = Model(inputs=inputs, outputs=outputs, name='ensemble_mlp_v0')
     
+    #print model architecture
+    print("Ensemble MLP architecture")
+    model.summary()
+
+    #compile the model with optimizer, loss and metric
+    model.compile(optimizer=optimizers.Adam(lr=0.0001),
+                  loss='binary_crossentropy',
+                  metrics=['binary_accuracy'])
+
+    return model
+
+
+
+#
+def train_mlp(mlp, )
+
+
+
+
 
 ############################################################ Script ############################################################
 
@@ -294,7 +330,6 @@ def main():
     h5_paths = get_h5_path_dialog(model_paths)
 
     # 4.0 - Select random sample from the data (with replacement)
-    sample_size = 551
     sample_size = int(args.sample_size)
     # sample_size = int(input("How many samples do you want to create and run (int): "))
     sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test", deterministic=False)
@@ -319,6 +354,8 @@ def main():
 
     # 7.0 - Load ensemble members and perform prediction with it.
     prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
+
+    # lets hook in at this point, in order to train an mlp instead.
 
     # 8.0 - Find ensemble model weights as a vector and store on disk
     model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method=args.method, verbatim=True)
