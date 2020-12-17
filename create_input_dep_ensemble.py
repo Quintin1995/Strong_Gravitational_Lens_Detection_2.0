@@ -61,6 +61,7 @@ def _get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
     parser.add_argument("--n_chunks", help="The amount of chunks that the ensemble will be trained for.", default=1, required=False)
+    parser.add_argument("--chunk_size", help="The size of the chunks that the ensemble will be trained on.", default=1024, required=False)
     # parser.add_argument("--method", help="What ensemble method should be used? To determine model weights? For example: Nelder-Mead.", default="Nelder-Mead", required=False)
     parser.add_argument("--network", help="Name of the network used, in order to load the right architecture", default="simple_net", required=False)
     args = parser.parse_args()
@@ -101,11 +102,12 @@ def main():
     h5_paths = get_h5_path_dialog(model_paths)
 
     sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=1.0, source_frac=0.085, negative_frac=1.0, type_data="train", deterministic=False)
-    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=0.5, negative_frac=1.0, type_data="validation", deterministic=False)
-    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=0.5, negative_frac=1.0, type_data="test", deterministic=False)
+    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=0.2, negative_frac=1.0, type_data="validation", deterministic=False)
+    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=0.2, negative_frac=1.0, type_data="test", deterministic=False)
     
     # Load all the data into memory
     PSF_r = compute_PSF_r()  # Used for sources only
+
     lenses_train      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_train)
     sources_train     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_train)
     negatives_train   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_train)
@@ -118,8 +120,8 @@ def main():
     sources_test     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_test)
     negatives_test   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_test)
 
-    for i in range(args.n_chunk):
-        X_chunk_train, y_chunk_train = load_chunk_train(int(args.sample_size), lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
+    for i in range(args.n_chunks):
+        X_chunk_train, y_chunk_train = load_chunk_train(args.chunk_size, lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
         # Construct input dependent ensemble model

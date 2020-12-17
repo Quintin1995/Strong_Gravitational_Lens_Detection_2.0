@@ -76,6 +76,8 @@ def dstack_data(data):
 # If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
 # There is also a check on whether the loaded data already has a color channel dimension, if not create it.
 def load_normalize_img(data_type, are_sources, normalize_dat, PSF_r, filenames):
+    print("filename idx0:  {}".format(filenames[0]))
+    
     data_array = np.zeros((len(filenames), 101, 101, 1))
 
     for idx, filename in enumerate(filenames):
