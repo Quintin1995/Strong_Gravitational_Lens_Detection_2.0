@@ -12,6 +12,17 @@ import yaml
 import scipy
 
 
+# Choose multiple models as Ensemble members.
+def choose_ensemble_members():
+    model_paths = list()
+    do_select_more_models = True
+    while do_select_more_models:
+        model_paths += get_model_paths()
+        do_select_more_models = binary_dialog("\nDo you want to select more members for the Ensemble?")
+    print("\nChoosen models: ")
+    for model_path in model_paths:
+        print("model path = {}".format(model_path))
+    return model_paths
 
 
 # Count the number of true positive, true negative, false positive and false negative in for a prediction vector relative to the label vector.
@@ -115,7 +126,7 @@ def compute_PSF_r():
         return PSF_r
 
 
-# Select a random sample with replacement from all files.
+# Select a random sample without replacement from all files.
 def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"):
     lenses_path_train    = os.path.join("data", type_data, "lenses")
     sources_path_train   = os.path.join("data", type_data, "sources")
@@ -136,6 +147,34 @@ def get_samples(size=1000, type_data="validation", deterministic=True, seed="30"
     lenses_fnames    = random.sample(lenses_fnames, size)
     negatives_fnames = random.sample(negatives_fnames, size)
     return sources_fnames, lenses_fnames, negatives_fnames
+
+
+# Select a random sample without replacement from all files.
+def get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="train", deterministic=True, seed="30"):
+    lenses_path_train    = os.path.join("data", type_data, "lenses")
+    sources_path_train   = os.path.join("data", type_data, "sources")
+    negatives_path_train = os.path.join("data", type_data, "negatives")
+
+    # Try to glob files in the given path
+    lenses_fnames       = glob.glob(os.path.join(lenses_path_train, "*_r_*.fits"))
+    sources_fnames      = glob.glob(os.path.join(sources_path_train, "*/*.fits"))
+    negatives_fnames    = glob.glob(os.path.join(negatives_path_train, "*_r_*.fits"))
+
+    print("\nsources on disk: {} for {}".format(len(sources_fnames), type_data))
+    print("lenses on disk: {} for {}".format(len(lenses_fnames), type_data))
+    print("negatives on disk: {} for {}".format(len(negatives_fnames), type_data))
+
+    if deterministic:
+        random.seed(seed)
+    sources_fnames   = random.sample(sources_fnames, int(source_frac*len(sources_fnames)))
+    lenses_fnames    = random.sample(lenses_fnames, int(lens_frac*len(lenses_fnames)))
+    negatives_fnames = random.sample(negatives_fnames, int(negative_frac*len(negatives_fnames)))
+
+    print("\t{} fnames selected for {}".format(len(sources_fnames), type_data))
+    print("\t{} fnames selected for {}".format(len(lenses_fnames), type_data))
+    print("\t{} fnames selected for {}\n\n".format(len(negatives_fnames), type_data))
+    return sources_fnames, lenses_fnames, negatives_fnames
+
 
 
 # Normalizationp per image

@@ -157,7 +157,7 @@ def load_chunk_test(data_type, mock_lens_alpha_scaling, lenses_test, sources_tes
 
 
 # Loading a valiation chunk into memory
-def _load_chunk_val(Xlenses_validation, Xsources_validation, Xnegatives_validation, mock_lens_alpha_scaling):
+def load_chunk_val(Xlenses_validation, Xsources_validation, Xnegatives_validation, mock_lens_alpha_scaling):
     start_time = time.time()
     num_positive = Xlenses_validation.shape[0]
     # num_negative = Xnegatives_validation.shape[0] + Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
@@ -229,7 +229,7 @@ def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
 
         # 3.0 - Construct a Network object that has a model as property.
-        network = Network(params, dg, training=False, verbatim=False)
+        network = Network(params, dg, training=False, verbatim=True)
         network.model.load_weights(h5_paths[model_idx])
 
         # Keep track of model name
@@ -302,7 +302,7 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
 
 
 # Loading a chunk into memory
-def load_chunk(chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
+def load_chunk_train(chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
     start_time = time.time()
 
     # Half a chunk positive and half negative
@@ -330,8 +330,6 @@ def load_chunk(chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens
 
     print("Creating training chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
     return X_chunk, y_chunk
-
-
 
 
 # Construct a multi-layer-perceptron
@@ -377,7 +375,7 @@ def main():
     parser.add_argument("--method", help="What ensemble method should be used? To determine model weights? For example: Nelder-Mead.", default="Nelder-Mead", required=False)
     args = parser.parse_args()
 
-    ###
+    ### set root directory
     root_dir_ensembles = "ensembles"
 
     # 0.1 - Create folder that holds Ensembles
@@ -403,7 +401,7 @@ def main():
     # if args.method == "mlp":
     sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_samples(size=sample_size, type_data="train", deterministic=False)
     sources_fnames_val, lenses_fnames_val, negatives_fnames_val = get_samples(size=551, type_data="validation", deterministic=False)
-    sources_fnames_test, lenses_fnames_test, negatives_fnames_test = get_samples(size=551, type_data="test", deterministic=False)
+    sources_fnames_test, lenses_fnames_test, negatives_fnames_test = get_samples(size=551, type_data="test", deterministic=True)
     # if args.method == "Nelder-Mead":
     #     sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="train", deterministic=False)
 
@@ -430,9 +428,9 @@ def main():
 
         # 6.0 - Load a 50/50 positive/negative chunk into memory
         # if args.method == "Nelder-Mead":
-        X_chunk_val, y_chunk_val = _load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
+        X_chunk_val, y_chunk_val = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
         # if args.method == "mlp":
-        X_chunk, y_chunk = load_chunk(int(args.sample_size), lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
+        X_chunk, y_chunk = load_chunk_train(int(args.sample_size), lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
 
         # chunk of code that can be used to visualize some images of the given set:
         if False:
