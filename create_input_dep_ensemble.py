@@ -8,7 +8,7 @@ import os
 import time
 import random
 import numpy as np
-from create_ensemble import load_chunk_test, load_chunk_val, load_chunk_train
+from create_ensemble import load_chunk_test, load_chunk_val, load_chunk_train, load_models_and_predict
 
 ########################### Description ###########################
 ## Take user through dialog that lets the user select trained models.
@@ -75,6 +75,13 @@ def _set_and_create_dirs(args):
     return ensemble_dir
 
 
+# Converts an 2D array of floats to a one hot encoding. Where a row represent the predictions of all members of the ensemble.
+def convert_pred_matrix_to_one_hot_encoding(pred_matrix):
+    one_hot = np.zeros(pred_matrix.shape)
+    for row, column in enumerate(np.argmax(pred_matrix, axis=1)):
+        one_hot[row][column] = 1.0
+    return one_hot
+
 
 
 def main():
@@ -115,15 +122,18 @@ def main():
         X_chunk_train, y_chunk_train = load_chunk_train(int(args.sample_size), lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
-        #1. load the ensemble network and predict on train chunk
-        # # Construct input dependent ensemble model
+        # Construct input dependent ensemble model
         ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
 
-        #2. Load the individual networks and predict on the train chunk
+        # 2. Load the individual networks and predict on the train chunk
+        prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk_train, y_chunk_train, model_paths, h5_paths)
+
+        #3. Convert prediction matrix to one hot encoding for loss calculation.
+        one_hot_pred_matrix = convert_pred_matrix_to_one_hot_encoding(prediction_matrix)
 
         #2. Create prediction matrix (y_hat_matrix), where each column corresponds to the prediction of a single model in the ensemble
     
-        #3. 
+        #3. From the prediction matrix we want a 
 
     X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
 
