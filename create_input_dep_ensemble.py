@@ -101,7 +101,7 @@ def main():
     # Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
     h5_paths = get_h5_path_dialog(model_paths)
 
-    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=1.0, source_frac=0.085, negative_frac=1.0, type_data="train", deterministic=False)
+    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=0.5, source_frac=0.05, negative_frac=0.5, type_data="train", deterministic=False)
     sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=0.2, negative_frac=1.0, type_data="validation", deterministic=False)
     sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=0.2, negative_frac=1.0, type_data="test", deterministic=False)
     
@@ -124,16 +124,22 @@ def main():
         X_chunk_train, y_chunk_train = load_chunk_train(args.chunk_size, lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
-        # Construct input dependent ensemble model
+        # 1 Construct input dependent ensemble model
         ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
 
-        # 2. Load the individual networks and predict on the train chunk
+        # 2 Load the individual networks and predict on the train chunk
         prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk_train, y_chunk_train, model_paths, h5_paths)
 
-        #3. Convert prediction matrix to one hot encoding for loss calculation.
+        # 3 Convert prediction matrix to one hot encoding
         one_hot_pred_matrix = convert_pred_matrix_to_one_hot_encoding(prediction_matrix)
+        
+        # The one hot encoding can be considered the ground truth for the ensemble network.
+        # Because the 1.0, in the one hot encoding represents the index of the network that should have been chosen.
+        y_hat_ensemble_model = one_hot_pred_matrix
 
-        #2. Create prediction matrix (y_hat_matrix), where each column corresponds to the prediction of a single model in the ensemble
+        print(prediction_matrix)
+        print(y_hat_ensemble_model)
+
     
         #3. From the prediction matrix we want a 
 
