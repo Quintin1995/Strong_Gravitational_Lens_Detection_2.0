@@ -229,7 +229,7 @@ def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
         dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
 
         # 3.0 - Construct a Network object that has a model as property.
-        network = Network(params, dg, training=False, verbatim=True)
+        network = Network(params, dg, training=False, verbatim=False)
         network.model.load_weights(h5_paths[model_idx])
 
         # Keep track of model name
