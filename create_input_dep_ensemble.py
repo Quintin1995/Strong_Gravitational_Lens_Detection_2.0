@@ -10,6 +10,8 @@ import time
 import random
 import numpy as np
 from create_ensemble import load_chunk_test, load_chunk_val, load_chunk_train, load_models_and_predict
+import functools
+
 
 ########################### Description ###########################
 ## Take user through dialog that lets the user select trained models.
@@ -105,24 +107,27 @@ def main():
     # Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
     h5_paths = get_h5_path_dialog(model_paths)
 
-    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=0.5, source_frac=0.05, negative_frac=0.5, type_data="train", deterministic=False)
-    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=0.2, negative_frac=1.0, type_data="validation", deterministic=False)
-    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=0.2, negative_frac=1.0, type_data="test", deterministic=False)
+    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="train", deterministic=False)
+    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="validation", deterministic=False)
+    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="test", deterministic=False)
     
     # Load all the data into memory
     PSF_r = compute_PSF_r()  # Used for sources only
+    with Pool(24) as p:
 
-    lenses_train      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_train)
-    sources_train     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_train)
-    negatives_train   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_train)
-    
-    lenses_val       = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_val)
-    sources_val      = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_val)
-    negatives_val    = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_val)
+        lenses_train_f     = functools.partial(load_normalize_img, np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r)
+        lenses_train      = p.map(lenses_train_f, lenses_fnames_train)
 
-    lenses_test      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_test)
-    sources_test     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_test)
-    negatives_test   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_test)
+        sources_train     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_train)
+        negatives_train   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_train)
+        
+        lenses_val        = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_val)
+        sources_val       = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_val)
+        negatives_val     = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_val)
+
+        lenses_test       = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_test)
+        sources_test      = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_test)
+        negatives_test    = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_test)
 
     # 1 Construct input dependent ensemble model
     ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
