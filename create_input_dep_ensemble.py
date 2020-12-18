@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, BatchNormalization, Activation
 from tensorflow.keras.initializers import glorot_uniform
+from tensorflow.keras.optimizers import RMSprop
 import os
 import time
 import random
@@ -51,6 +52,10 @@ def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
 
     model = Model(inputs=inp, outputs=out)
 
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=RMSprop(),
+                  metrics = ['categorical_accuracy'])
+
     model.summary()
 
     return model
@@ -82,7 +87,6 @@ def convert_pred_matrix_to_one_hot_encoding(pred_matrix):
     for row, column in enumerate(np.argmax(pred_matrix, axis=1)):
         one_hot[row][column] = 1.0
     return one_hot
-
 
 
 def main():
@@ -120,25 +124,37 @@ def main():
     sources_test     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_test)
     negatives_test   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_test)
 
-    for i in range(args.n_chunks):
+    # 1 Construct input dependent ensemble model
+    ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
+
+    # Loop over training chunks
+    for chunk_idx in range(int(args.n_chunks)):
+        
+        # 1 Load a train and validation chunk
         X_chunk_train, y_chunk_train = load_chunk_train(args.chunk_size, lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
-        # 1 Construct input dependent ensemble model
-        ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
-
         # 2 Load the individual networks and predict on the train chunk
-        prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk_train, y_chunk_train, model_paths, h5_paths)
+        prediction_matrix_train, model_names_train, individual_scores_train = load_models_and_predict(X_chunk_train, y_chunk_train, model_paths, h5_paths)
+        prediction_matrix_val, model_names_val, individual_scores_val       = load_models_and_predict(X_chunk_val, y_chunk_val, model_paths, h5_paths)
 
         # 3 Convert prediction matrix to one hot encoding
-        one_hot_pred_matrix = convert_pred_matrix_to_one_hot_encoding(prediction_matrix)
+        one_hot_pred_matrix_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train)
+        one_hot_pred_matrix_val   = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_val)
         
-        # The one hot encoding can be considered the ground truth for the ensemble network.
+        # 4 The one hot encoding can be considered the ground truth for the ensemble network.
         # Because the 1.0, in the one hot encoding represents the index of the network that should have been chosen.
-        y_hat_ensemble_model = one_hot_pred_matrix
+        y_hat_ensemble_model_train = one_hot_pred_matrix_train
+        y_hat_ensemble_model_val = one_hot_pred_matrix_val
 
-        print(prediction_matrix)
-        print(y_hat_ensemble_model)
+        history = ens_model.fit(x=X_chunk_train,
+                                y=y_hat_ensemble_model_train,
+                                batch_size=None,
+                                epochs=1,
+                                verbose=1,
+                                validation_data=(X_chunk_val, y_hat_ensemble_model_val),
+                                shuffle=True,
+                                )
 
     
         #3. From the prediction matrix we want a 
