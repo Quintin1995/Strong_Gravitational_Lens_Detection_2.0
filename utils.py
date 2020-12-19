@@ -12,6 +12,23 @@ import yaml
 import scipy
 
 
+def split_path(path):
+    folders = []
+    while 1:
+        path, folder = os.path.split(path)
+
+        if folder != "":
+            folders.append(folder)
+        elif path != "":
+            folders.append(path)
+
+            break
+        
+    folders.reverse()
+    folders = folders[(-1*len(folders))+1:len(folders)]
+    return folders
+
+
 # Choose multiple models as Ensemble members.
 def choose_ensemble_members():
     model_paths = list()

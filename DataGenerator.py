@@ -25,7 +25,7 @@ from multiprocessing import Pool
 import functools
 
 
-# Normalizationp per image
+# Normalization per image
 def normalize_img(numpy_img):
     return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
 

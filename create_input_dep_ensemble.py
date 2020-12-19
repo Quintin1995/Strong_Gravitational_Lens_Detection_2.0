@@ -1,16 +1,24 @@
-from utils import create_dir_if_not_exists, choose_ensemble_members, get_h5_path_dialog, get_samples, get_fnames_from_disk, load_normalize_img, compute_PSF_r
+from utils import create_dir_if_not_exists, choose_ensemble_members, get_h5_path_dialog, get_samples, get_fnames_from_disk, compute_PSF_r, load_settings_yaml, dstack_data
 import argparse
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, BatchNormalization, Activation
 from tensorflow.keras.initializers import glorot_uniform
-from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras.optimizers import RMSprop, Adam
 import os
 import time
 import random
 import numpy as np
-from create_ensemble import load_chunk_test, load_chunk_val, load_chunk_train, load_models_and_predict
+from create_ensemble import load_chunk_test, load_chunk_val, load_chunk_train
 import functools
+from multiprocessing import Pool
+from astropy.io import fits
+import scipy
+from DataGenerator import DataGenerator
+import glob
+from Network import Network
+from Parameters import Parameters
+from skimage import exposure
 
 
 ########################### Description ###########################
@@ -26,6 +34,90 @@ import functools
 
 
 ############################################################ Functions ############################################################
+
+
+
+# Given 4D numpy image data and corresponding labels, model paths and weights,
+# this function will return a prediction matrix, containing a prediction on each 
+# example for each model. It will also return names of the models.
+def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
+
+    # Construct a matrix that holds a prediction value for each image and each model in the ensemble
+    prediction_matrix = np.zeros((X_chunk.shape[0], len(model_weights_paths)))
+    model_names       = list()      # Keep track of model names
+    individual_scores = list()      # Keep track of model acc on an individual basis
+    
+    # Load each model and perform prediction with it.
+    for model_idx, model_path in enumerate(model_weights_paths):
+
+        # 1.0 - Set model parameters
+        model_path, filename = os.path.split(model_path)
+        model_path, filename = os.path.split(model_path)
+        yaml_path = glob.glob(os.path.join(model_path, "run.yaml"))[0]
+        settings_yaml = load_settings_yaml(yaml_path, verbatim=False)                           # Returns a dictionary object.
+        params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
+        params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
+        
+        # 2.0 - Create a dataGenerator object, because the network class wants it
+        dg = DataGenerator(params, mode="no_training", do_shuffle_data=False, do_load_validation=False)
+
+        # 3.0 - Construct a Network object that has a model as property.
+        network = Network(params, dg, training=False, verbatim=False)
+        network.model.load_weights(model_weights_paths[model_idx])
+
+        # Keep track of model name
+        model_names.append(network.params.model_name)
+
+        # 4.0 - Evaluate on validation chunk
+        if "resnet_single_newtr_last_last_weights_only" in model_path:
+            X_chunk = dstack_data(X_chunk)
+        evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
+        print("\n\nIndividual Evaluations:")
+        print("Model name: {}".format(network.params.model_name))
+        for met_idx in range(len(evals)):
+            print("{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
+            individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
+        print("")
+
+        # 5.0 - Predict on validation chunk
+        predictions = network.model.predict(X_chunk)
+        prediction_matrix[:,model_idx] = np.squeeze(predictions)
+    # Networks are also need later on, therefore we need to add them to a list
+    return prediction_matrix, model_names, individual_scores
+
+
+# Normalization per image
+def normalize_img(numpy_img):
+    return ((numpy_img - np.amin(numpy_img)) / (np.amax(numpy_img) - np.amin(numpy_img)))
+
+
+# Simple case function to reduce line count in other function
+def normalize_function(img, norm_type, data_type):
+    if norm_type == "per_image":
+        img = normalize_img(img)
+    if norm_type == "adapt_hist_eq":
+        img = normalize_img(img)
+        img = exposure.equalize_adapthist(img).astype(data_type)
+    return img
+
+
+# If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
+# There is also a check on whether the loaded data already has a color channel dimension, if not create it.
+def _load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_filename):
+    idx, filename = idx_filename
+    if idx % 1000 == 0:
+        print("loaded {} images".format(idx), flush=True)
+    if are_sources:
+        img = fits.getdata(filename).astype(data_type)
+        img = scipy.signal.fftconvolve(img, PSF_r, mode="same")                                # Convolve with psf_r, has to do with camara point spread function.
+        return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)       # Expand color channel and normalize
+    else:
+        img = fits.getdata(filename).astype(data_type)
+        if img.ndim == 3:                                                                      # Some images are stored with color channel
+            return normalize_function(img, normalize_dat, data_type)
+        elif img.ndim == 2:                                                                    # Some images are stored without color channel
+            return np.expand_dims(normalize_function(img, normalize_dat, data_type), axis=2)
+
 
 # Return a neural network, considered to be the ensemble model. 
 # This model should predict which network in the ensemble gets
@@ -55,7 +147,7 @@ def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
     model = Model(inputs=inp, outputs=out)
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer=RMSprop(),
+                  optimizer=Adam(lr=0.0001),
                   metrics = ['categorical_accuracy'])
 
     model.summary()
@@ -69,8 +161,8 @@ def _get_arguments():
     parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
     parser.add_argument("--n_chunks", help="The amount of chunks that the ensemble will be trained for.", default=1, required=False)
     parser.add_argument("--chunk_size", help="The size of the chunks that the ensemble will be trained on.", default=1024, required=False)
-    # parser.add_argument("--method", help="What ensemble method should be used? To determine model weights? For example: Nelder-Mead.", default="Nelder-Mead", required=False)
     parser.add_argument("--network", help="Name of the network used, in order to load the right architecture", default="simple_net", required=False)
+    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run_default.yaml", required=False)
     args = parser.parse_args()
     return args
 
@@ -95,6 +187,9 @@ def main():
     # Parse input arguments
     args = _get_arguments()
 
+
+    settings_dict = load_settings_yaml(args.run)
+
     # Set root directory, ensemble directory and create them.
     ensemble_dir = _set_and_create_dirs(args)
 
@@ -102,46 +197,61 @@ def main():
     tf.compat.v1.disable_eager_execution()
 
     # Model Selection from directory - Select multiple models
-    model_paths = choose_ensemble_members()
+    # model_paths = choose_ensemble_members()
+    model_paths = list(settings_dict["models"])
 
     # Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
-    h5_paths = get_h5_path_dialog(model_paths)
+    # h5_paths = get_h5_path_dialog(model_paths)
 
-    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="train", deterministic=False)
-    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="validation", deterministic=False)
-    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=1.0, negative_frac=1.0, type_data="test", deterministic=False)
+    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=0.5, source_frac=0.05, negative_frac=0.5, type_data="train", deterministic=False)
+    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=0.25, negative_frac=1.0, type_data="validation", deterministic=False)
+    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=0.25, negative_frac=1.0, type_data="test", deterministic=False)
     
     # Load all the data into memory
     PSF_r = compute_PSF_r()  # Used for sources only
     with Pool(24) as p:
+        lenses_train_f    = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        lenses_train      = np.asarray(p.map(lenses_train_f, enumerate(lenses_fnames_train), chunksize=128), np.float32)
 
-        lenses_train_f     = functools.partial(load_normalize_img, np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r)
-        lenses_train      = p.map(lenses_train_f, lenses_fnames_train)
-
-        sources_train     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_train)
-        negatives_train   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_train)
+        sources_train_f   = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+        sources_train     = np.asarray(p.map(sources_train_f, enumerate(sources_fnames_train), chunksize=128), np.float32)
         
-        lenses_val        = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_val)
-        sources_val       = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_val)
-        negatives_val     = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_val)
+        negatives_train_f = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        negatives_train   = np.asarray(p.map(negatives_train_f, enumerate(negatives_fnames_train), chunksize=128), np.float32)
+        
+        lenses_val_f      = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        lenses_val        = np.asarray(p.map(lenses_val_f, enumerate(lenses_fnames_val), chunksize=128), np.float32)
 
-        lenses_test       = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_test)
-        sources_test      = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_test)
-        negatives_test    = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_test)
+        sources_val_f     = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+        sources_val       = np.asarray(p.map(sources_val_f, enumerate(sources_fnames_val), chunksize=128), np.float32)
+
+        negatives_val_f   = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        negatives_val     = np.asarray(p.map(negatives_val_f, enumerate(negatives_fnames_val), chunksize=128), np.float32)
+
+        lenses_test_f     = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        lenses_test       = np.asarray(p.map(lenses_test_f, enumerate(lenses_fnames_test), chunksize=128), np.float32)
+
+        sources_test_f    = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+        sources_test      = np.asarray(p.map(sources_test_f, enumerate(sources_fnames_test), chunksize=128), np.float32)
+
+        negatives_test_f  = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        negatives_test    = np.asarray(p.map(negatives_test_f, enumerate(negatives_fnames_test), chunksize=128), np.float32)
 
     # 1 Construct input dependent ensemble model
-    ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
+    if args.network == "simple_net":
+        ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
 
     # Loop over training chunks
     for chunk_idx in range(int(args.n_chunks)):
+        print("Chunk: {}".format(chunk_idx))
         
         # 1 Load a train and validation chunk
         X_chunk_train, y_chunk_train = load_chunk_train(args.chunk_size, lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
         # 2 Load the individual networks and predict on the train chunk
-        prediction_matrix_train, model_names_train, individual_scores_train = load_models_and_predict(X_chunk_train, y_chunk_train, model_paths, h5_paths)
-        prediction_matrix_val, model_names_val, individual_scores_val       = load_models_and_predict(X_chunk_val, y_chunk_val, model_paths, h5_paths)
+        prediction_matrix_train, model_names_train, individual_scores_train = _load_models_and_predict(X_chunk_train, y_chunk_train, model_paths)
+        prediction_matrix_val, model_names_val, individual_scores_val       = _load_models_and_predict(X_chunk_val, y_chunk_val, model_paths)
 
         # 3 Convert prediction matrix to one hot encoding
         one_hot_pred_matrix_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train)
