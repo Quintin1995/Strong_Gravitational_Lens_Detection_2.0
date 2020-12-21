@@ -5,8 +5,8 @@ models:
     - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
 
-num_chunks:   250                                # The amount of chunks that the ensemble will be trained for.
-chunk_size:   1024                               # The size of the chunks that the ensemble will be trained on.
+num_chunks:   500                                # The amount of chunks that the ensemble will be trained for.
+chunk_size:   4096                               # The size of the chunks that the ensemble will be trained on.
 ens_name:     "peregrine_test1_3mems"            # Name of the ensemble. There will be a folder with the given name.
 network_name: "simple_net"                       # Name of the network used, in order to load the right architecture
 
