@@ -16,7 +16,6 @@ import random
 from scipy.optimize import minimize
 from scipy.special import softmax
 from functools import partial
-from sklearn.metrics import confusion_matrix
 import yaml
 import math
 ############################################################ Functions ############################################################
