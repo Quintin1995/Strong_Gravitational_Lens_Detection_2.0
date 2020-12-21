@@ -159,7 +159,7 @@ def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
     model = Model(inputs=inp, outputs=out)
     model.compile(loss='binary_crossentropy',
                   optimizer=Adam(lr=float(setting_dict["learning_rate"])),
-                  metrics = ['binary_accuracy'])
+                  metrics = ['categorical_accuracy'])
 
     model.summary()
     return model
@@ -253,8 +253,8 @@ def main():
 
     # Create a callback that will store the model if the validation binary accuracy is better than it was.
     mc_loss = ModelCheckpointYaml(
-        os.path.join(ensemble_dir, "ensemble_model_val_bin_acc.h5"), 
-        monitor="val_binary_accuracy",
+        os.path.join(ensemble_dir, "ensemble_model_val_cat_acc.h5"), 
+        monitor="val_categorical_accuracy",
         verbose=1, save_best_only=True,
         mode='min',
         save_weights_only=False,
@@ -263,7 +263,7 @@ def main():
     # Keep track of training history with a .csv file
     f = open(os.path.join(ensemble_dir, "training_history.csv"), "w", 1)
     writer = csv.writer(f)
-    writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy"])    #csv headers
+    writer.writerow(["chunk", "loss", "categorical_accuracy", "val_loss", "val_categorical_accuracy"])    #csv headers
 
     # Loop over training chunks
     for chunk_idx in range(int(settings_dict["num_chunks"])):
@@ -312,20 +312,15 @@ def main():
                                 )
         writer.writerow([str(chunk_idx),
                         str(history.history["loss"][0]),
-                        str(history.history["binary_accuracy"][0]),
+                        str(history.history["categorical_accuracy"][0]),
                         str(history.history["val_loss"][0]),
-                        str(history.history["val_binary_accuracy"][0])]) 
+                        str(history.history["val_categorical_accuracy"][0])]) 
 
-    # Outside the training loop we want to use the test data for performance metric evaluation.
-    X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
+    # Outside the training loop we want to use the test data for {accuracy, f_beta, precision, recall} performance metric evaluations.
+    # X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
 
-
-
- 
 
 ############################################################ Script    ############################################################
-
-
 
 
 if __name__ == "__main__":
