@@ -255,7 +255,7 @@ def main():
         os.path.join(ensemble_dir, "ensemble_model_val_cat_acc.h5"), 
         monitor="val_categorical_accuracy",
         verbose=1, save_best_only=True,
-        mode='min',
+        mode='max',
         save_weights_only=False,
         mc_dict_filename=os.path.join(ensemble_dir, "mc_best_val_bin_acc.yaml"))
 
@@ -266,7 +266,7 @@ def main():
 
     # Loop over training chunks
     for chunk_idx in range(int(settings_dict["num_chunks"])):
-        print("CHUNK: {}".format(chunk_idx))
+        print("\nCHUNK: {}".format(chunk_idx))
         
         # 1 Load a train and validation chunk
         X_chunk_train, y_chunk_train = load_chunk_train(settings_dict["chunk_size"], lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
