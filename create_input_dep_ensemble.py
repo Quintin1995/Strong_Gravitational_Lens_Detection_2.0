@@ -73,10 +73,10 @@ def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
         if "resnet_single_newtr_last_last_weights_only" in model_path:
             X_chunk = dstack_data(X_chunk)
         evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
-        print("\nIndividual Evaluations:")
-        print("Model name: {}".format(network.params.model_name))
+        print("\tIndividual Evaluations:")
+        print("\tModel name: {}".format(network.params.model_name))
         for met_idx in range(len(evals)):
-            print("{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
+            print("\t{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
             individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
 
         # 5.0 - Predict on validation chunk
@@ -266,7 +266,7 @@ def main():
 
     # Loop over training chunks
     for chunk_idx in range(int(settings_dict["num_chunks"])):
-        print("Chunk: {}".format(chunk_idx))
+        print("CHUNK: {}".format(chunk_idx))
         
         # 1 Load a train and validation chunk
         X_chunk_train, y_chunk_train = load_chunk_train(settings_dict["chunk_size"], lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
@@ -304,6 +304,7 @@ def main():
         # print stats to the user/slurm and store them in a csv
         for pair in history.history.items():
             print(pair)
+        print("")     # print newline in slurm for clarity.
         writer.writerow([str(chunk_idx),
                         str(history.history["loss"][0]),
                         str(history.history["categorical_accuracy"][0]),
