@@ -248,6 +248,9 @@ def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
         # 5.0 - Predict on validation chunk
         predictions = network.model.predict(X_chunk)
         prediction_matrix[:,model_idx] = np.squeeze(predictions)
+
+        
+
     # Networks are also need later on, therefore we need to add them to a list
     return prediction_matrix, model_names, individual_scores
 
