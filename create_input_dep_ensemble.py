@@ -51,9 +51,11 @@ def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
     for model_idx, model_path in enumerate(model_weights_paths):
 
         # 1.0 - Set model parameters
-        model_path, filename = os.path.split(model_path)
-        model_path, filename = os.path.split(model_path)
-        yaml_path = glob.glob(os.path.join(model_path, "run.yaml"))[0]
+        model_path, _ = os.path.split(model_path)        # Remove last part of path
+        model_path, _ = os.path.split(model_path)        # Remove last part of path again.
+        system_specific_path = os.getcwd()
+        path = os.path.join(system_specific_path, model_path, "run.yaml")
+        yaml_path = glob.glob(path)[0]
         settings_yaml = load_settings_yaml(yaml_path, verbatim=False)                           # Returns a dictionary object.
         params = Parameters(settings_yaml, yaml_path, mode="no_training")                       # Create Parameter object
         params.data_type = np.float32 if params.data_type == "np.float32" else np.float32       # This must be done here, due to the json, not accepting this kind of if statement in the parameter class.
@@ -131,6 +133,14 @@ def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
     x = Activation('relu')(x)
     x = MaxPooling2D(pool_size=(2, 2))(x)
 
+    x = Conv2D(64, kernel_size=3, padding='valid', kernel_initializer=glorot_uniform(seed=0))(inp)
+    x = BatchNormalization(axis=3)(x)   # Axis three is color channel
+    x = Activation('relu')(x)
+
+    x = Conv2D(128, kernel_size=3, padding='valid', kernel_initializer=glorot_uniform(seed=0))(x)
+    x = BatchNormalization(axis=3)(x)   # Axis three is color channel
+    x = Activation('relu')(x)
+
     x = Conv2D(128, kernel_size=3, padding='valid', kernel_initializer=glorot_uniform(seed=0))(x)
     x = BatchNormalization(axis=3)(x)   # Axis three is color channel
     x = Activation('relu')(x)
@@ -142,13 +152,13 @@ def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
     
     flat = Flatten()(x)
     flat = Dense(10, activation='relu')(flat)
-    out = Dense(num_outputs, activation='softmax')(flat)
+    out = Dense(num_outputs, activation='sigmoid')(flat)
 
     model = Model(inputs=inp, outputs=out)
 
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='binary_crossentropy',
                   optimizer=Adam(lr=0.0001),
-                  metrics = ['categorical_accuracy'])
+                  metrics = ['binary_accuracy'])
 
     model.summary()
 
@@ -158,18 +168,18 @@ def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
 # Deal with input arguments
 def _get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
-    parser.add_argument("--n_chunks", help="The amount of chunks that the ensemble will be trained for.", default=1, required=False)
-    parser.add_argument("--chunk_size", help="The size of the chunks that the ensemble will be trained on.", default=1024, required=False)
-    parser.add_argument("--network", help="Name of the network used, in order to load the right architecture", default="simple_net", required=False)
+    # parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
+    # parser.add_argument("--n_chunks", help="The amount of chunks that the ensemble will be trained for.", default=1, required=False)
+    # parser.add_argument("--chunk_size", help="The size of the chunks that the ensemble will be trained on.", default=1024, required=False)
+    # parser.add_argument("--network", help="Name of the network used, in order to load the right architecture", default="simple_net", required=False)
     parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run_default.yaml", required=False)
     args = parser.parse_args()
     return args
 
 
-def _set_and_create_dirs(args):
+def _set_and_create_dirs(settings_dict):
     root_dir_ensembles = "ensembles"
-    ensemble_dir = os.path.join(root_dir_ensembles, args.ensemble_name)
+    ensemble_dir = os.path.join(root_dir_ensembles, settings_dict["ens_name"])
     create_dir_if_not_exists(root_dir_ensembles, verbatim=False)
     create_dir_if_not_exists(ensemble_dir)
     return ensemble_dir
@@ -187,11 +197,10 @@ def main():
     # Parse input arguments
     args = _get_arguments()
 
-
     settings_dict = load_settings_yaml(args.run)
 
     # Set root directory, ensemble directory and create them.
-    ensemble_dir = _set_and_create_dirs(args)
+    ensemble_dir = _set_and_create_dirs(settings_dict)
 
     # Fix memory leaks if running on tensorflow 2
     tf.compat.v1.disable_eager_execution()
@@ -238,15 +247,15 @@ def main():
         negatives_test    = np.asarray(p.map(negatives_test_f, enumerate(negatives_fnames_test), chunksize=128), np.float32)
 
     # 1 Construct input dependent ensemble model
-    if args.network == "simple_net":
+    if settings_dict["network_name"] == "simple_net":
         ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
 
     # Loop over training chunks
-    for chunk_idx in range(int(args.n_chunks)):
+    for chunk_idx in range(int(settings_dict["num_chunks"])):
         print("Chunk: {}".format(chunk_idx))
         
         # 1 Load a train and validation chunk
-        X_chunk_train, y_chunk_train = load_chunk_train(args.chunk_size, lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
+        X_chunk_train, y_chunk_train = load_chunk_train(settings_dict["chunk_size"], lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
         # 2 Load the individual networks and predict on the train chunk
@@ -254,23 +263,22 @@ def main():
         prediction_matrix_val, model_names_val, individual_scores_val       = _load_models_and_predict(X_chunk_val, y_chunk_val, model_paths)
 
         # 3 Convert prediction matrix to one hot encoding
-        one_hot_pred_matrix_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train)
-        one_hot_pred_matrix_val   = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_val)
-        
-        # 4 The one hot encoding can be considered the ground truth for the ensemble network.
-        # Because the 1.0, in the one hot encoding represents the index of the network that should have been chosen.
-        y_hat_ensemble_model_train = one_hot_pred_matrix_train
-        y_hat_ensemble_model_val = one_hot_pred_matrix_val
+        y_true_train = np.zeros(prediction_matrix_train.shape)
+        for i in range(prediction_matrix_train.shape[0]):
+            y_true_train[i] = 1 - np.absolute(y_chunk_train[i] - prediction_matrix_train[i])
+
+        y_true_val = np.zeros(prediction_matrix_val.shape)
+        for i in range(prediction_matrix_val.shape[0]):
+            y_true_val[i] = 1 - np.absolute(y_chunk_val[i] - prediction_matrix_val[i])
 
         history = ens_model.fit(x=X_chunk_train,
-                                y=y_hat_ensemble_model_train,
+                                y=y_true_train,
                                 batch_size=None,
                                 epochs=1,
                                 verbose=1,
-                                validation_data=(X_chunk_val, y_hat_ensemble_model_val),
+                                validation_data=(X_chunk_val, y_true_val),
                                 shuffle=True,
                                 )
-
     
         #3. From the prediction matrix we want a 
 
