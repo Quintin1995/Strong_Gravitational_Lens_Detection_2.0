@@ -14,6 +14,7 @@ import functools
 from multiprocessing import Pool
 from astropy.io import fits
 import scipy
+from scipy.special import softmax
 from DataGenerator import DataGenerator
 import glob
 from Network import Network
@@ -78,7 +79,6 @@ def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
         for met_idx in range(len(evals)):
             print("{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
             individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
-        print("-----")
 
         # 5.0 - Predict on validation chunk
         predictions = network.model.predict(X_chunk)
@@ -168,7 +168,7 @@ def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
 # Deal with input arguments
 def _get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run1.yaml", required=False)
+    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run_default.yaml", required=False)
     args = parser.parse_args()
     return args
 
@@ -182,10 +182,19 @@ def _set_and_create_dirs(settings_dict):
 
 
 # Converts an 2D array of floats to a one hot encoding. Where a row represent the predictions of all members of the ensemble.
-def convert_pred_matrix_to_one_hot_encoding(pred_matrix):
+def convert_pred_matrix_to_one_hot_encoding(pred_matrix, y_true):
     one_hot = np.zeros(pred_matrix.shape)
-    for row, column in enumerate(np.argmax(pred_matrix, axis=1)):
-        one_hot[row][column] = 1.0
+    mins = np.argmin(pred_matrix, axis=1)
+    maxs = np.argmax(pred_matrix, axis=1)
+    
+    for row, column in enumerate(maxs):
+        if y_true[row] == 1.0:
+            one_hot[row][column] = 1.0
+
+    for row, column in enumerate(mins):
+        if y_true[row] == 0.0:
+            one_hot[row][column] = 1.0
+    
     return one_hot
 
 
@@ -269,20 +278,35 @@ def main():
         prediction_matrix_val, model_names_val, individual_scores_val       = _load_models_and_predict(X_chunk_val, y_chunk_val, model_paths)
 
         # 3 Convert prediction matrix to one hot encoding
-        y_true_train = np.zeros(prediction_matrix_train.shape)
-        for i in range(prediction_matrix_train.shape[0]):
-            y_true_train[i] = 1 - np.absolute(y_chunk_train[i] - prediction_matrix_train[i])
+        # y_true_train = np.zeros(prediction_matrix_train.shape)
+        # for i in range(prediction_matrix_train.shape[0]):
+        #     y_true_train[i] = 1 - np.absolute(y_chunk_train[i] - prediction_matrix_train[i])
+        one_hot_y_true_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train, y_chunk_train)
 
-        y_true_val = np.zeros(prediction_matrix_val.shape)
-        for i in range(prediction_matrix_val.shape[0]):
-            y_true_val[i] = 1 - np.absolute(y_chunk_val[i] - prediction_matrix_val[i])
+        # y_true_val = np.zeros(prediction_matrix_val.shape)
+        # for i in range(prediction_matrix_val.shape[0]):
+        #     y_true_val[i] = 1 - np.absolute(y_chunk_val[i] - prediction_matrix_val[i])
+        one_hot_y_true_val = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_val, y_chunk_val)
+        
+        if False:       # used for debugging the newly calculated target label vector.
+            print("")
+            print("example label    : {}".format(y_chunk_train[0]))
+            # print("target label vec : {}".format(y_true_train[0]))
+            print("target one hot   : {}".format(one_hot_y_true_val[0]))
+            print("predicted vector : {}".format(prediction_matrix_train[0]))
+            print("")
+            print("example label    : {}".format(y_chunk_train[-1]))
+            # print("target label vec : {}".format(y_true_train[-1]))
+            print("target one hot   : {}".format(one_hot_y_true_val[-1]))
+            print("predicted vector : {}".format(prediction_matrix_train[-1]))
+            input("Press Enter to continue.., [ENTER]")
 
         history = ens_model.fit(x=X_chunk_train,
-                                y=y_true_train,
+                                y=one_hot_y_true_train,
                                 batch_size=None,
                                 epochs=1,
                                 verbose=1,
-                                validation_data=(X_chunk_val, y_true_val),
+                                validation_data=(X_chunk_val, one_hot_y_true_val),
                                 shuffle=True,
                                 callbacks = [mc_loss]
                                 )
