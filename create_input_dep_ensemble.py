@@ -14,7 +14,6 @@ import functools
 from multiprocessing import Pool
 from astropy.io import fits
 import scipy
-from scipy.special import softmax
 from DataGenerator import DataGenerator
 import glob
 from Network import Network
