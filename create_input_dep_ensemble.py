@@ -277,38 +277,33 @@ def main():
         prediction_matrix_val, model_names_val, individual_scores_val       = _load_models_and_predict(X_chunk_val, y_chunk_val, model_paths)
 
         # 3 Convert prediction matrix to one hot encoding
-        # y_true_train = np.zeros(prediction_matrix_train.shape)
-        # for i in range(prediction_matrix_train.shape[0]):
-        #     y_true_train[i] = 1 - np.absolute(y_chunk_train[i] - prediction_matrix_train[i])
         one_hot_y_true_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train, y_chunk_train)
-
-        # y_true_val = np.zeros(prediction_matrix_val.shape)
-        # for i in range(prediction_matrix_val.shape[0]):
-        #     y_true_val[i] = 1 - np.absolute(y_chunk_val[i] - prediction_matrix_val[i])
         one_hot_y_true_val = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_val, y_chunk_val)
         
         if False:       # used for debugging the newly calculated target label vector.
             print("")
             print("example label    : {}".format(y_chunk_train[0]))
-            # print("target label vec : {}".format(y_true_train[0]))
             print("target one hot   : {}".format(one_hot_y_true_val[0]))
             print("predicted vector : {}".format(prediction_matrix_train[0]))
             print("")
             print("example label    : {}".format(y_chunk_train[-1]))
-            # print("target label vec : {}".format(y_true_train[-1]))
             print("target one hot   : {}".format(one_hot_y_true_val[-1]))
             print("predicted vector : {}".format(prediction_matrix_train[-1]))
             input("Press Enter to continue.., [ENTER]")
 
+        # Perform the model fit function on the training data and validate.
         history = ens_model.fit(x=X_chunk_train,
                                 y=one_hot_y_true_train,
                                 batch_size=None,
                                 epochs=1,
-                                verbose=1,
+                                verbose=0,
                                 validation_data=(X_chunk_val, one_hot_y_true_val),
                                 shuffle=True,
                                 callbacks = [mc_loss]
                                 )
+        # print stats to the user/slurm and store them in a csv
+        for pair in history.history.items():
+            print(pair)
         writer.writerow([str(chunk_idx),
                         str(history.history["loss"][0]),
                         str(history.history["categorical_accuracy"][0]),

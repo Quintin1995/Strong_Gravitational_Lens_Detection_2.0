@@ -5,7 +5,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=ensembles
-#SBATCH --array=1
+#SBATCH --array=2
 
 module load TensorFlow/2.1.0-fosscuda-2019b-Python-3.7.4
 module load matplotlib/3.1.1-fosscuda-2019b-Python-3.7.4
