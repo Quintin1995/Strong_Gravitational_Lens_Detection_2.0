@@ -168,7 +168,7 @@ def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
 # Deal with input arguments
 def _get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run_default.yaml", required=False)
+    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensemble_runs/run_default.yaml", required=False)
     args = parser.parse_args()
     return args
 
