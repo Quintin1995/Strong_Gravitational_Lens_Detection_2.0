@@ -19,7 +19,8 @@ import glob
 from Network import Network
 from Parameters import Parameters
 from skimage import exposure
-
+from ModelCheckpointYaml import *
+import csv
 
 ########################### Description ###########################
 ## Take user through dialog that lets the user select trained models.
@@ -27,8 +28,6 @@ from skimage import exposure
 ## We use softmax on the output vector and determine which member/model of the ensemble gets to predict on the input image.
 ## Via this method, a network selects which network gets to predict on the input image, based on information within the image.
 ########################### End Description #######################
-
-
 
 
 
@@ -74,12 +73,12 @@ def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
         if "resnet_single_newtr_last_last_weights_only" in model_path:
             X_chunk = dstack_data(X_chunk)
         evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
-        print("\n\nIndividual Evaluations:")
+        print("\nIndividual Evaluations:")
         print("Model name: {}".format(network.params.model_name))
         for met_idx in range(len(evals)):
             print("{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
             individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
-        print("")
+        print("-----")
 
         # 5.0 - Predict on validation chunk
         predictions = network.model.predict(X_chunk)
@@ -124,10 +123,12 @@ def _load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fi
 # Return a neural network, considered to be the ensemble model. 
 # This model should predict which network in the ensemble gets
 # to predict the final prediction on the input image.
-def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
+def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
 
+    # Define input
     inp = Input(shape=input_shape)
     
+    # Define architecture
     x = Conv2D(64, kernel_size=3, padding='valid', kernel_initializer=glorot_uniform(seed=0))(inp)
     x = BatchNormalization(axis=3)(x)   # Axis three is color channel
     x = Activation('relu')(x)
@@ -152,27 +153,22 @@ def get_ensemble_model(input_shape=(101,101,1), num_outputs=3):
     
     flat = Flatten()(x)
     flat = Dense(10, activation='relu')(flat)
-    out = Dense(num_outputs, activation='sigmoid')(flat)
+    out = Dense(num_outputs, activation='softmax')(flat)
 
+    # Construct the model based on the defined architecture and compile it.
     model = Model(inputs=inp, outputs=out)
-
     model.compile(loss='binary_crossentropy',
-                  optimizer=Adam(lr=0.0001),
+                  optimizer=Adam(lr=float(setting_dict["learning_rate"])),
                   metrics = ['binary_accuracy'])
 
     model.summary()
-
     return model
 
 
 # Deal with input arguments
 def _get_arguments():
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
-    # parser.add_argument("--n_chunks", help="The amount of chunks that the ensemble will be trained for.", default=1, required=False)
-    # parser.add_argument("--chunk_size", help="The size of the chunks that the ensemble will be trained on.", default=1024, required=False)
-    # parser.add_argument("--network", help="Name of the network used, in order to load the right architecture", default="simple_net", required=False)
-    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run_default.yaml", required=False)
+    parser.add_argument("--run", help="Location/path of the run.yaml file. This is usually structured as a path.", default="runs/ensembles/run1.yaml", required=False)
     args = parser.parse_args()
     return args
 
@@ -206,15 +202,11 @@ def main():
     tf.compat.v1.disable_eager_execution()
 
     # Model Selection from directory - Select multiple models
-    # model_paths = choose_ensemble_members()
     model_paths = list(settings_dict["models"])
 
-    # Select a weights file. There are 2 for each model. Selected based on either validation loss or validation metric. The metric can differ per model.
-    # h5_paths = get_h5_path_dialog(model_paths)
-
-    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(lens_frac=0.5, source_frac=0.05, negative_frac=0.5, type_data="train", deterministic=False)
-    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(lens_frac=1.0, source_frac=0.25, negative_frac=1.0, type_data="validation", deterministic=False)
-    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(lens_frac=1.0, source_frac=0.25, negative_frac=1.0, type_data="test", deterministic=False)
+    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(settings_dict["lens_frac_train"], settings_dict["source_frac_train"], settings_dict["negative_frac_train"], type_data="train", deterministic=False)
+    sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(settings_dict["lens_frac_val"], settings_dict["source_frac_val"], settings_dict["negative_frac_val"], type_data="validation", deterministic=False)
+    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(settings_dict["lens_frac_test"], settings_dict["source_frac_test"], settings_dict["negative_frac_test"], type_data="test", deterministic=False)
     
     # Load all the data into memory
     PSF_r = compute_PSF_r()  # Used for sources only
@@ -248,7 +240,21 @@ def main():
 
     # 1 Construct input dependent ensemble model
     if settings_dict["network_name"] == "simple_net":
-        ens_model = get_ensemble_model(input_shape=(101,101,1), num_outputs=len(model_paths))
+        ens_model = get_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
+
+    # Create a callback that will store the model if the validation binary accuracy is better than it was.
+    mc_loss = ModelCheckpointYaml(
+        os.path.join(ensemble_dir, "ensemble_model_val_bin_acc.h5"), 
+        monitor="val_binary_accuracy",
+        verbose=1, save_best_only=True,
+        mode='min',
+        save_weights_only=False,
+        mc_dict_filename=os.path.join(ensemble_dir, "mc_best_val_bin_acc.yaml"))
+
+    # Keep track of training history with a .csv file
+    f = open(os.path.join(ensemble_dir, "training_history.csv"), "w", 1)
+    writer = csv.writer(f)
+    writer.writerow(["chunk", "loss", "binary_accuracy", "val_loss", "val_binary_accuracy"])    #csv headers
 
     # Loop over training chunks
     for chunk_idx in range(int(settings_dict["num_chunks"])):
@@ -278,10 +284,15 @@ def main():
                                 verbose=1,
                                 validation_data=(X_chunk_val, y_true_val),
                                 shuffle=True,
+                                callbacks = [mc_loss]
                                 )
-    
-        #3. From the prediction matrix we want a 
+        writer.writerow([str(chunk_idx),
+                        str(history.history["loss"][0]),
+                        str(history.history["binary_accuracy"][0]),
+                        str(history.history["val_loss"][0]),
+                        str(history.history["val_binary_accuracy"][0])]) 
 
+    # Outside the training loop we want to use the test data for performance metric evaluation.
     X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
 
 
