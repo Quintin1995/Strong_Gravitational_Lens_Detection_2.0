@@ -193,7 +193,7 @@ def convert_pred_matrix_to_one_hot_encoding(pred_matrix, y_true):
     for row, column in enumerate(mins):
         if y_true[row] == 0.0:
             one_hot[row][column] = 1.0
-    
+
     return one_hot
 
 
@@ -291,16 +291,36 @@ def main():
             print("predicted vector : {}".format(prediction_matrix_train[-1]))
             input("Press Enter to continue.., [ENTER]")
 
+        # Shuffle the data
+        random_idxs = np.random.permutation(X_chunk_train.shape[0])
+        X_chunk_train = X_chunk_train[random_idxs]
+        y_chunk_train = y_chunk_train[random_idxs]
+
         # Perform the model fit function on the training data and validate.
-        history = ens_model.fit(x=X_chunk_train,
-                                y=one_hot_y_true_train,
-                                batch_size=None,
-                                epochs=1,
-                                verbose=0,
-                                validation_data=(X_chunk_val, one_hot_y_true_val),
-                                shuffle=True,
-                                callbacks = [mc_loss]
+        # history = ens_model.fit(x=X_chunk_train,          # replace with train on batch, but keep a copy of the .fit
+        #                         y=one_hot_y_true_train,
+        #                         batch_size=None,
+        #                         epochs=1,
+        #                         verbose=0,
+        #                         validation_data=(X_chunk_val, one_hot_y_true_val),
+        #                         shuffle=True,
+        #                         callbacks = [mc_loss]
+        #                         )
+
+
+        # Perform the model fit function on the training data and validate.
+        history = ens_model.train_on_batch(
+                                x=X_chunk_train,
+                                y=one_hot_y_true_train
                                 )
+        # Perform validation
+        if chunk_idx % 1 == 0:
+            history = ens_model.test_on_batch(
+                                    x=X_chunk_val,
+                                    y=one_hot_y_true_val
+                                    )
+        
+
         # print stats to the user/slurm and store them in a csv
         for pair in history.history.items():
             print(pair)
