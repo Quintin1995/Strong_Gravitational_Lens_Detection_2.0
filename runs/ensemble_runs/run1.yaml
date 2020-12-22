@@ -4,6 +4,7 @@ models:
     - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_41s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
+do_post_training_evaluations: False
 
 num_chunks:   500                                # The amount of chunks that the ensemble will be trained for.
 chunk_size:   4096                               # The size of the chunks that the ensemble will be trained on.

@@ -38,13 +38,15 @@ import csv
 
 # Given 4D numpy image data and corresponding labels, model paths and weights,
 # this function will return a prediction matrix, containing a prediction on each 
-# example for each model. It will also return names of the models.
-def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
+# example for each model. It will also return names of the models and individual
+# evaluations of the trained models on validation data.
+def _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, model_weights_paths, do_individual_eval=False):
 
     # Construct a matrix that holds a prediction value for each image and each model in the ensemble
-    prediction_matrix = np.zeros((X_chunk.shape[0], len(model_weights_paths)))
-    model_names       = list()      # Keep track of model names
-    individual_scores = list()      # Keep track of model acc on an individual basis
+    prediction_matrix_train = np.zeros((X_chunk_train.shape[0], len(model_weights_paths)))
+    prediction_matrix_val   = np.zeros((X_chunk_val.shape[0], len(model_weights_paths)))
+    model_names             = list()      # Keep track of model names
+    individual_scores       = list()      # Keep track of model acc on an individual basis
     
     # Load each model and perform prediction with it.
     for model_idx, model_path in enumerate(model_weights_paths):
@@ -69,21 +71,26 @@ def _load_models_and_predict(X_chunk, y_chunk, model_weights_paths):
         # Keep track of model name
         model_names.append(network.params.model_name)
 
-        # 4.0 - Evaluate on validation chunk
+        # Dstack the data if it is the enrico model
         if "resnet_single_newtr_last_last_weights_only" in model_path:
             X_chunk = dstack_data(X_chunk)
-        evals = network.model.evaluate(X_chunk, y_chunk, verbose=0)
-        print("\tIndividual Evaluations:")
-        print("\tModel name: {}".format(network.params.model_name))
-        for met_idx in range(len(evals)):
-            print("\t{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
-            individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
 
-        # 5.0 - Predict on validation chunk
-        predictions = network.model.predict(X_chunk)
-        prediction_matrix[:,model_idx] = np.squeeze(predictions)
-    # Networks are also need later on, therefore we need to add them to a list
-    return prediction_matrix, model_names, individual_scores
+        if do_individual_eval:
+            evals = network.model.evaluate(X_chunk_val, y_chunk_val, verbose=0)
+            print("\tIndividual Evaluations:")
+            print("\tModel name: {}".format(network.params.model_name))
+            for met_idx in range(len(evals)):
+                print("\t{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
+                individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
+
+        # 5.0 - Predict on train and validation chunks
+        predictions_train = network.model.predict(X_chunk_train)
+        prediction_matrix_train[:,model_idx] = np.squeeze(predictions_train)
+
+        predictions_val = network.model.predict(X_chunk_val)
+        prediction_matrix_val[:,model_idx] = np.squeeze(predictions_val)
+
+    return prediction_matrix_train, prediction_matrix_val, model_names, individual_scores
 
 
 # Normalization per image
@@ -201,6 +208,7 @@ def main():
     # Parse input arguments
     args = _get_arguments()
 
+    # load setting yaml
     settings_dict = load_settings_yaml(args.run)
 
     # Set root directory, ensemble directory and create them.
@@ -216,7 +224,7 @@ def main():
     sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(settings_dict["lens_frac_val"], settings_dict["source_frac_val"], settings_dict["negative_frac_val"], type_data="validation", deterministic=False)
     sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(settings_dict["lens_frac_test"], settings_dict["source_frac_test"], settings_dict["negative_frac_test"], type_data="test", deterministic=False)
     
-    # Load all the data into memory
+    # Load all the data into memory using multi-threading
     PSF_r = compute_PSF_r()  # Used for sources only
     with Pool(24) as p:
         lenses_train_f    = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
@@ -237,15 +245,6 @@ def main():
         negatives_val_f   = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
         negatives_val     = np.asarray(p.map(negatives_val_f, enumerate(negatives_fnames_val), chunksize=128), np.float32)
 
-        lenses_test_f     = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
-        lenses_test       = np.asarray(p.map(lenses_test_f, enumerate(lenses_fnames_test), chunksize=128), np.float32)
-
-        sources_test_f    = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
-        sources_test      = np.asarray(p.map(sources_test_f, enumerate(sources_fnames_test), chunksize=128), np.float32)
-
-        negatives_test_f  = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
-        negatives_test    = np.asarray(p.map(negatives_test_f, enumerate(negatives_fnames_test), chunksize=128), np.float32)
-
     # 1 Construct input dependent ensemble model
     if settings_dict["network_name"] == "simple_net":
         ens_model = get_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
@@ -259,7 +258,7 @@ def main():
         save_weights_only=False,
         mc_dict_filename=os.path.join(ensemble_dir, "mc_best_val_bin_acc.yaml"))
 
-    # Keep track of training history with a .csv file
+    # Keep track of training history with a .csv file writer
     f = open(os.path.join(ensemble_dir, "training_history.csv"), "w", 1)
     writer = csv.writer(f)
     writer.writerow(["chunk", "loss", "categorical_accuracy", "val_loss", "val_categorical_accuracy"])    #csv headers
@@ -273,8 +272,7 @@ def main():
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
         # 2 Load the individual networks and predict on the train chunk
-        prediction_matrix_train, model_names_train, individual_scores_train = _load_models_and_predict(X_chunk_train, y_chunk_train, model_paths)
-        prediction_matrix_val, model_names_val, individual_scores_val       = _load_models_and_predict(X_chunk_val, y_chunk_val, model_paths)
+        prediction_matrix_train, prediction_matrix_val, model_names_train, _ = _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, model_paths, do_individual_eval=False)
 
         # 3 Convert prediction matrix to one hot encoding
         one_hot_y_true_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train, y_chunk_train)
@@ -283,12 +281,12 @@ def main():
         if False:       # used for debugging the newly calculated target label vector.
             print("")
             print("example label    : {}".format(y_chunk_train[0]))
-            print("target one hot   : {}".format(one_hot_y_true_val[0]))
             print("predicted vector : {}".format(prediction_matrix_train[0]))
+            print("target one hot   : {}".format(one_hot_y_true_val[0]))
             print("")
             print("example label    : {}".format(y_chunk_train[-1]))
-            print("target one hot   : {}".format(one_hot_y_true_val[-1]))
             print("predicted vector : {}".format(prediction_matrix_train[-1]))
+            print("target one hot   : {}".format(one_hot_y_true_val[-1]))
             input("Press Enter to continue.., [ENTER]")
 
         # Shuffle the data
@@ -297,41 +295,39 @@ def main():
         y_chunk_train = y_chunk_train[random_idxs]
 
         # Perform the model fit function on the training data and validate.
-        # history = ens_model.fit(x=X_chunk_train,          # replace with train on batch, but keep a copy of the .fit
-        #                         y=one_hot_y_true_train,
-        #                         batch_size=None,
-        #                         epochs=1,
-        #                         verbose=0,
-        #                         validation_data=(X_chunk_val, one_hot_y_true_val),
-        #                         shuffle=True,
-        #                         callbacks = [mc_loss]
-        #                         )
-
-
-        # Perform the model fit function on the training data and validate.
-        history = ens_model.train_on_batch(
-                                x=X_chunk_train,
-                                y=one_hot_y_true_train
+        history = ens_model.fit(x=X_chunk_train,          # replace with train on batch, but keep a copy of the .fit
+                                y=one_hot_y_true_train,
+                                batch_size=None,
+                                epochs=1,
+                                verbose=0,
+                                validation_data=(X_chunk_val, one_hot_y_true_val),
+                                shuffle=True,
+                                callbacks = [mc_loss]
                                 )
-        # Perform validation
-        if chunk_idx % 1 == 0:
-            history = ens_model.test_on_batch(
-                                    x=X_chunk_val,
-                                    y=one_hot_y_true_val
-                                    )
-        
-
-        # print stats to the user/slurm and store them in a csv
+        print("")
         for pair in history.history.items():
             print(pair)
-        print("")     # print newline in slurm for clarity.
+    
+        # store result in csv
         writer.writerow([str(chunk_idx),
                         str(history.history["loss"][0]),
                         str(history.history["categorical_accuracy"][0]),
                         str(history.history["val_loss"][0]),
                         str(history.history["val_categorical_accuracy"][0])]) 
+    
+    if bool(settings_dict["do_post_training_evaluations"]):
+        # Outside training loop
+        with Pool(24) as p:
+            lenses_test_f     = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+            lenses_test       = np.asarray(p.map(lenses_test_f, enumerate(lenses_fnames_test), chunksize=128), np.float32)
 
-    # Outside the training loop we want to use the test data for {accuracy, f_beta, precision, recall} performance metric evaluations.
+            sources_test_f    = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+            sources_test      = np.asarray(p.map(sources_test_f, enumerate(sources_fnames_test), chunksize=128), np.float32)
+
+            negatives_test_f  = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+            negatives_test    = np.asarray(p.map(negatives_test_f, enumerate(negatives_fnames_test), chunksize=128), np.float32)
+    
+    # Use the test data for {accuracy, f_beta, precision, recall} performance metric evaluations.
     # X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
 
 
