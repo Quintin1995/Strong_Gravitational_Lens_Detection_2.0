@@ -175,7 +175,7 @@ def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
     model = Model(inputs=inp, outputs=out)
     model.compile(loss='categorical_crossentropy',
                   optimizer=Adam(lr=float(setting_dict["learning_rate"])),
-                  metrics = ['accuracy'])
+                  metrics = ['acc'])
 
     model.summary()
     return model
