@@ -163,9 +163,9 @@ def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
 
     # Construct the model based on the defined architecture and compile it.
     model = Model(inputs=inp, outputs=out)
-    model.compile(loss='binary_crossentropy',
+    model.compile(loss='categorical_crossentropy',
                   optimizer=Adam(lr=float(setting_dict["learning_rate"])),
-                  metrics = ['categorical_accuracy'])
+                  metrics = ['accuracy'])
 
     model.summary()
     return model
@@ -252,7 +252,7 @@ def main():
     # Create a callback that will store the model if the validation binary accuracy is better than it was.
     mc_loss = ModelCheckpointYaml(
         os.path.join(ensemble_dir, "ensemble_model_val_cat_acc.h5"), 
-        monitor="val_categorical_accuracy",
+        monitor="val_acc",
         verbose=1, save_best_only=True,
         mode='max',
         save_weights_only=False,
@@ -261,7 +261,7 @@ def main():
     # Keep track of training history with a .csv file writer
     f = open(os.path.join(ensemble_dir, "training_history.csv"), "w", 1)
     writer = csv.writer(f)
-    writer.writerow(["chunk", "loss", "categorical_accuracy", "val_loss", "val_categorical_accuracy"])    #csv headers
+    writer.writerow(["chunk", "loss", "acc", "val_loss", "val_acc"])    #csv headers
 
     # Loop over training chunks
     for chunk_idx in range(int(settings_dict["num_chunks"])):
@@ -311,9 +311,9 @@ def main():
         # store result in csv
         writer.writerow([str(chunk_idx),
                         str(history.history["loss"][0]),
-                        str(history.history["categorical_accuracy"][0]),
+                        str(history.history["acc"][0]),
                         str(history.history["val_loss"][0]),
-                        str(history.history["val_categorical_accuracy"][0])]) 
+                        str(history.history["val_acc"][0])]) 
     
     if bool(settings_dict["do_post_training_evaluations"]):
         # Outside training loop
