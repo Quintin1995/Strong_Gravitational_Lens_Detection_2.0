@@ -189,19 +189,15 @@ def _set_and_create_dirs(settings_dict):
 
 # Converts an 2D array of floats to a one hot encoding. Where a row represent the predictions of all members of the ensemble.
 def convert_pred_matrix_to_one_hot_encoding(pred_matrix, y_true):
-    one_hot = np.zeros(pred_matrix.shape)
-    mins = np.argmin(pred_matrix, axis=1)
-    maxs = np.argmax(pred_matrix, axis=1)
-    
-    for row, column in enumerate(maxs):
-        if y_true[row] == 1.0:
-            one_hot[row][column] = 1.0
-
-    for row, column in enumerate(mins):
-        if y_true[row] == 0.0:
-            one_hot[row][column] = 1.0
-
-    return one_hot
+    pred_matrix_one_hot = np.zeros(pred_matrix.shape)
+    for idx in range(y_true.shape[0]):
+        if y_true[idx] == 1.0:
+            idx_max = np.argmax(pred_matrix[idx])
+            pred_matrix_one_hot[idx, idx_max] = 1.0
+        else:
+            idx_min = np.argmin(pred_matrix[idx])
+            pred_matrix_one_hot[idx, idx_min] = 1.0
+    return pred_matrix_one_hot
 
 
 def main():
@@ -279,15 +275,13 @@ def main():
         one_hot_y_true_val = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_val, y_chunk_val)
         
         if False:       # used for debugging the newly calculated target label vector.
-            print("")
-            print("example label    : {}".format(y_chunk_train[0]))
-            print("predicted vector : {}".format(prediction_matrix_train[0]))
-            print("target one hot   : {}".format(one_hot_y_true_val[0]))
-            print("")
-            print("example label    : {}".format(y_chunk_train[-1]))
-            print("predicted vector : {}".format(prediction_matrix_train[-1]))
-            print("target one hot   : {}".format(one_hot_y_true_val[-1]))
-            input("Press Enter to continue.., [ENTER]")
+            for i in range(10):
+                rand_idx = random.randint(0,y_chunk_train.shape[0])
+                print("")
+                print("example label    : {}".format(y_chunk_train[rand_idx]))
+                print("predicted vector : {}".format(prediction_matrix_train[rand_idx]))
+                print("target one hot   : {}".format(one_hot_y_true_val[rand_idx]))
+                input("Press Enter to continue.., [ENTER]")
 
         # Shuffle the data
         random_idxs = np.random.permutation(X_chunk_train.shape[0])
