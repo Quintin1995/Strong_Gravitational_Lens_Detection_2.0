@@ -38,15 +38,41 @@ import csv
 
 # Given 4D numpy image data and corresponding labels, model paths and weights,
 # this function will return a prediction matrix, containing a prediction on each 
-# example for each model. It will also return names of the models and individual
+# example for each model. It will also return individual
 # evaluations of the trained models on validation data.
-def _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, model_weights_paths, do_individual_eval=False):
+def predict_on_networks(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, networks, do_individual_eval=False):
 
     # Construct a matrix that holds a prediction value for each image and each model in the ensemble
-    prediction_matrix_train = np.zeros((X_chunk_train.shape[0], len(model_weights_paths)))
-    prediction_matrix_val   = np.zeros((X_chunk_val.shape[0], len(model_weights_paths)))
-    model_names             = list()      # Keep track of model names
+    prediction_matrix_train = np.zeros((X_chunk_train.shape[0], len(networks)))
+    prediction_matrix_val   = np.zeros((X_chunk_val.shape[0], len(networks)))
     individual_scores       = list()      # Keep track of model acc on an individual basis
+    
+    # Load each model and perform prediction with it.
+    for model_idx, network in enumerate(networks):
+
+        if do_individual_eval:
+            evals = network.model.evaluate(X_chunk_val, y_chunk_val, verbose=0)
+            print("\tIndividual Evaluations:")
+            print("\tModel name: {}".format(network.params.model_name))
+            for met_idx in range(len(evals)):
+                print("\t{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
+                individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
+
+        # Predict on train and validation chunks
+        predictions_train = network.model.predict(X_chunk_train)
+        prediction_matrix_train[:,model_idx] = np.squeeze(predictions_train)
+
+        predictions_val = network.model.predict(X_chunk_val)
+        prediction_matrix_val[:,model_idx] = np.squeeze(predictions_val)
+
+    return prediction_matrix_train, prediction_matrix_val, individual_scores
+
+
+# Loads a set of neural networks en return them as a list.
+def load_networks(model_weights_paths):
+
+    model_names = list()      # Keep track of model names
+    networks    = list()      # List holding networks in memory
     
     # Load each model and perform prediction with it.
     for model_idx, model_path in enumerate(model_weights_paths):
@@ -71,26 +97,10 @@ def _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_
         # Keep track of model name
         model_names.append(network.params.model_name)
 
-        # Dstack the data if it is the enrico model
-        if "resnet_single_newtr_last_last_weights_only" in model_path:
-            X_chunk = dstack_data(X_chunk)
+        # Add networks to the list.
+        networks.append(network)
 
-        if do_individual_eval:
-            evals = network.model.evaluate(X_chunk_val, y_chunk_val, verbose=0)
-            print("\tIndividual Evaluations:")
-            print("\tModel name: {}".format(network.params.model_name))
-            for met_idx in range(len(evals)):
-                print("\t{} = {}".format(network.model.metrics_names[met_idx], evals[met_idx]))
-                individual_scores.append((network.model.metrics_names[met_idx], evals[met_idx]))
-
-        # 5.0 - Predict on train and validation chunks
-        predictions_train = network.model.predict(X_chunk_train)
-        prediction_matrix_train[:,model_idx] = np.squeeze(predictions_train)
-
-        predictions_val = network.model.predict(X_chunk_val)
-        prediction_matrix_val[:,model_idx] = np.squeeze(predictions_val)
-
-    return prediction_matrix_train, prediction_matrix_val, model_names, individual_scores
+    return networks, model_names
 
 
 # Normalization per image
@@ -268,7 +278,10 @@ def main():
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
         # 2 Load the individual networks and predict on the train chunk
-        prediction_matrix_train, prediction_matrix_val, model_names_train, _ = _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, model_paths, do_individual_eval=False)
+        if chunk_idx == 0:
+            networks, model_names = load_networks(model_paths)
+        prediction_matrix_train, prediction_matrix_val, individual_scores = predict_on_networks(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, networks, do_individual_eval=False)
+        # prediction_matrix_train, prediction_matrix_val, model_names_train, _ = _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, model_paths, do_individual_eval=False)
 
         # 3 Convert prediction matrix to one hot encoding
         one_hot_y_true_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train, y_chunk_train)
