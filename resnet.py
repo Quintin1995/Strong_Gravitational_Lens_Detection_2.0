@@ -190,7 +190,7 @@ def build_resnet(input_shape, num_outputs, block_fn, repetitions, settings_dict,
         block_shape = K.int_shape(block)
         pool2 = AveragePooling2D(pool_size=(block_shape[1], block_shape[2]), strides=(1, 1))(block)
         flatten1 = Flatten()(pool2)
-        dense = Dense(units=num_outputs, kernel_initializer="he_normal", activation="sigmoid")(flatten1)
+        dense = Dense(units=num_outputs, kernel_initializer="he_normal", activation=settings_dict["last_activation_function"])(flatten1)
 
         model = Model(inputs=input, outputs=dense)
         if verbatim:

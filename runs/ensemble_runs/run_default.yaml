@@ -11,11 +11,12 @@ do_test_eval: False    # Set to true if an ensemble has been trained and you wan
 num_chunks:   250                                # The amount of chunks that the ensemble will be trained for.
 chunk_size:   1024                               # The size of the chunks that the ensemble will be trained on.
 ens_name:     "peregrine_3mems"                  # Name of the ensemble. There will be a folder with the given name.
-network_name: "resnet18"                       # Name of the network used, in order to load the right architecture
+network_name: "resnet18"                        # Name of the network used, in order to load the right architecture
 
 # Network
 learning_rate: 0.0001
 loss_funcion: "categorical_crossentropy"
+last_activation_function: "softmax"              #"sigmmoid", "softmax"
 metrics:                                         # this is a list, with 1 item.
     - "acc"
 
