@@ -22,6 +22,7 @@ from skimage import exposure
 from ModelCheckpointYaml import *
 import matplotlib.pyplot as plt
 import csv
+from resnet import *
 
 ########################### Description ###########################
 ## Take user through dialog that lets the user select trained models.
@@ -140,7 +141,7 @@ def _load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_fi
 # Return a neural network, considered to be the ensemble model. 
 # This model should predict which network in the ensemble gets
 # to predict the final prediction on the input image.
-def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
+def get_simple_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
 
     # Define input
     inp = Input(shape=input_shape)
@@ -180,6 +181,11 @@ def get_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
 
     model.summary()
     return model
+
+
+# Wrapper for resnet18 specifically.
+def get_resnet18_ensemble_model(setting_dict, input_shape=(101,101,1), num_outputs=3):
+    return build_resnet(input_shape, num_outputs, basic_block, [2, 2, 2, 2], settings_dict=setting_dict)
 
 
 # Deal with input arguments
@@ -319,8 +325,9 @@ def main():
 
     # Construct input dependent ensemble model
     if settings_dict["network_name"] == "simple_net":
-        ens_model = get_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
-    
+        ens_model = get_simple_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
+    if settings_dict["network_name"] == "resnet18":
+        ens_model = get_resnet18_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
 
     # Load the individual networks/models into a list and keep track of their names.
     networks, model_names = load_networks(model_paths)
@@ -361,7 +368,7 @@ def main():
         print(pred)
 
 
-############################################################ Script    ############################################################
+############################################################ Script ############################################################
 
 
 if __name__ == "__main__":

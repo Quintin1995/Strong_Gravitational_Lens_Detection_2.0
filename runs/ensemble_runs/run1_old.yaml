@@ -1,0 +1,31 @@
+# Paths to models that should be members of the ensemble. Should reference a .h5 file.
+models:
+    - 'models/final_experiment1_loss_functions/12_01_2020_00h_47m_35s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_41s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
+
+do_post_training_evaluations: False
+
+num_chunks:   500                                # The amount of chunks that the ensemble will be trained for.
+chunk_size:   4096                               # The size of the chunks that the ensemble will be trained on.
+ens_name:     "peregrine_test1_3mems"            # Name of the ensemble. There will be a folder with the given name.
+network_name: "simple_net"                       # Name of the network used, in order to load the right architecture
+
+
+#network
+learning_rate: 0.0001
+
+
+
+# Data Loading
+lens_frac_train:     1.0 #0.5
+source_frac_train:   1.0 #0.05
+negative_frac_train: 1.0 #0.5
+
+lens_frac_val:       1.0
+source_frac_val:     1.0 #0.25
+negative_frac_val:   1.0
+
+lens_frac_test:      1.0
+source_frac_test:    1.0 #0.25
+negative_frac_test:  1.0
