@@ -4,14 +4,14 @@ models:
     - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_41s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
-do_training: True    # Set to true if you want to train an ensemble model.
+do_training: True     # Set to true if you want to train an ensemble model.
 do_test_eval: True    # Set to true if an ensemble has been trained and you want to test its performance on a test set.
 
 # Training
-num_chunks:   250                                # The amount of chunks that the ensemble will be trained for.
-chunk_size:   1024                               # The size of the chunks that the ensemble will be trained on.
-ens_name:     "peregrine_3mems"                  # Name of the ensemble. There will be a folder with the given name.
-network_name: "resnet18"                       # Name of the network used, in order to load the right architecture
+num_chunks:   500                                # The amount of chunks that the ensemble will be trained for.
+chunk_size:   4096                               # The size of the chunks that the ensemble will be trained on.
+ens_name:     "peregrine_3mems_v2"               # Name of the ensemble. There will be a folder with the given name.
+network_name: "resnet18"                         # Name of the network used, in order to load the right architecture
 
 # Network
 learning_rate: 0.0001
