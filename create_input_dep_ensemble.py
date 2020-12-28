@@ -20,6 +20,7 @@ from Network import Network
 from Parameters import Parameters
 from skimage import exposure
 from ModelCheckpointYaml import *
+import matplotlib.pyplot as plt
 import csv
 
 ########################### Description ###########################
@@ -210,26 +211,23 @@ def convert_pred_matrix_to_one_hot_encoding(pred_matrix, y_true):
     return pred_matrix_one_hot
 
 
-def main():
-    # Parse input arguments
-    args = _get_arguments()
+# Training loop for the ensemble
+def train_ensemble(ens_model, ensemble_dir, settings_dict, networks):
 
-    # load setting yaml
-    settings_dict = load_settings_yaml(args.run)
+    # Create a callback that will store the model if the validation binary accuracy is better than it was.
+    mc_loss = ModelCheckpointYaml(
+        os.path.join(ensemble_dir, "ensemble_model_val_cat_acc.h5"), 
+        monitor="val_acc",
+        verbose=1,
+        save_best_only=True,
+        mode='max',
+        save_weights_only=False,
+        mc_dict_filename=os.path.join(ensemble_dir, "mc_best_val_bin_acc.yaml"))
 
-    # Set root directory, ensemble directory and create them.
-    ensemble_dir = _set_and_create_dirs(settings_dict)
-
-    # Fix memory leaks if running on tensorflow 2
-    tf.compat.v1.disable_eager_execution()
-
-    # Model Selection from directory - Select multiple models
-    model_paths = list(settings_dict["models"])
-
+    # Get filenames of the data
     sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_fnames_from_disk(settings_dict["lens_frac_train"], settings_dict["source_frac_train"], settings_dict["negative_frac_train"], type_data="train", deterministic=False)
     sources_fnames_val, lenses_fnames_val, negatives_fnames_val       = get_fnames_from_disk(settings_dict["lens_frac_val"], settings_dict["source_frac_val"], settings_dict["negative_frac_val"], type_data="validation", deterministic=False)
-    sources_fnames_test, lenses_fnames_test, negatives_fnames_test    = get_fnames_from_disk(settings_dict["lens_frac_test"], settings_dict["source_frac_test"], settings_dict["negative_frac_test"], type_data="test", deterministic=False)
-    
+
     # Load all the data into memory using multi-threading
     PSF_r = compute_PSF_r()  # Used for sources only
     with Pool(24) as p:
@@ -251,19 +249,6 @@ def main():
         negatives_val_f   = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
         negatives_val     = np.asarray(p.map(negatives_val_f, enumerate(negatives_fnames_val), chunksize=128), np.float32)
 
-    # 1 Construct input dependent ensemble model
-    if settings_dict["network_name"] == "simple_net":
-        ens_model = get_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
-
-    # Create a callback that will store the model if the validation binary accuracy is better than it was.
-    mc_loss = ModelCheckpointYaml(
-        os.path.join(ensemble_dir, "ensemble_model_val_cat_acc.h5"), 
-        monitor="val_acc",
-        verbose=1, save_best_only=True,
-        mode='max',
-        save_weights_only=False,
-        mc_dict_filename=os.path.join(ensemble_dir, "mc_best_val_bin_acc.yaml"))
-
     # Keep track of training history with a .csv file writer
     f = open(os.path.join(ensemble_dir, "training_history.csv"), "w", 1)
     writer = csv.writer(f)
@@ -277,11 +262,8 @@ def main():
         X_chunk_train, y_chunk_train = load_chunk_train(settings_dict["chunk_size"], lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
         X_chunk_val, y_chunk_val     = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
 
-        # 2 Load the individual networks and predict on the train chunk
-        if chunk_idx == 0:
-            networks, model_names = load_networks(model_paths)
+        # 2 predict on the train and validation chunk
         prediction_matrix_train, prediction_matrix_val, individual_scores = predict_on_networks(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, networks, do_individual_eval=False)
-        # prediction_matrix_train, prediction_matrix_val, model_names_train, _ = _load_models_and_predict(X_chunk_train, y_chunk_train, X_chunk_val, y_chunk_val, model_paths, do_individual_eval=False)
 
         # 3 Convert prediction matrix to one hot encoding
         one_hot_y_true_train = convert_pred_matrix_to_one_hot_encoding(prediction_matrix_train, y_chunk_train)
@@ -295,11 +277,6 @@ def main():
                 print("predicted vector : {}".format(prediction_matrix_train[rand_idx]))
                 print("target one hot   : {}".format(one_hot_y_true_val[rand_idx]))
                 input("Press Enter to continue.., [ENTER]")
-
-        # Shuffle the data
-        random_idxs = np.random.permutation(X_chunk_train.shape[0])
-        X_chunk_train = X_chunk_train[random_idxs]
-        y_chunk_train = y_chunk_train[random_idxs]
 
         # Perform the model fit function on the training data and validate.
         history = ens_model.fit(x=X_chunk_train,          # replace with train on batch, but keep a copy of the .fit
@@ -321,9 +298,41 @@ def main():
                         str(history.history["acc"][0]),
                         str(history.history["val_loss"][0]),
                         str(history.history["val_acc"][0])]) 
+    return ens_model
+
+
+def main():
+    # Parse input arguments
+    args = _get_arguments()
+
+    # load setting yaml
+    settings_dict = load_settings_yaml(args.run)
+
+    # Set root directory, ensemble directory and create them.
+    ensemble_dir = _set_and_create_dirs(settings_dict)
+
+    # Fix memory leaks if running on tensorflow 2
+    tf.compat.v1.disable_eager_execution()
+
+    # Model Selection from directory - Select multiple models
+    model_paths = list(settings_dict["models"])
+
+    # Construct input dependent ensemble model
+    if settings_dict["network_name"] == "simple_net":
+        ens_model = get_ensemble_model(settings_dict, input_shape=(101,101,1), num_outputs=len(model_paths))
     
-    if bool(settings_dict["do_post_training_evaluations"]):
-        # Outside training loop
+
+    # Load the individual networks/models into a list and keep track of their names.
+    networks, model_names = load_networks(model_paths)
+
+    # Perfrom input dependent ensemble training.
+    if settings_dict["do_training"]:
+        ens_model = train_ensemble(ens_model, ensemble_dir, settings_dict, networks)
+    
+    if settings_dict["do_test_eval"]:
+        # Load test data
+        sources_fnames_test, lenses_fnames_test, negatives_fnames_test  = get_fnames_from_disk(settings_dict["lens_frac_test"], settings_dict["source_frac_test"], settings_dict["negative_frac_test"], type_data="test", deterministic=False)
+        PSF_r = compute_PSF_r()  # Used for sources only
         with Pool(24) as p:
             lenses_test_f     = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
             lenses_test       = np.asarray(p.map(lenses_test_f, enumerate(lenses_fnames_test), chunksize=128), np.float32)
@@ -334,8 +343,22 @@ def main():
             negatives_test_f  = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
             negatives_test    = np.asarray(p.map(negatives_test_f, enumerate(negatives_fnames_test), chunksize=128), np.float32)
     
+    # Load the weight of the ensemble model
+    ens_model.load_weights(os.path.join(ensemble_dir, "ensemble_model_val_cat_acc.h5"))
+
     # Use the test data for {accuracy, f_beta, precision, recall} performance metric evaluations.
-    # X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
+    X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
+
+    if False:   # for debugging
+        for i in range(X_chunk_test.shape[0]):
+            plt.imshow(np.squeeze(X_chunk_test[i]), cmap='Greys_r')
+            plt.title("Test Image with label: {}".format(y_chunk_test[i]))
+            plt.show()
+
+    # Perform prediction on the test set
+    post_pred = ens_model.predict(X_chunk_test)
+    for pred in post_pred:
+        print(pred)
 
 
 ############################################################ Script    ############################################################

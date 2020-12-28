@@ -2,20 +2,19 @@
 models:
     - 'models/final_experiment1_loss_functions/12_01_2020_00h_47m_35s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_41s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
-    #- 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
-do_post_training_evaluations: False
+do_training: False    # Set to true if you want to train an ensemble model.
+do_test_eval: True    # Set to true if an ensemble has been trained and you want to test its performance on a test set.
 
+# Training
 num_chunks:   250                                # The amount of chunks that the ensemble will be trained for.
 chunk_size:   1024                               # The size of the chunks that the ensemble will be trained on.
-ens_name:     "peregrine_ensemble_test1"         # Name of the ensemble. There will be a folder with the given name.
+ens_name:     "peregrine_3mems"                  # Name of the ensemble. There will be a folder with the given name.
 network_name: "simple_net"                       # Name of the network used, in order to load the right architecture
 
-
-#network
+# Network
 learning_rate: 0.0001
-
-
 
 # Data Loading
 lens_frac_train:     0.5
