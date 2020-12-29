@@ -4,7 +4,7 @@ models:
     - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_41s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
-do_training: True     # Set to true if you want to train an ensemble model.
+do_training: False     # Set to true if you want to train an ensemble model.
 do_test_eval: True    # Set to true if an ensemble has been trained and you want to test its performance on a test set.
 
 # Training

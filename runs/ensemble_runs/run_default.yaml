@@ -8,7 +8,7 @@ do_training: True    # Set to true if you want to train an ensemble model.
 do_test_eval: False    # Set to true if an ensemble has been trained and you want to test its performance on a test set.
 
 # Training
-num_chunks:   250                                # The amount of chunks that the ensemble will be trained for.
+num_chunks:   2000                                # The amount of chunks that the ensemble will be trained for.
 chunk_size:   1024                               # The size of the chunks that the ensemble will be trained on.
 ens_name:     "peregrine_3mems"                  # Name of the ensemble. There will be a folder with the given name.
 network_name: "resnet18"                        # Name of the network used, in order to load the right architecture

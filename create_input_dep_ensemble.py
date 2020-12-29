@@ -1,4 +1,4 @@
-from utils import create_dir_if_not_exists, choose_ensemble_members, get_h5_path_dialog, get_samples, get_fnames_from_disk, compute_PSF_r, load_settings_yaml, dstack_data
+from utils import create_dir_if_not_exists, choose_ensemble_members, get_h5_path_dialog, get_samples, get_fnames_from_disk, compute_PSF_r, load_settings_yaml, dstack_data, count_TP_TN_FP_FN_and_FB
 import argparse
 import tensorflow as tf
 from tensorflow.keras.models import Model
@@ -23,6 +23,7 @@ from ModelCheckpointYaml import *
 import matplotlib.pyplot as plt
 import csv
 from resnet import *
+import math
 
 ########################### Description ###########################
 ## Take user through dialog that lets the user select trained models.
@@ -362,10 +363,65 @@ def main():
             plt.title("Test Image with label: {}".format(y_chunk_test[i]))
             plt.show()
 
-    # Perform prediction on the test set
-    post_pred = ens_model.predict(X_chunk_test)
-    for pred in post_pred:
-        print(pred)
+    # Perform prediction on the test set for the ensemble model
+    ens_preds = ens_model.predict(X_chunk_test)
+    for idx, pred in enumerate(ens_preds):
+        if idx < 10:
+            print(pred)
+
+    # Loop over individual models and predict
+    individual_predictions = np.zeros((ens_preds.shape))
+    for net_idx, network in enumerate(networks):
+        individual_predictions[:,net_idx] = np.squeeze(network.model.predict(X_chunk_test))
+    print("")
+    for idx, pred in enumerate(individual_predictions):
+        if idx < 10:
+            print(pred)
+    print("")
+
+    # Now we should use the prediction of the ensemble model as weights for the individual predictions of its members.
+    ens_y_hat = np.zeros(y_chunk_test.shape)
+    for i in range(individual_predictions.shape[0]):
+        ensemble_row    = ens_preds[i]
+        members_row     = individual_predictions[i]
+        ens_y_hat[i]  = np.dot(ensemble_row, members_row)
+        if i < 10:
+            print(ens_y_hat[i])
+
+    ### f_beta graph and its paramters
+    beta_squarred           = 0.03                                  # For f-beta calculation
+    stepsize                = 0.01                                  # For f-beta calculation
+    threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
+    colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
+
+    # I would like to see an f_beta figure of the ensemble that can be compared with a single model's f_beta figure.
+    f_betas, precision_data, recall_data = [], [], []
+    for p_threshold in threshold_range:
+        (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(ens_y_hat, y_chunk_test, p_threshold, beta_squarred)
+        print(accuracy)
+        f_betas.append(F_beta)
+        precision_data.append(precision)
+        recall_data.append(recall)
+
+    # step 7.2 - Plotting all lines
+    plt.plot(list(threshold_range), f_betas, colors[0], label = "f_beta")
+    plt.plot(list(threshold_range), precision_data, ":", color=colors[0], alpha=0.9, linewidth=3, label="Precision")
+    plt.plot(list(threshold_range), recall_data, "--", color=colors[0], alpha=0.9, linewidth=3, label="Recall")
+    
+    # set up plot aesthetics
+    plt.xlabel("p threshold")
+    plt.ylabel("F")
+    plt.title("Ensemble F_beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+    figure = plt.gcf() # get current figure
+    axes = plt.gca()
+    # axes.set_ylim([0.63, 1.00])
+    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+    plt.grid(color='grey', linestyle='dashed', linewidth=1)
+    plt.legend()
+    plt.savefig('{}.png'.format(os.path.join(ensemble_dir, "f_beta_plot")))
+    plt.show()
+
+
 
 
 ############################################################ Script ############################################################
