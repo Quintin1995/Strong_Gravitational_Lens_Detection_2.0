@@ -1,8 +1,8 @@
 # Paths to models that should be members of the ensemble. Should reference a .h5 file.
 models:
-    - 'models/final_experiment1_loss_functions/11_30_2020_20h_11m_52s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
-    - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_40s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
-    - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_28s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/12_01_2020_05h_20m_36s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_28_2020_20h_25m_53s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_29_2020_17h_24m_46s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
 do_training: True     # Set to true if you want to train an ensemble model.
 do_test_eval: True     # Set to true if an ensemble has been trained and you want to test its performance on a test set.
@@ -10,7 +10,7 @@ do_test_eval: True     # Set to true if an ensemble has been trained and you wan
 # Training
 num_chunks:   2000                               # The amount of chunks that the ensemble will be trained for.
 chunk_size:   4096                               # The size of the chunks that the ensemble will be trained on.
-ens_name:     "peregrine_3mems_v2"               # Name of the ensemble. There will be a folder with the given name.
+ens_name:     "peregrine_3mems_v7"               # Name of the ensemble. There will be a folder with the given name.
 network_name: "resnet18"                         # Name of the network used, in order to load the right architecture
 
 # Network

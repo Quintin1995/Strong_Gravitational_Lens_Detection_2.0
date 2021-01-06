@@ -388,6 +388,12 @@ def main():
         if i < 10:
             print(ens_y_hat[i])
 
+    # for i in range(individual_predictions.shape[0]):
+    #     winning_idx = np.argmax(ens_preds[i])
+    #     ens_y_hat[i] = individual_predictions[i,winning_idx]
+    #     if i < 10:
+    #         print(ens_y_hat[i])
+    
     ### f_beta graph and its paramters
     beta_squarred           = 0.03                                  # For f-beta calculation
     stepsize                = 0.01                                  # For f-beta calculation
@@ -409,9 +415,9 @@ def main():
     plt.plot(list(threshold_range), recall_data, "--", color=colors[0], alpha=0.9, linewidth=3, label="Recall")
     
     # set up plot aesthetics
-    plt.xlabel("p threshold")
-    plt.ylabel("F")
-    plt.title("Ensemble F_beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+    plt.xlabel("p threshold", fontsize=40)
+    plt.ylabel("F", fontsize=40)
+    plt.title("Ensemble F_beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)), fontsize=40)
     figure = plt.gcf() # get current figure
     axes = plt.gca()
     # axes.set_ylim([0.63, 1.00])
@@ -420,8 +426,6 @@ def main():
     plt.legend()
     plt.savefig('{}.png'.format(os.path.join(ensemble_dir, "f_beta_plot")))
     plt.show()
-
-
 
 
 ############################################################ Script ############################################################
