@@ -296,8 +296,20 @@ class DataGenerator:
         X_chunk = np.concatenate((X_pos, X_neg))
         y_chunk = np.concatenate((y_pos, y_neg))
 
+        if False:
+            img0 = np.squeeze(X_chunk[0])
+            plt.imshow(img0, cmap='gray')
+            plt.title("Before Segmentation", fontsize=35)
+            plt.show()
+
         if self.params.do_max_tree_seg:
             X_chunk = self._fill_arguments_max_tree_segmenter(X_chunk)
+
+        if False:
+            img0 = np.squeeze(X_chunk[0])
+            plt.imshow(img0, cmap='gray')
+            plt.title("After Segmentation", fontsize=35)
+            plt.show()
 
         print("Creating training chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
         return X_chunk, y_chunk

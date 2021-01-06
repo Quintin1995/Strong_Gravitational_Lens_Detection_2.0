@@ -33,7 +33,7 @@ validation_chunksize: 128
 use_avg_pooling_2D: True          #Boolean, # Whether the resnet contains GLOBAL AVG POOLING
 
 # Segmentation Parameters - default values are emperically determined.
-do_max_tree_seg : False            #Boolean, Whether to perform max_tree_segmenation or not.
+do_max_tree_seg : True            #Boolean, Whether to perform max_tree_segmenation or not.
 # define kernel type and size
 conv_method     : "gaussian"        #string# options= {"gaussian", "boxcar"}
 ksize           : 5               #int#    options = {3,5}     If 3, it creates a 3x3 kernel. If 5, then it will create a 5x5 kernel
