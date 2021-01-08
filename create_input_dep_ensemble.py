@@ -26,18 +26,17 @@ from resnet import *
 import math
 
 ########################### Description ###########################
-## Take user through dialog that lets the user select trained models.
 ## Construct a model/network that takes in training data and outputs a vector of length=#members in enemble
 ## We use softmax on the output vector and determine which member/model of the ensemble gets to predict on the input image.
 ## Via this method, a network selects which network gets to predict on the input image, based on information within the image.
+## The final ensemble model is used to predict the weights of the members for final classification by means of taking the dot
+## product of the weights and the members their prediction.
 ########################### End Description #######################
 
 
 
 
 ############################################################ Functions ############################################################
-
-
 
 # Given 4D numpy image data and corresponding labels, model paths and weights,
 # this function will return a prediction matrix, containing a prediction on each 
@@ -123,7 +122,7 @@ def normalize_function(img, norm_type, data_type):
 
 # If the data array contains sources, then a PSF_r convolution needs to be performed over the image.
 # There is also a check on whether the loaded data already has a color channel dimension, if not create it.
-def _load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_filename):
+def load_and_normalize_img(data_type, are_sources, normalize_dat, PSF_r, idx_filename):
     idx, filename = idx_filename
     if idx % 1000 == 0:
         print("loaded {} images".format(idx), flush=True)
@@ -238,22 +237,22 @@ def train_ensemble(ens_model, ensemble_dir, settings_dict, networks):
     # Load all the data into memory using multi-threading
     PSF_r = compute_PSF_r()  # Used for sources only
     with Pool(24) as p:
-        lenses_train_f    = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        lenses_train_f    = functools.partial(load_and_normalize_img, np.float32, False, "per_image", PSF_r)
         lenses_train      = np.asarray(p.map(lenses_train_f, enumerate(lenses_fnames_train), chunksize=128), np.float32)
 
-        sources_train_f   = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+        sources_train_f   = functools.partial(load_and_normalize_img, np.float32, True, "per_image", PSF_r)
         sources_train     = np.asarray(p.map(sources_train_f, enumerate(sources_fnames_train), chunksize=128), np.float32)
         
-        negatives_train_f = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        negatives_train_f = functools.partial(load_and_normalize_img, np.float32, False, "per_image", PSF_r)
         negatives_train   = np.asarray(p.map(negatives_train_f, enumerate(negatives_fnames_train), chunksize=128), np.float32)
         
-        lenses_val_f      = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        lenses_val_f      = functools.partial(load_and_normalize_img, np.float32, False, "per_image", PSF_r)
         lenses_val        = np.asarray(p.map(lenses_val_f, enumerate(lenses_fnames_val), chunksize=128), np.float32)
 
-        sources_val_f     = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+        sources_val_f     = functools.partial(load_and_normalize_img, np.float32, True, "per_image", PSF_r)
         sources_val       = np.asarray(p.map(sources_val_f, enumerate(sources_fnames_val), chunksize=128), np.float32)
 
-        negatives_val_f   = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+        negatives_val_f   = functools.partial(load_and_normalize_img, np.float32, False, "per_image", PSF_r)
         negatives_val     = np.asarray(p.map(negatives_val_f, enumerate(negatives_fnames_val), chunksize=128), np.float32)
 
     # Keep track of training history with a .csv file writer
@@ -342,13 +341,13 @@ def main():
         sources_fnames_test, lenses_fnames_test, negatives_fnames_test  = get_fnames_from_disk(settings_dict["lens_frac_test"], settings_dict["source_frac_test"], settings_dict["negative_frac_test"], type_data="test", deterministic=False)
         PSF_r = compute_PSF_r()  # Used for sources only
         with Pool(24) as p:
-            lenses_test_f     = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+            lenses_test_f     = functools.partial(load_and_normalize_img, np.float32, False, "per_image", PSF_r)
             lenses_test       = np.asarray(p.map(lenses_test_f, enumerate(lenses_fnames_test), chunksize=128), np.float32)
 
-            sources_test_f    = functools.partial(_load_and_normalize_img, np.float32, True, "per_image", PSF_r)
+            sources_test_f    = functools.partial(load_and_normalize_img, np.float32, True, "per_image", PSF_r)
             sources_test      = np.asarray(p.map(sources_test_f, enumerate(sources_fnames_test), chunksize=128), np.float32)
 
-            negatives_test_f  = functools.partial(_load_and_normalize_img, np.float32, False, "per_image", PSF_r)
+            negatives_test_f  = functools.partial(load_and_normalize_img, np.float32, False, "per_image", PSF_r)
             negatives_test    = np.asarray(p.map(negatives_test_f, enumerate(negatives_fnames_test), chunksize=128), np.float32)
     
     # Load the weight of the ensemble model
@@ -384,7 +383,7 @@ def main():
     for i in range(individual_predictions.shape[0]):
         ensemble_row    = ens_preds[i]
         members_row     = individual_predictions[i]
-        ens_y_hat[i]  = np.dot(ensemble_row, members_row)
+        ens_y_hat[i]    = np.dot(ensemble_row, members_row)
         if i < 10:
             print(ens_y_hat[i])
 
@@ -404,7 +403,7 @@ def main():
     f_betas, precision_data, recall_data = [], [], []
     for p_threshold in threshold_range:
         (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(ens_y_hat, y_chunk_test, p_threshold, beta_squarred)
-        print(accuracy)
+        print("acc: {0:.3f} on threshold: {1:.3f}".format(accuracy, p_threshold))
         f_betas.append(F_beta)
         precision_data.append(precision)
         recall_data.append(recall)
