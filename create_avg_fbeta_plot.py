@@ -35,9 +35,9 @@ def AUC_discrete(xs, ys):
 names               = ["binary_crossentropy", "f_beta_metric"  , "f_beta_soft_metric", "macro_softloss_f1", "macro_double_softloss_f1", "f_beta_softloss"]
 metric_interests    = ["loss"               ,"metric"          , "metric"            , "loss"             , "loss"                    , "loss"]
 
-
-names               = [ "f_beta_softloss"]
-metric_interests    = [ "loss"]
+if False:
+    names               = [ "f_beta_softloss"]
+    metric_interests    = [ "loss"]
 
 ####
 do_eval             = True
@@ -123,7 +123,7 @@ for collection_idx, model_collection in enumerate(model_collections):
         # Step 6.2 - Predict the labels of the test chunk on the loaded neural network - averaged over 'avg_iter_counter' predictions
         preds = network.model.predict(X_test_chunk)
 
-        if True:       # used to plot historgram of prediction = prediction distribution.
+        if False:       # used to plot historgram of prediction = prediction distribution.
             # temporarily make histogram of predictions
             n, bins, patches = plt.hist(x=list(np.squeeze(preds)), bins='auto', color='#0504aa',
                                 alpha=0.7, rwidth=0.85)
