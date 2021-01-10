@@ -27,6 +27,7 @@ rootdir       = "ensembles"
 subdir        = "final_ensemble_experiment"
 ensembles_dir = os.path.join(rootdir, subdir)
 ens_dirs      = os.listdir(ensembles_dir)
+colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 
 
 # Load test data into RAM before evaluation of each ensemble
@@ -47,7 +48,11 @@ if True:
     X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
 
 
-# Loop over each ensemble 
+f_beta_vectors = list()
+precision_data_vectors = list()
+recall_data_vectors = list()
+
+# Loop over each ensemble
 for ens_dir in ens_dirs:
     
     # Get settings of ensemble
@@ -76,7 +81,7 @@ for ens_dir in ens_dirs:
     print("\n\n ensemble model predict:")
     ens_preds = ens_model.predict(X_chunk_test)
     for idx, pred in enumerate(ens_preds):
-        if idx < 600:
+        if idx < 10:
             print(pred)
 
     # Loop over individual models and predict
@@ -85,9 +90,8 @@ for ens_dir in ens_dirs:
     for net_idx, network in enumerate(networks):
         individual_predictions[:,net_idx] = np.squeeze(network.model.predict(X_chunk_test))
     for idx, pred in enumerate(individual_predictions):
-        if idx < 600:
+        if idx < 10:
             print(individual_predictions[idx])
-    input("stopping here for a sec")
 
     # Now we should use the prediction of the ensemble model as weights for the individual predictions of its members.
     print("\n\n final prediction:")
@@ -104,7 +108,6 @@ for ens_dir in ens_dirs:
     beta_squarred           = 0.03                                  # For f-beta calculation
     stepsize                = 0.01                                  # For f-beta calculation
     threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
-    colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 
     # I would like to see an f_beta figure of the ensemble that can be compared with a single model's f_beta figure.
     f_betas, precision_data, recall_data = [], [], []
@@ -115,24 +118,43 @@ for ens_dir in ens_dirs:
         f_betas.append(F_beta)
         precision_data.append(precision)
         recall_data.append(recall)
+    # Keep track of each fbeta, precision and recall curve for each ensemble:
+    f_beta_vectors.append(f_betas)
+    precision_data_vectors.append(precision_data)
+    recall_data_vectors.append(recall_data)
 
-    # step 7.2 - Plotting all lines
-    plt.plot(list(threshold_range), f_betas, colors[0], label = "f_beta")
-    plt.plot(list(threshold_range), precision_data, ":", color=colors[0], alpha=0.9, linewidth=3, label="Precision")
-    plt.plot(list(threshold_range), recall_data, "--", color=colors[0], alpha=0.9, linewidth=3, label="Recall")
-    
-    # set up plot aesthetics
-    plt.xlabel("p threshold", fontsize=40)
-    plt.ylabel("F", fontsize=40)
-    plt.title("Ensemble F_beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)), fontsize=40)
-    figure = plt.gcf() # get current figure
-    axes = plt.gca()
-    # axes.set_ylim([0.63, 1.00])
-    figure.set_size_inches(12, 8)       # (12,8), seems quite fine
-    plt.grid(color='grey', linestyle='dashed', linewidth=1)
-    plt.legend()
-    fname = '{}.png'.format(os.path.join(ensembles_dir, ens_dir, "f_beta_plot"))
-    print(fname)
-    # plt.savefig(fname)
-    plt.show()
-    plt.clf()
+# step 7.0 - calculate std and mean - based on f_beta_vectors
+colls = list(zip(*f_beta_vectors))
+means = np.asarray(list(map(np.mean, map(np.asarray, colls))))
+stds = np.asarray(list(map(np.std, map(np.asarray, colls))))
+
+# step 7.1 - define upper and lower limits
+upline  = np.add(means, stds)
+lowline = np.subtract(means, stds)
+
+# Step 7.1.1 - Calculate mean precision and recall rates
+colls_pre = list(zip(*precision_data_vectors))
+precision_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_pre)))))
+colls_recall = list(zip(*recall_data_vectors))
+recall_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_recall)))))
+
+# step 7.2 - Plotting all lines
+plt.plot(list(threshold_range), precision_mu, ":", color=colors[0], label="precision mean", alpha=0.9, linewidth=3)
+plt.plot(list(threshold_range), recall_mu, "--", color=colors[0], label="recall mean", alpha=0.9, linewidth=3)
+plt.plot(list(threshold_range), upline, colors[0])
+plt.plot(list(threshold_range), means, colors[0], label="3 Members Ensemble")
+plt.plot(list(threshold_range), lowline, colors[0])
+plt.fill_between(list(threshold_range), upline, lowline, color=colors[0], alpha=0.5) 
+
+plt.xlabel("p threshold")
+plt.ylabel("F")
+plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+figure = plt.gcf() # get current figure
+axes = plt.gca()
+axes.set_ylim([0.63, 1.00])
+figure.set_size_inches(12, 8)       # (12,8), seems quite fine
+fname = '{}.png'.format(os.path.join(ensembles_dir, ens_dir, "f_beta_plot"))
+plt.savefig(fname, dpi=100)
+plt.grid(color='grey', linestyle='dashed', linewidth=1)
+plt.legend()
+plt.show()
