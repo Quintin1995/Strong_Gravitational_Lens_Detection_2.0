@@ -26,9 +26,11 @@ def plot_3D(con_fea1, con_fea2, con_fea3):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(einstein_radii, alpha_scalings, predictions, cmap='viridis')
-    plt.xlabel("Einstein Radius")
-    plt.ylabel("Source Intensity Scaling")
-    plt.title("Influence of brightness intensity scaling of Source and Einstein Radius")
+    plt.xlabel("Einstein Radius", fontsize=25)
+    plt.ylabel("Source Intensity Scaling", fontsize=25)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.title("Influence of brightness intensity scaling of Source and Einstein Radius", fontsize=25)
     plt.show()
 
 
@@ -47,16 +49,18 @@ def hexbin_plot(con_fea1, con_fea2, predictions, gridsize=10, calc_TPR=True):
         plt.hexbin(x=con_fea1, y=con_fea2, C=predictions, gridsize=gridsize, cmap='copper', reduce_C_function=reduce_function)
     else:
         plt.hexbin(x=con_fea1, y=con_fea2, C=predictions, gridsize=gridsize, cmap='copper')
-    plt.xlabel("Einstein Radius")
-    plt.ylabel("Source Brighness Scaling")
+    plt.xlabel("Einstein Radius", fontsize=25)
+    plt.ylabel("Source Brighness Scaling", fontsize=25)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
     cbar = plt.colorbar()
-    cbar.ax.get_yaxis().labelpad = 15
+    cbar.ax.get_yaxis().labelpad = 25
     if calc_TPR:
-        plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold))
-        cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270)
+        plt.title("Einstein Radius versus Brighness Scaling of Source - TPR (th={})".format(threshold), fontsize=25)
+        cbar.ax.set_ylabel('True Positive Ratio per bin', rotation=270, fontsize=25)
     else:
-        plt.title("Einstein Radius versus Brighness Scaling of Source and Model Certainty")
-        cbar.ax.set_ylabel('Model Prediction', rotation=270)
+        plt.title("Einstein Radius versus Brighness Scaling of Source and Model Certainty", fontsize=25)
+        cbar.ax.set_ylabel('Model Prediction', rotation=270, fontsize=25)
     plt.show()
 
 
@@ -64,12 +68,14 @@ def hexbin_plot(con_fea1, con_fea2, predictions, gridsize=10, calc_TPR=True):
 def show_scatterplot_ER_vs_intensity_and_certainty(einstein_radii, alpha_scalings, predictions):
     fig, ax = plt.subplots()
     plt.scatter(x=einstein_radii, y=alpha_scalings, c=predictions, cmap='copper')   #cmap {'winter', 'cool', 'copper'}
-    plt.xlabel("Einstein Radius")
-    plt.ylabel("Source Brighness Scaling")
-    plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction")
+    plt.xlabel("Einstein Radius", fontsize=25)
+    plt.ylabel("Source Brighness Scaling", fontsize=25)
+    plt.title("Einstein Radius and Brighness Scaling of Source versus Model Prediction", fontsize=25)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
     cbar = plt.colorbar()
-    cbar.ax.get_yaxis().labelpad = 15
-    cbar.ax.set_ylabel('Prediction value Model', rotation=270)
+    cbar.ax.get_yaxis().labelpad = 25
+    cbar.ax.set_ylabel('Prediction value Model', rotation=270, fontsize=25)
 
 
 # Plot Signal to Noise Ratio (binned) versus the true positive rate of that bin.
@@ -113,10 +119,12 @@ def plot_SNR_vs_TPR(predictions, SNRs, threshold, num_bins=10):
     plt.bar(r, FNBars, bottom=TPBars, color='#f9bc86', edgecolor='white', width=barWidth, label='False Negative')
     
     plt.xticks(r, labels)
-    plt.xlabel("Fraction of Source Image above 2x Average Noise in Lens")
-    plt.ylabel("Percentage")
-    plt.legend()
-    plt.title("Percentage of True Positives and False Negatives per Bin")# per binned (Source above 2x average noise) Interval")
+    plt.xlabel("Fraction of Source Image above 2x Average Noise in Lens", fontsize=25)
+    plt.ylabel("Percentage", fontsize=25)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=15)
+    plt.legend(fontsize=15)
+    plt.title("Percentage of True Positives and False Negatives per Bin", fontsize=25)# per binned (Source above 2x average noise) Interval")
     plt.grid(color='grey', linestyle='dashed', linewidth=1)
 
     plt.show()
@@ -307,10 +315,12 @@ def plot_feature_versus_prediction(predictions, feature_list, threshold=None, ti
     plt.plot(positives, preds_positives, 'o', color='blue', label="positives {}".format(len(preds_positives)))
     plt.plot(negatives, preds_negatives, 'o', color='red', label="negatives {}".format(len(preds_negatives)))
 
-    plt.title("{} vs network certainty. FNR: {:.2f}".format(title, len(preds_negatives)/sample_size))
-    plt.xlabel("{} of source".format(title))
-    plt.ylabel("Model prediction")
-    plt.legend()
+    plt.title("{} vs network certainty. FNR: {:.2f}".format(title, len(preds_negatives)/sample_size), fontsize=25)
+    plt.xlabel("{} of source".format(title), fontsize=25)
+    plt.ylabel("Model prediction", fontsize=25)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.legend(fontsize=15)
     plt.show()
 
 

@@ -7,13 +7,15 @@ import os
 from Parameters import Parameters
 import tensorflow as tf
 from utils import get_model_paths, get_h5_path_dialog, load_settings_yaml, binary_dialog, hms, load_normalize_img, get_samples, compute_PSF_r, normalize_img, create_dir_if_not_exists, dstack_data, count_TP_TN_FP_FN_and_FB
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras import optimizers
 import matplotlib.pyplot as plt
 import time
 import random
 from scipy.optimize import minimize
 from scipy.special import softmax
 from functools import partial
-from sklearn.metrics import confusion_matrix
 import yaml
 import math
 ############################################################ Functions ############################################################
@@ -118,7 +120,43 @@ def merge_lenses_and_sources(lenses_array, sources_array, num_mock_lenses, data_
 
 
 # Loading a valiation chunk into memory
-def _load_chunk_val(Xlenses_validation, Xsources_validation, Xnegatives_validation, mock_lens_alpha_scaling):
+def load_chunk_test(data_type, mock_lens_alpha_scaling, lenses_test, sources_test, negatives_test, seed=4321):
+
+    # set seed for reproducibility
+    random.seed(seed)
+    np.random.seed(seed)
+
+    start_time = time.time()
+    num_positive = lenses_test.shape[0]
+    
+    # Lets create a balanced test set.
+    num_negative = num_positive
+
+    # Get mock lenses data and labels
+    X_pos, y_pos = merge_lenses_and_sources(lenses_test, sources_test, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=True)
+        
+    # Store Negative data in numpy array and create label vector
+    X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)    
+    y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
+
+    # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
+    negative_sample_contaminant_prob = 0.8
+    for i in range(num_negative):
+        if random.random() <= negative_sample_contaminant_prob:
+            X_neg[i] = np.sqrt(negatives_test[random.randint(0, negatives_test.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
+        else:
+            X_neg[i] = np.sqrt(lenses_test[random.randint(0, lenses_test.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
+
+    # Concatenate the positive and negative examples into one chunk (also the labels)
+    X_chunk = np.concatenate((X_pos, X_neg))
+    y_chunk = np.concatenate((y_pos, y_neg))
+
+    print("Creating test chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), num_positive+num_negative), flush=True)
+    return X_chunk, y_chunk
+
+
+# Loading a valiation chunk into memory
+def load_chunk_val(Xlenses_validation, Xsources_validation, Xnegatives_validation, mock_lens_alpha_scaling):
     start_time = time.time()
     num_positive = Xlenses_validation.shape[0]
     # num_negative = Xnegatives_validation.shape[0] + Xlenses_validation.shape[0]   #also num positive, because the unmerged lenses with sources are also deemed a negative sample.
@@ -210,6 +248,7 @@ def load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths):
         # 5.0 - Predict on validation chunk
         predictions = network.model.predict(X_chunk)
         prediction_matrix[:,model_idx] = np.squeeze(predictions)
+
     # Networks are also need later on, therefore we need to add them to a list
     return prediction_matrix, model_names, individual_scores
 
@@ -260,8 +299,71 @@ def evaluate_ensemble(prediction_matrix, y, model_weights, threshold=0.5):
     error_percentage = error_count/y_hat.shape[0]
     acc = 1.0 - error_percentage
     return acc, y_hat_copy
-    
 
+
+# Loading a chunk into memory
+def load_chunk_train(chunksize, X_lenses, X_negatives, X_sources, data_type, mock_lens_alpha_scaling):
+    start_time = time.time()
+
+    # Half a chunk positive and half negative
+    num_positive = int(chunksize / 2)
+    num_negative = int(chunksize / 2)
+    
+    # Get mock lenses data and labels
+    X_pos, y_pos = merge_lenses_and_sources(X_lenses, X_sources, num_positive, data_type, mock_lens_alpha_scaling, do_deterministic=False)
+        
+    # Store Negative data in numpy array and create label vector
+    X_neg = np.empty((num_negative, X_pos.shape[1], X_pos.shape[2], X_pos.shape[3]), dtype=data_type)
+    y_neg = np.zeros(X_neg.shape[0], dtype=data_type)
+
+    # We want a 80% probability of selecting from the contaminants set, and 20% probability of selecting an LRG from the lenses set.
+    negative_sample_contaminant_prob = 0.8
+    for i in range(num_negative):
+        if random.random() <= negative_sample_contaminant_prob:
+            X_neg[i] = np.sqrt(X_negatives[random.randint(0, X_negatives.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
+        else:
+            X_neg[i] = np.sqrt(X_lenses[random.randint(0, X_lenses.shape[0] - 1)])        #sqrt stretch is needed, because the positive examples are also sqrt stretched
+
+    # Concatenate the positive and negative examples into one chunk (also the labels)
+    X_chunk = np.concatenate((X_pos, X_neg))
+    y_chunk = np.concatenate((y_pos, y_neg))
+
+    print("Creating training chunk took: {}, chunksize: {}".format(hms(time.time() - start_time), chunksize), flush=True)
+    return X_chunk, y_chunk
+
+
+# Construct a multi-layer-perceptron
+# takes as input the predictions of the ensemble and outputs the prediction made by the mlp
+def get_mlp(input_size=5, output_size=1, name='ensemble_mlp'):
+
+    # Define Architecture
+    inputs  = Input(shape=(input_size,))
+    dense   = Dense(10, activation='relu')(inputs)
+    dense   = Dense(15, activation='relu')(dense)
+    dense   = Dense(10, activation='relu')(dense)
+    outputs = Dense(output_size, activation='sigmoid')(dense)
+
+    model = Model(inputs=inputs, outputs=outputs, name=name)
+    
+    #print model architecture
+    print("Ensemble MLP architecture")
+    model.summary()
+
+    #compile the model with optimizer, loss and metric
+    model.compile(optimizer=optimizers.Adam(lr=0.0001),
+                  loss='binary_crossentropy',
+                  metrics=['binary_accuracy'])
+
+    return model
+
+
+# commment
+def train_mlp(mlp, prediction_matrix, y_chunk, epochs=10, x_val=None, y_val=None):
+    history = mlp.fit(prediction_matrix, y_chunk, batch_size=64, epochs=epochs, validation_data=(x_val, y_val))
+    return mlp
+
+
+    
 ############################################################ Script ############################################################
 
 def main():
@@ -269,11 +371,11 @@ def main():
     # 0.0 - Deal with input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--ensemble_name", help="Name of the ensemble. There will be a folder with the given name.", default="test_ensemble", required=False)
-    parser.add_argument("--sample_size", help="The amount of images used in the validation set to optimize ensemble model weights. A maximum of 551 can be used.", default=551, required=False)
+    parser.add_argument("--sample_size", help="The amount of images used in the validation set to optimize ensemble model weights. A maximum of 551 can be used.", default=1024, required=False)
     parser.add_argument("--method", help="What ensemble method should be used? To determine model weights? For example: Nelder-Mead.", default="Nelder-Mead", required=False)
     args = parser.parse_args()
 
-    ###
+    ### set root directory
     root_dir_ensembles = "ensembles"
 
     # 0.1 - Create folder that holds Ensembles
@@ -294,42 +396,78 @@ def main():
     h5_paths = get_h5_path_dialog(model_paths)
 
     # 4.0 - Select random sample from the data (with replacement)
-    sample_size = 551
     sample_size = int(args.sample_size)
     # sample_size = int(input("How many samples do you want to create and run (int): "))
-    sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="test", deterministic=False)
+    # if args.method == "mlp":
+    sources_fnames_train, lenses_fnames_train, negatives_fnames_train = get_samples(size=sample_size, type_data="train", deterministic=False)
+    sources_fnames_val, lenses_fnames_val, negatives_fnames_val = get_samples(size=551, type_data="validation", deterministic=False)
+    sources_fnames_test, lenses_fnames_test, negatives_fnames_test = get_samples(size=551, type_data="test", deterministic=True)
+    # if args.method == "Nelder-Mead":
+    #     sources_fnames, lenses_fnames, negatives_fnames = get_samples(size=sample_size, type_data="train", deterministic=False)
 
     # 5.0 - Load unnormalized data in order to calculate the amount of noise in a lens.
     # Create a chunk of data that each neural network understands (preprocessed quite identically)
     PSF_r = compute_PSF_r()  # Used for sources only
-    lenses      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames)
-    sources     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames)
-    negatives   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames)
-
-    # 6.0 - Load a 50/50 positive/negative chunk into memory
-    X_chunk, y_chunk = _load_chunk_val(lenses, sources, negatives, mock_lens_alpha_scaling=(0.02, 0.30))
-
-    # chunk of code that can be used to visualize some images of the given set:
-    if False:
-        for i in range(X_chunk.shape[0]):
-            img = np.squeeze(negatives[i])
-            plt.imshow(img, cmap='gray')
-            plt.axis('off')
-            plt.show()
-
-    # 7.0 - Load ensemble members and perform prediction with it.
-    prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
-
-    # 8.0 - Find ensemble model weights as a vector and store on disk
-    model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method=args.method, verbatim=True)
+    lenses_train      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_train)
+    sources_train     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_train)
+    negatives_train   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_train)
     
-    # 9.0 - Ensemble Evaluation
+    lenses_val       = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_val)
+    sources_val      = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_val)
+    negatives_val    = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_val)
+
+    lenses_test      = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=lenses_fnames_test)
+    sources_test     = load_normalize_img(np.float32, are_sources=True, normalize_dat="per_image", PSF_r=PSF_r, filenames=sources_fnames_test)
+    negatives_test   = load_normalize_img(np.float32, are_sources=False, normalize_dat="per_image", PSF_r=PSF_r, filenames=negatives_fnames_test)
+
+    # lets hook in at this point, in order to train an mlp instead.
+    mlp = get_mlp(input_size=len(model_paths), output_size=1, name=str(args.ensemble_name))
+
+    num_chunks = 2
+    for i in range(num_chunks):
+
+        # 6.0 - Load a 50/50 positive/negative chunk into memory
+        # if args.method == "Nelder-Mead":
+        X_chunk_val, y_chunk_val = load_chunk_val(lenses_val, sources_val, negatives_val, mock_lens_alpha_scaling=(0.02, 0.30))
+        # if args.method == "mlp":
+        X_chunk, y_chunk = load_chunk_train(int(args.sample_size), lenses_train, negatives_train, sources_train, np.float32, mock_lens_alpha_scaling=(0.02, 0.30))
+
+        # chunk of code that can be used to visualize some images of the given set:
+        if False:
+            for i in range(X_chunk.shape[0]):
+                img = np.squeeze(X_chunk[i])
+                plt.imshow(img, cmap='gray')
+                plt.axis('off')
+                print(y_chunk)
+                plt.show()
+
+        # 7.0 - Load ensemble members and perform prediction with it.
+        prediction_matrix, model_names, individual_scores = load_models_and_predict(X_chunk, y_chunk, model_paths, h5_paths)
+
+        prediction_matrix_val, model_names_val, individual_scores_val = load_models_and_predict(X_chunk_val, y_chunk_val, model_paths, h5_paths)
+
+        mlp = train_mlp(mlp, prediction_matrix, y_chunk, epochs=5, x_val=prediction_matrix_val, y_val=y_chunk_val)
+
+    # Create a test chunk:
+    X_chunk_test, y_chunk_test = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
+
+    # if we created an mlp to predict y_hat based on all ensemble members their predictions:
+    if args.method == "mlp":
+        mlp.save_weights(os.path.join(ensemble_dir, "ensemble_mlp.h5"))
+        prediction_matrix_test, model_names, individual_scores = load_models_and_predict(X_chunk_test, y_chunk_test, model_paths, h5_paths)
+        y_hat = mlp.predict(prediction_matrix_test)
+        print("y_hat mlp ensemble: {}".format([y for y in np.squeeze(y_hat)]))
+        loss, acc = mlp.evaluate(prediction_matrix_test, y_chunk_test)
+        print("mlp loss = {}, acc = {}".format(loss, acc))
+    
+    # 9.0 - Ensemble Evaluation on Nelder-Mead
     threshold = 0.5
-    acc, y_hat = evaluate_ensemble(prediction_matrix, y_chunk, model_weights, threshold=threshold)
+    model_weights = find_ensemble_weights(prediction_matrix, y_chunk, model_names, method=args.method, verbatim=True)
+    if args.method == "Nelder-Mead":
+        acc, y_hat = evaluate_ensemble(prediction_matrix_val, y_chunk_val, model_weights, threshold=threshold)
+    print("Model Weight Vector:\t{}".format(model_weights))
     print("\n\nAccuracy of Ensemble\t{:.3f} at threshold: {}".format(acc, threshold))
     print("Model names:\t\t{}".format(model_names))
-    print("Model Weight Vector:\t{}".format(model_weights))
-
 
     ### f_beta graph and its paramters
     beta_squarred           = 0.03                                  # For f-beta calculation
@@ -337,11 +475,10 @@ def main():
     threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
     colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 
-
     # I would like to see an f_beta figure of the ensemble that can be compared with a single model's f_beta figure.
     f_betas, precision_data, recall_data = [], [], []
     for p_threshold in threshold_range:
-        (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(y_hat, y_chunk, p_threshold, beta_squarred)
+        (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(y_hat, y_chunk_val, p_threshold, beta_squarred)
         f_betas.append(F_beta)
         precision_data.append(precision)
         recall_data.append(recall)
@@ -357,7 +494,7 @@ def main():
     plt.title("Ensemble F_beta, where Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
     figure = plt.gcf() # get current figure
     axes = plt.gca()
-    axes.set_ylim([0.63, 1.00])
+    # axes.set_ylim([0.63, 1.00])
     figure.set_size_inches(12, 8)       # (12,8), seems quite fine
     plt.grid(color='grey', linestyle='dashed', linewidth=1)
     plt.legend()
