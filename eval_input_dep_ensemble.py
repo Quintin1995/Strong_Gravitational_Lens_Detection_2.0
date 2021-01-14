@@ -22,12 +22,35 @@ from create_input_dep_ensemble import get_simple_ensemble_model, get_resnet18_en
 ## Most code is copied from create_input_dep_ensemble
 
 
+def show_acc_matrix():
+    print()
+    print("acc: {0:.3f} +- {1:.3f}".format(ensemble_accs[0], ensemble_stds[0]))
+    print("f_b: {0:.3f} +- {1:.3f}".format(ensemble_fbeta_means[0], ensemble_fbeta_stds[0]))
+    print("pre: {0:.3f} +- {1:.3f}".format(ensemble_precision_means[0], ensemble_precision_stds[0]))
+    print("rec: {0:.3f} +- {1:.3f}".format(ensemble_recall_means[0], ensemble_recall_stds[0]))
+    
+
+
 # Directory stuff
 rootdir       = "ensembles"
-subdir        = "final_ensemble_experiment"
+subdir        = "final_ensemble_exp_6mems_DNN_model"
 ensembles_dir = os.path.join(rootdir, subdir)
 ens_dirs      = os.listdir(ensembles_dir)
 colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
+
+
+# are lists, but store only one item for now.
+ensemble_accs   = list()
+ensemble_stds   = list()
+
+ensemble_precision_means = list()
+ensemble_precision_stds  = list()
+
+ensemble_recall_means = list()
+ensemble_recall_stds  = list()
+
+ensemble_fbeta_means = list()
+ensemble_fbeta_stds  = list()
 
 
 # Load test data into RAM before evaluation of each ensemble
@@ -47,7 +70,7 @@ if True:
     # Use the test data for {accuracy, f_beta, precision, recall} performance metric evaluations.
     X_chunk_test, y_chunk_test   = load_chunk_test(np.float32, (0.02, 0.30), lenses_test, sources_test, negatives_test)
 
-
+accs_vectors = list()
 f_beta_vectors = list()
 precision_data_vectors = list()
 recall_data_vectors = list()
@@ -110,18 +133,52 @@ for ens_dir in ens_dirs:
     threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
 
     # I would like to see an f_beta figure of the ensemble that can be compared with a single model's f_beta figure.
-    f_betas, precision_data, recall_data = [], [], []
+    accs, f_betas, precision_data, recall_data = [], [], [], []
     print("\n\n accuracies per f_beta bin:")
     for p_threshold in threshold_range:
         (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(ens_y_hat, y_chunk_test, p_threshold, beta_squarred)
         print("acc: {0:.3f} on threshold: {1:.3f}".format(accuracy, p_threshold))
+        accs.append(accuracy)
         f_betas.append(F_beta)
         precision_data.append(precision)
         recall_data.append(recall)
     # Keep track of each fbeta, precision and recall curve for each ensemble:
+    accs_vectors.append(accs)
     f_beta_vectors.append(f_betas)
     precision_data_vectors.append(precision_data)
     recall_data_vectors.append(recall_data)
+
+
+# transform to 2d numpy array
+f_beta_matrix = np.asarray(f_beta_vectors)
+precision_matrix = np.asarray(precision_data_vectors)
+recall_matrix = np.asarray(recall_data_vectors)
+
+# Calculate mean-std, precision-std en recall_std per model collection
+mu_fbeta    = np.mean(f_beta_matrix, axis=0)
+stds_fbeta  = np.std(f_beta_matrix, axis=0)
+
+precisions     = np.mean(precision_matrix, axis=0)
+precision_stds = np.std(precision_matrix, axis=0)
+
+recalls      = np.mean(recall_matrix, axis=0)
+recalls_stds = np.std(recall_matrix, axis=0)
+
+
+# Calculate mean binary accuracy and standard deviation of the collection of models
+test_accs = np.asarray(accs_vectors)
+ensemble_accs.append(np.mean(test_accs))
+ensemble_stds.append(np.std(test_accs))
+
+ensemble_precision_means.append(precisions[(precisions.shape[0]//2-1)])
+ensemble_precision_stds.append(precision_stds[(precision_stds.shape[0]//2-1)])
+
+ensemble_recall_means.append(recalls[(recalls.shape[0]//2-1)])
+ensemble_recall_stds.append(recalls_stds[(recalls_stds.shape[0]//2-1)])
+
+ensemble_fbeta_means.append(mu_fbeta[(mu_fbeta.shape[0]//2-1)])
+ensemble_fbeta_stds.append(stds_fbeta[(stds_fbeta.shape[0]//2-1)])
+
 
 # step 7.0 - calculate std and mean - based on f_beta_vectors
 colls = list(zip(*f_beta_vectors))
@@ -139,10 +196,10 @@ colls_recall = list(zip(*recall_data_vectors))
 recall_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_recall)))))
 
 # step 7.2 - Plotting all lines
-plt.plot(list(threshold_range), precision_mu, ":", color=colors[0], label="precision mean", alpha=0.9, linewidth=3)
-plt.plot(list(threshold_range), recall_mu, "--", color=colors[0], label="recall mean", alpha=0.9, linewidth=3)
+plt.plot(list(threshold_range), precision_mu, ":", color=colors[0], label="Precision mean", alpha=0.9, linewidth=3)
+plt.plot(list(threshold_range), recall_mu, "--", color=colors[0], label="Recall mean", alpha=0.9, linewidth=3)
 plt.plot(list(threshold_range), upline, colors[0])
-plt.plot(list(threshold_range), means, colors[0], label="3 Members Ensemble")
+plt.plot(list(threshold_range), means, colors[0], label="6 Members Ensemble")
 plt.plot(list(threshold_range), lowline, colors[0])
 plt.fill_between(list(threshold_range), upline, lowline, color=colors[0], alpha=0.5) 
 
@@ -157,4 +214,6 @@ fname = '{}.png'.format(os.path.join(ensembles_dir, ens_dir, "f_beta_plot"))
 plt.savefig(fname, dpi=100)
 plt.grid(color='grey', linestyle='dashed', linewidth=1)
 plt.legend()
+show_acc_matrix()
 plt.show()
+
