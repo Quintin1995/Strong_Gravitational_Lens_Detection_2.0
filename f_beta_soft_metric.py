@@ -3,7 +3,6 @@ import tensorflow as tf
 
 class SoftFBeta:
 
-
     def __init__(self, beta = 0.17):
         tf.compat.v1.disable_eager_execution()
         self.beta = beta
