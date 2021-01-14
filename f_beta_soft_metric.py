@@ -9,9 +9,11 @@ class SoftFBeta:
         self.beta = beta
 
 
-    def _precision (self, y_true, y_pred):
+    def _precision_old (self, y_true, y_pred):
         return tf.reduce_sum((1 - y_true) * (1 - y_pred)) / (tf.reduce_sum((1 - y_true)) + K.epsilon())
 
+    def _precision (self, y_true, y_pred):
+        return tf.reduce_sum(y_pred * y_true) / (tf.reduce_sum((y_pred * y_true) + (y_pred * (1 - y_true))) + K.epsilon())
 
     def _recall (self, y_true, y_pred):
         return tf.reduce_sum(y_true * y_pred) / (tf.reduce_sum(y_true) + K.epsilon())
