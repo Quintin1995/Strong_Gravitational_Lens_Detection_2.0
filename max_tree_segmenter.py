@@ -107,6 +107,7 @@ def _contruct_max_tree_and_filter(img, connectivity_kernel, area_threshold):
     # Bounding box parameters
     Wmin,Wmax           = 3, 60         # Emperically determined
     Hmin,Hmax           = 3, 60         # Emperically determined
+    rr                  = 0.45 
 
     # Construct a Max-Tree
     mxt = siamxt.MaxTreeAlpha(img, connectivity_kernel)
@@ -117,10 +118,11 @@ def _contruct_max_tree_and_filter(img, connectivity_kernel, area_threshold):
     # Computing boudingbox
     dx = mxt.node_array[7,:] - mxt.node_array[6,:]   # These specific idxs were predetermined, by the author of the package.
     dy = mxt.node_array[10,:] - mxt.node_array[9,:]  # These specific idxs were predetermined, by the author of the package.
-    RR = 1.0 * area_threshold / (dx*dy)                        # Rectangularity
+    area = mxt.node_array [3,:]                      # get area from max tree datastructure
+    RR = 1.0 * area / (dx*dy)                        # Rectangularity
 
     # Filter - Selecting nodes that fit the criteria
-    nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & ((RR>1.1) | (RR<0.9))  #Emperically determined
+    nodes = (dx > Hmin) & (dx<Hmax) & (dy>Wmin) & (dy<Wmax) & (RR > rr)  #Emperically determined
     mxt.contractDR(nodes)     # Filter out nodes in the Max-Tree that do not fit the given criteria
 
     # Get the image from the max-tree data structure
@@ -166,8 +168,8 @@ def max_tree_segmenter(numpy_array,
     
     # Define a circular mask based on the incoming image dimensions
     r                     = square_crop_size//2       # Radius
-    cx                    = numpy_array.shape[1]//2
-    cy                    = numpy_array.shape[2]//2
+    cx                    = numpy_array.shape[1]//2     #center of x dimension
+    cy                    = numpy_array.shape[2]//2     #center of y dimension
 
     if use_seg_imgs:
         copy_dat = np.copy(numpy_array)

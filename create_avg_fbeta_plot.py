@@ -35,6 +35,9 @@ def AUC_discrete(xs, ys):
 names               = ["binary_crossentropy", "f_beta_metric"  , "f_beta_soft_metric", "macro_softloss_f1", "macro_double_softloss_f1", "f_beta_softloss"]
 metric_interests    = ["loss"               ,"metric"          , "metric"            , "loss"             , "loss"                    , "loss"]
 
+names               = ["MT_final"]
+metric_interests    = ["loss"]
+
 if False:
     names               = [ "f_beta_softloss"]
     metric_interests    = [ "loss"]
@@ -49,6 +52,7 @@ stepsize                = 0.01                                  # For f-beta cal
 threshold_range         = np.arange(stepsize, 1.0, stepsize)    # For f-beta calculation
 
 root = os.path.join("models", "final_experiment1_loss_functions")
+root = os.path.join("models", "final_experiment2_max_tree")
 
 colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 ########################################## Script ##########################################
