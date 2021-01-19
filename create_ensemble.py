@@ -22,7 +22,7 @@ import math
 
 
 # Dump ensemble parameters to a yaml file as a dictionary
-def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores, precision, recall, fbeta):
+def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, precision, recall, fbeta):
     ensemble_dict = {
         "model_names":       model_names,
         "model_weights":     [float(str(x)) for x in model_weights],
@@ -31,7 +31,6 @@ def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, t
         "accuracy":          acc,
         "threshold":         threshold,
         "sample_size":       sample_size,
-        "individual_scores": ["{} {:.3f}".format(str(met), float(str(score))) for met, score in individual_scores],
         "precision":         precision,
         "recall":            recall,
         "f_beta":            fbeta
@@ -506,7 +505,7 @@ def main():
     precision = precision_data[(len(threshold_range)//2) + 1]
     recall    = recall_data[(len(threshold_range)//2) + 1]
     fbeta     = f_betas[(len(threshold_range)//2) + 1]
-    _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, individual_scores, precision, recall, fbeta)
+    _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, precision, recall, fbeta)
 
     
 

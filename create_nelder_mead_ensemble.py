@@ -61,6 +61,25 @@ def mean_square_error(y, Xs, w0):
     return mean
 
 
+# Dump ensemble parameters to a yaml file as a dictionary
+def _write_params_to_yaml(model_names, model_weights, args, ensemble_dir, acc, threshold, sample_size, precision, recall, fbeta):
+    ensemble_dict = {
+        "model_names":       model_names,
+        "model_weights":     [float(str(x)) for x in model_weights],
+        "ensemble_size":     len(model_names),
+        "accuracy":          acc,
+        "threshold":         threshold,
+        "sample_size":       sample_size,
+        "precision":         precision,
+        "recall":            recall,
+        "f_beta":            fbeta
+
+    }
+    ensemble_params_fname = os.path.join(ensemble_dir, "ensemble_parameters.yaml")
+    with open(ensemble_params_fname, 'w') as outfile:
+        yaml.dump(ensemble_dict, outfile, default_flow_style=False)
+
+
 # Given a prediction matrix it will try to find weights for each model.
 # Via a minimization problem.
 # The prediction matrix should have number of item in chunk as rows and the number of members as columns (NxM)
@@ -192,13 +211,14 @@ def main():
     colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
 
     # calculate different performance metrics on current model
-    f_betas, precision_data, recall_data = [], [], []
+    f_betas, precision_data, recall_data, accs_data = [], [], [], []
     for p_threshold in threshold_range:
         (TP, TN, FP, FN, precision, recall, fp_rate, accuracy, F_beta) = count_TP_TN_FP_FN_and_FB(ens_y_hat, y_chunk_test, p_threshold, beta_squarred)
         print("acc: {0:.3f} on threshold: {1:.3f}".format(accuracy, p_threshold))
         f_betas.append(F_beta)
         precision_data.append(precision)
         recall_data.append(recall)
+        accs_data.append(accuracy)
 
     # Plotting all lines
     plt.plot(list(threshold_range), f_betas, colors[0], label = "f_beta")
@@ -218,6 +238,14 @@ def main():
     plt.savefig('{}.png'.format(os.path.join(ensemble_dir, "f_beta_plot")))
     plt.show()
 
+    # 10.0 - Create a dictionary that will hold Ensemble parameters
+    acc       = accs_data[(len(threshold_range)//2) + 1]
+    acc       = float("{:.03f}".format(acc))   # this conversion was somehow necessary.
+    precision = precision_data[(len(threshold_range)//2) + 1]
+    recall    = recall_data[(len(threshold_range)//2) + 1]
+    fbeta     = f_betas[(len(threshold_range)//2) + 1]
+    threshold = 0.5
+    _write_params_to_yaml(model_names, mem_weight_vec, args, ensemble_dir, acc, threshold, settings_dict["chunk_size"], precision, recall, fbeta)
 
 ############################################################ Script ############################################################
 
