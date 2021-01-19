@@ -1,0 +1,22 @@
+# Paths to models that should be members of the ensemble. Should reference a .h5 file.
+models:
+    - 'models/final_experiment1_loss_functions/12_01_2020_00h_47m_35s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/01_14_2021_16h_30m_32s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
+    #- 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
+
+# Optimization Parameters
+ens_name:     "test_NM_ensemble_v0"   #Name of the ensemble. There will be a folder with the given name.
+chunk_size:   4096                    # The size of the chunks that the ensemble will be trained on.
+
+# Data Loading
+lens_frac_train:     0.5
+source_frac_train:   0.05
+negative_frac_train: 0.5
+
+lens_frac_val:     1.0
+source_frac_val:   0.25
+negative_frac_val: 1.0
+
+lens_frac_test:     1.0
+source_frac_test:   0.25
+negative_frac_test: 1.0
