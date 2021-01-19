@@ -1,0 +1,34 @@
+# Paths to models that should be members of the ensemble. Should reference a .h5 file.
+models:
+    - 'models/final_experiment1_loss_functions/12_01_2020_06h_26m_39s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_28_2020_20h_59m_28s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/11_29_2020_18h_30m_56s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
+
+do_training: True     # Set to true if you want to train an ensemble model.
+do_test_eval: True     # Set to true if an ensemble has been trained and you want to test its performance on a test set.
+
+# Training
+num_chunks:   2000                               # The amount of chunks that the ensemble will be trained for.
+chunk_size:   4096                               # The size of the chunks that the ensemble will be trained on.
+ens_name:     "peregrine_3mems_v8"               # Name of the ensemble. There will be a folder with the given name.
+network_name: "resnet18"                         # Name of the network used, in order to load the right architecture
+
+# Network
+learning_rate: 0.0001
+loss_funcion: "categorical_crossentropy"
+last_activation_function: "softmax"              #"sigmmoid", "softmax"
+metrics:                                         # this is a list, with 1 item.
+    - "acc"
+
+# Data Loading
+lens_frac_train:     1.0
+source_frac_train:   1.0
+negative_frac_train: 1.0
+
+lens_frac_val:     1.0
+source_frac_val:   1.0
+negative_frac_val: 1.0
+
+lens_frac_test:     1.0
+source_frac_test:   1.0
+negative_frac_test: 1.0
