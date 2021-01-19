@@ -34,11 +34,10 @@ def show_acc_matrix(ensemble_accs,
 def main():
     # Directory stuff
     rootdir       = "ensembles"
-    subdir        = "final_ensemble_exp_3mems_NM"
+    subdir        = "final_ensemble_exp_6mems_NM"
     ensembles_dir = os.path.join(rootdir, subdir)
     ens_dirs      = os.listdir(ensembles_dir)
     colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
-
 
     # are lists, but store only one item for now.
     ensemble_accs   = list()
