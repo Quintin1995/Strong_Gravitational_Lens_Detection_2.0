@@ -193,7 +193,7 @@ def main():
     # Plotting layout and styling
     plt.xlabel("p threshold", fontsize=25)
     plt.ylabel("F", fontsize=25)
-    plt.title("F_beta score - Beta = {0:.2f} - Nelder-Mead - 6 Members".format(math.sqrt(beta_squarred)), fontsize=25)
+    plt.title("F_beta score - Beta = {0:.2f} - Nelder-Mead - {} Members".format(math.sqrt(beta_squarred), len(model_names)), fontsize=25)
     figure = plt.gcf() # get current figure
     axes = plt.gca()
     axes.set_ylim([0.63, 1.00])
