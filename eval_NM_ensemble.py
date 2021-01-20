@@ -34,7 +34,7 @@ def show_acc_matrix(ensemble_accs,
 def main():
     # Directory stuff
     rootdir       = "ensembles"
-    subdir        = "final_ensemble_exp_6mems_NM"
+    subdir        = "final_ensemble_exp_3mems_NM"
     ensembles_dir = os.path.join(rootdir, subdir)
     ens_dirs      = os.listdir(ensembles_dir)
     colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
@@ -193,7 +193,7 @@ def main():
     # Plotting layout and styling
     plt.xlabel("p threshold", fontsize=25)
     plt.ylabel("F", fontsize=25)
-    plt.title("F_beta score - Beta = {0:.2f} - Nelder-Mead - {} Members".format(math.sqrt(beta_squarred), len(model_names)), fontsize=25)
+    plt.title("F_beta score - Beta = {0:.2f} - Nelder-Mead - {1} Members".format(math.sqrt(beta_squarred), len(model_names)), fontsize=25)
     figure = plt.gcf() # get current figure
     axes = plt.gca()
     axes.set_ylim([0.63, 1.00])

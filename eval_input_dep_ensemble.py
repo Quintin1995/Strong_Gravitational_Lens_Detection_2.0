@@ -33,7 +33,7 @@ def show_acc_matrix():
 
 # Directory stuff
 rootdir       = "ensembles"
-subdir        = "final_ensemble_exp_6mems_DNN_model"
+subdir        = "final_ensemble_exp_3mems_DNN_model"
 ensembles_dir = os.path.join(rootdir, subdir)
 ens_dirs      = os.listdir(ensembles_dir)
 colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
@@ -199,13 +199,13 @@ recall_mu = np.asarray(list(map(np.mean,(map(np.asarray, colls_recall)))))
 plt.plot(list(threshold_range), precision_mu, ":", color=colors[0], label="Precision mean", alpha=0.9, linewidth=3)
 plt.plot(list(threshold_range), recall_mu, "--", color=colors[0], label="Recall mean", alpha=0.9, linewidth=3)
 plt.plot(list(threshold_range), upline, colors[0])
-plt.plot(list(threshold_range), means, colors[0], label="6 Members Ensemble")
+plt.plot(list(threshold_range), means, colors[0], label="Fb mean")
 plt.plot(list(threshold_range), lowline, colors[0])
 plt.fill_between(list(threshold_range), upline, lowline, color=colors[0], alpha=0.5) 
 
-plt.xlabel("p threshold")
-plt.ylabel("F")
-plt.title("F_beta score - Beta = {0:.2f}".format(math.sqrt(beta_squarred)))
+plt.xlabel("p threshold", fontsize=25)
+plt.ylabel("F", fontsize=25)
+plt.title("F_beta score - Beta = {0:.2f} - IDE - {1} Members".format(math.sqrt(beta_squarred), len(model_names)), fontsize=25)
 figure = plt.gcf() # get current figure
 axes = plt.gca()
 axes.set_ylim([0.63, 1.00])
