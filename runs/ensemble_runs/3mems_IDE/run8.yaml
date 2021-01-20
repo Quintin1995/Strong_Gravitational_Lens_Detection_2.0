@@ -1,7 +1,7 @@
 # Paths to models that should be members of the ensemble. Should reference a .h5 file.
 models:
     - 'models/final_experiment1_loss_functions/12_01_2020_06h_26m_39s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
-    - 'models/final_experiment1_loss_functions/11_28_2020_20h_59m_28s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/01_15_2021_18h_26m_51s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_29_2020_18h_30m_56s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
 
 do_training: True     # Set to true if you want to train an ensemble model.

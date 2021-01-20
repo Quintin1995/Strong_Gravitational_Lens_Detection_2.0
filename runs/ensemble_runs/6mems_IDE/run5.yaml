@@ -1,7 +1,7 @@
 # Paths to models that should be members of the ensemble. Should reference a .h5 file.
 models:
     - 'models/final_experiment1_loss_functions/11_30_2020_19h_36m_15s_binary_crossentropy/checkpoints/binary_crossentropy_best_val_loss.h5'
-    - 'models/final_experiment1_loss_functions/11_28_2020_14h_51m_39s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
+    - 'models/final_experiment1_loss_functions/01_15_2021_15h_07m_52s_f_beta_softloss/checkpoints/f_beta_softloss_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_29_2020_15h_16m_27s_macro_softloss_f1/checkpoints/macro_softloss_f1_best_val_loss.h5'
     - 'models/final_experiment1_loss_functions/11_27_2020_17h_14m_07s_f_beta_soft_metric/checkpoints/f_beta_soft_metric_best_val_metric.h5'
     - 'models/final_experiment1_loss_functions/11_30_2020_13h_45m_18s_macro_double_softloss_f1/checkpoints/macro_double_softloss_f1_best_val_loss.h5'
