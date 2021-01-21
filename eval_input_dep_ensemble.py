@@ -33,7 +33,7 @@ def show_acc_matrix():
 
 # Directory stuff
 rootdir       = "ensembles"
-subdir        = "final_ensemble_exp_3mems_DNN_model"
+subdir        = "final_ensemble_exp_6mems_IDE"
 ensembles_dir = os.path.join(rootdir, subdir)
 ens_dirs      = os.listdir(ensembles_dir)
 colors = ['r', 'c', 'green', 'orange', 'lawngreen', 'b', 'plum', 'darkturquoise', 'm']
